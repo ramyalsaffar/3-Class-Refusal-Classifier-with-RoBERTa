@@ -162,49 +162,6 @@ else:
 #------------------------------------------------------------------------------
 
 
-# AWS Secrets Handler Class
-#---------------------------
-# Only loaded if AWS is available
-if AWS_AVAILABLE:
-    class SecretsHandler:
-        """Handle AWS Secrets Manager operations"""
-
-        def __init__(self, region='us-east-1'):
-            self.region = region
-            self.client = boto3.client('secretsmanager', region_name=region)
-
-        def get_secret(self, secret_name):
-            """Retrieve secret from AWS Secrets Manager"""
-            try:
-                response = self.client.get_secret_value(SecretId=secret_name)
-
-                if 'SecretString' in response:
-                    secret = response['SecretString']
-                    try:
-                        return json.loads(secret)
-                    except json.JSONDecodeError:
-                        return secret
-                else:
-                    return response['SecretBinary']
-
-            except ClientError as e:
-                error_code = e.response['Error']['Code']
-                print(f"❌ Error retrieving secret '{secret_name}': {error_code}")
-                raise
-
-        def get_api_key(self, secret_name, key_field='api_key'):
-            """Retrieve API key from Secrets Manager"""
-            secret = self.get_secret(secret_name)
-
-            if isinstance(secret, dict):
-                return secret.get(key_field) or secret.get(key_field.upper())
-            else:
-                return secret
-
-
-#------------------------------------------------------------------------------
-
-
 # Execute Code Files
 #-------------------
 
@@ -221,19 +178,21 @@ exec(open(CodeFilePath+"02-Constants.py").read())
 print("✓ Loaded 02-Constants.py")
 
 
-# Load remaining code files (03-17, excluding 16 and 17)
+# Load remaining code files (03-19, excluding 18 and 19)
 #--------------------------------------------------------
-# Files are numbered 00-17:
+# Files are numbered 00-19:
 #   00-Imports.py (this file)
 #   01-Config.py (loaded above)
 #   02-Constants.py (loaded above)
-#   03-05: Data Collection (PromptGenerator, ResponseCollector, DataLabeler)
-#   06-08: Model Components (Dataset, Classifier, WeightedLoss)
-#   09: Training (Trainer)
-#   10-13: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester, Visualizer)
-#   14-15: Orchestration (RefusalPipeline, ExperimentRunner)
-#   16-Execute.py (main entry point - don't load)
-#   17-Analyze.py (analysis entry point - don't load)
+#   03-AWSConfig.py (AWS configuration)
+#   04-SecretsHandler.py (AWS Secrets Manager)
+#   05-07: Data Collection (PromptGenerator, ResponseCollector, DataLabeler)
+#   08-10: Model Components (Dataset, Classifier, WeightedLoss)
+#   11: Training (Trainer)
+#   12-15: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester, Visualizer)
+#   16-17: Orchestration (RefusalPipeline, ExperimentRunner)
+#   18-Execute.py (main entry point - don't load)
+#   19-Analyze.py (analysis entry point - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
@@ -243,8 +202,8 @@ code_files_ls = [x for x in code_files_ls if x not in [
     "00-Imports.py",      # This file
     "01-Config.py",        # Already loaded
     "02-Constants.py",     # Already loaded
-    "16-Execute.py",       # Execution script
-    "17-Analyze.py"        # Execution script
+    "18-Execute.py",       # Execution script
+    "19-Analyze.py"        # Execution script
 ]]
 
 # Loop over code files and load them
