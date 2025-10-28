@@ -178,9 +178,9 @@ exec(open(CodeFilePath+"02-Constants.py").read())
 print("✓ Loaded 02-Constants.py")
 
 
-# Load remaining code files (03-19, excluding 18 and 19)
+# Load remaining code files (03-21, excluding 20 and 21)
 #--------------------------------------------------------
-# Files are numbered 00-19:
+# Files are numbered 00-21:
 #   00-Imports.py (this file)
 #   01-Config.py (loaded above)
 #   02-Constants.py (loaded above)
@@ -189,10 +189,12 @@ print("✓ Loaded 02-Constants.py")
 #   05-07: Data Collection (PromptGenerator, ResponseCollector, DataLabeler)
 #   08-10: Model Components (Dataset, Classifier, WeightedLoss)
 #   11: Training (Trainer)
-#   12-15: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester, Visualizer)
-#   16-17: Orchestration (RefusalPipeline, ExperimentRunner)
-#   18-Execute.py (main entry point - don't load)
-#   19-Analyze.py (analysis entry point - don't load)
+#   12-14: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
+#   15-16: Interpretability (AttentionVisualizer, ShapAnalyzer)
+#   17: Visualization (Visualizer)
+#   18-19: Orchestration (RefusalPipeline, ExperimentRunner)
+#   20-Execute.py (main entry point - don't load)
+#   21-Analyze.py (analysis entry point - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
@@ -202,8 +204,8 @@ code_files_ls = [x for x in code_files_ls if x not in [
     "00-Imports.py",      # This file
     "01-Config.py",        # Already loaded
     "02-Constants.py",     # Already loaded
-    "18-Execute.py",       # Execution script
-    "19-Analyze.py"        # Execution script
+    "20-Execute.py",       # Execution script
+    "21-Analyze.py"        # Execution script
 ]]
 
 # Loop over code files and load them

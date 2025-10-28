@@ -281,6 +281,36 @@ class RefusalPipeline:
         )
         analysis_results['adversarial'] = adv_results
 
+        # Attention visualization
+        print("\n--- Attention Visualization ---")
+        attention_viz = AttentionVisualizer(self.model, self.tokenizer, DEVICE)
+        attention_results = attention_viz.analyze_samples(
+            test_df,
+            num_samples=INTERPRETABILITY_CONFIG['attention_samples_per_class']
+        )
+        analysis_results['attention'] = attention_results
+
+        # SHAP analysis (if enabled)
+        if INTERPRETABILITY_CONFIG['shap_enabled']:
+            print("\n--- SHAP Analysis ---")
+            try:
+                shap_analyzer = ShapAnalyzer(self.model, self.tokenizer, DEVICE)
+                shap_results = shap_analyzer.analyze_samples(
+                    test_df,
+                    num_samples=INTERPRETABILITY_CONFIG['shap_samples']
+                )
+                analysis_results['shap'] = shap_results
+            except ImportError:
+                print("⚠️  SHAP not installed - skipping SHAP analysis")
+                print("   Install with: pip install shap")
+                analysis_results['shap'] = None
+            except Exception as e:
+                print(f"⚠️  SHAP analysis failed: {e}")
+                analysis_results['shap'] = None
+        else:
+            print("\n--- SHAP Analysis (Disabled) ---")
+            analysis_results['shap'] = None
+
         return analysis_results
 
     def generate_visualizations(self, history: Dict, analysis_results: Dict):

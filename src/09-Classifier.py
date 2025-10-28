@@ -37,21 +37,25 @@ class RefusalClassifier(nn.Module):
         self.classifier = nn.Linear(self.hidden_size, self.num_classes)
 
     def forward(self, input_ids: torch.Tensor,
-                attention_mask: torch.Tensor) -> torch.Tensor:
+                attention_mask: torch.Tensor,
+                output_attentions: bool = False):
         """
         Forward pass.
 
         Args:
             input_ids: Token IDs (batch_size, seq_length)
             attention_mask: Attention mask (batch_size, seq_length)
+            output_attentions: Whether to return attention weights
 
         Returns:
-            Logits (batch_size, num_classes)
+            If output_attentions=False: Logits (batch_size, num_classes)
+            If output_attentions=True: Tuple of (logits, attention_weights)
         """
         # Get RoBERTa outputs
         outputs = self.roberta(
             input_ids=input_ids,
-            attention_mask=attention_mask
+            attention_mask=attention_mask,
+            output_attentions=output_attentions
         )
 
         # Use [CLS] token representation (pooled output)
@@ -63,6 +67,8 @@ class RefusalClassifier(nn.Module):
         # Classification
         logits = self.classifier(pooled_output)  # (batch_size, num_classes)
 
+        if output_attentions:
+            return logits, outputs.attentions
         return logits
 
     def predict_with_confidence(self, input_ids: torch.Tensor,

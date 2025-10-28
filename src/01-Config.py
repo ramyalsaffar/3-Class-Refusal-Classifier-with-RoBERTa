@@ -143,6 +143,27 @@ ANALYSIS_CONFIG = {
 }
 
 
+# Interpretability Configuration
+#--------------------------------
+INTERPRETABILITY_CONFIG = {
+    # Attention Visualization
+    'attention_samples_per_class': 10,          # Samples per class for attention analysis
+    'attention_layer_index': -1,                # Which layer to visualize (-1 = last layer)
+    'attention_top_k_tokens': 15,               # Number of top tokens to highlight
+    'visualize_all_layers': False,              # Whether to create all-layer comparison plots
+
+    # SHAP Analysis
+    'shap_enabled': True,                       # Enable SHAP analysis (requires shap package)
+    'shap_samples': 20,                         # Number of samples for SHAP analysis
+    'shap_background_samples': 50,              # Background samples for SHAP explainer
+    'shap_max_display': 20,                     # Max features to display in summary plots
+
+    # General Interpretability
+    'save_interpretability_results': True,      # Save interpretation results
+    'generate_example_visualizations': True     # Generate example plots per class
+}
+
+
 # Experiment Configuration
 #-------------------------
 EXPERIMENT_CONFIG = {
