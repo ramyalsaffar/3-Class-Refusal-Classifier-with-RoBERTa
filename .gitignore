@@ -205,3 +205,39 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+# ============================================
+# PROJECT SPECIFIC - Refusal Classifier
+# ============================================
+
+# Data directories (contain large files and API responses)
+data/raw/*.json
+data/responses/*.json
+data/responses/*.csv
+data/processed/*.csv
+data/splits/*.csv
+
+# Model checkpoints (large files)
+models/*.pt
+models/*.pth
+models/*.bin
+
+# Results and outputs
+results/*.json
+results/*.csv
+visualizations/*.png
+visualizations/*.pdf
+reports/*.txt
+reports/*.pdf
+
+# API keys (CRITICAL - never commit!)
+*.key
+*.pem
+secrets/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
