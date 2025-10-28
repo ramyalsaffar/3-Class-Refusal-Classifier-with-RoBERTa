@@ -109,8 +109,8 @@ class RefusalPipeline:
             print(f"  Class {i} ({CLASS_NAMES[i]}): {count} ({pct:.1f}%)")
 
         # Save labeled data
-        labeled_path = os.path.join(data_processed_path, "labeled_responses.csv")
-        responses_df.to_csv(labeled_path, index=False)
+        labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")
+        responses_df.to_pickle(labeled_path)
         print(f"\n✓ Saved labeled data to {labeled_path}")
 
         return responses_df
@@ -143,9 +143,9 @@ class RefusalPipeline:
         print(f"  Test: {len(test_df)} ({len(test_df)/len(labeled_df)*100:.1f}%)")
 
         # Save splits
-        train_df.to_csv(os.path.join(data_splits_path, "train.csv"), index=False)
-        val_df.to_csv(os.path.join(data_splits_path, "val.csv"), index=False)
-        test_df.to_csv(os.path.join(data_splits_path, "test.csv"), index=False)
+        train_df.to_pickle(os.path.join(data_splits_path, "train.pkl"))
+        val_df.to_pickle(os.path.join(data_splits_path, "val.pkl"))
+        test_df.to_pickle(os.path.join(data_splits_path, "test.pkl"))
 
         # Create PyTorch datasets
         print("\nCreating PyTorch datasets...")

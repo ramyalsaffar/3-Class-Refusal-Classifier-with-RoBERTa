@@ -168,8 +168,8 @@ class ResponseCollector:
             print(f"Saved {len(model_df)} responses to {filepath}")
 
         # Save combined
-        combined_path = os.path.join(output_dir, "all_responses.csv")
-        df.to_csv(combined_path, index=False)
+        combined_path = os.path.join(output_dir, "all_responses.pkl")
+        df.to_pickle(combined_path)
         print(f"Saved combined responses to {combined_path}")
 
 

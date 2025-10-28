@@ -123,7 +123,7 @@ class ExperimentRunner:
         )
 
         # Check if data exists
-        labeled_data_path = os.path.join(data_processed_path, "labeled_responses.csv")
+        labeled_data_path = os.path.join(data_processed_path, "labeled_responses.pkl")
         if not os.path.exists(labeled_data_path):
             print(f"❌ Error: Labeled data not found at {labeled_data_path}")
             print("Please run data collection first or use --full mode")
@@ -131,7 +131,7 @@ class ExperimentRunner:
 
         # Load data
         print(f"\nLoading data from {labeled_data_path}...")
-        labeled_df = pd.read_csv(labeled_data_path)
+        labeled_df = pd.read_pickle(labeled_data_path)
         print(f"✓ Loaded {len(labeled_df)} labeled samples")
 
         # Get API keys (only need OpenAI for potential adversarial testing)
@@ -165,7 +165,7 @@ class ExperimentRunner:
             return
 
         # Check if test data exists
-        test_data_path = os.path.join(data_splits_path, "test.csv")
+        test_data_path = os.path.join(data_splits_path, "test.pkl")
         if not os.path.exists(test_data_path):
             print(f"❌ Error: Test data not found at {test_data_path}")
             print("Please run full pipeline first")
@@ -173,7 +173,7 @@ class ExperimentRunner:
 
         # Load test data
         print(f"\nLoading test data from {test_data_path}...")
-        test_df = pd.read_csv(test_data_path)
+        test_df = pd.read_pickle(test_data_path)
         print(f"✓ Loaded {len(test_df)} test samples")
 
         # Load model
