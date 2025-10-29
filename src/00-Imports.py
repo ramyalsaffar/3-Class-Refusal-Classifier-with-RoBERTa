@@ -37,11 +37,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+from torch.optim import AdamW  # Moved from transformers to torch.optim in newer versions
 from transformers import (
     RobertaModel,
     RobertaTokenizer,
     RobertaConfig,
-    AdamW,
     get_linear_schedule_with_warmup
 )
 
