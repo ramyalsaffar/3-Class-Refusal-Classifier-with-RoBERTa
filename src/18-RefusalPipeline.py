@@ -82,19 +82,24 @@ class RefusalPipeline:
         return responses_df
 
     def label_data(self, responses_df: pd.DataFrame) -> pd.DataFrame:
-        """Step 3: Label responses."""
+        """Step 3: Label responses using LLM Judge."""
         print("\n" + "="*60)
-        print("STEP 3: LABELING DATA")
+        print("STEP 3: LABELING DATA WITH LLM JUDGE")
         print("="*60)
 
-        labeler = DataLabeler()
+        # Initialize labeler with OpenAI API key (for GPT-4 judge)
+        labeler = DataLabeler(api_key=self.api_keys['openai'])
 
-        # Label each response
+        # Label each response using the judge
         labels = []
         confidences = []
 
-        for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Labeling"):
-            label, confidence = labeler.label_response(row['response'], row['expected_label'])
+        for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="LLM Judge Labeling"):
+            label, confidence = labeler.label_response(
+                response=row['response'],
+                prompt=row['prompt'],
+                expected_label=row.get('expected_label', None)
+            )
             labels.append(label)
             confidences.append(confidence)
 
@@ -103,10 +108,11 @@ class RefusalPipeline:
 
         # Print label distribution
         print(f"\nLabel distribution:")
-        for i in range(3):
+        for i in range(-1, 3):
             count = (responses_df['label'] == i).sum()
             pct = count / len(responses_df) * 100
-            print(f"  Class {i} ({CLASS_NAMES[i]}): {count} ({pct:.1f}%)")
+            label_name = labeler.get_label_name(i)
+            print(f"  {label_name}: {count} ({pct:.1f}%)")
 
         # Save labeled data
         labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")
@@ -120,6 +126,13 @@ class RefusalPipeline:
         print("\n" + "="*60)
         print("STEP 4: PREPARING DATASETS")
         print("="*60)
+
+        # Filter out error labels (-1)
+        error_count = (labeled_df['label'] == -1).sum()
+        if error_count > 0:
+            print(f"⚠️  Filtering out {error_count} error-labeled samples")
+            labeled_df = labeled_df[labeled_df['label'] != -1].copy()
+            print(f"✓ Remaining samples: {len(labeled_df)}")
 
         # Split data
         train_df, temp_df = train_test_split(
