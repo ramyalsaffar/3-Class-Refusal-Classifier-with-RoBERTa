@@ -35,19 +35,21 @@ if __name__ == "__main__":
             runner.train_only()
 
         elif sys.argv[1] == '--analyze-only':
-            model_path = sys.argv[2] if len(sys.argv) > 2 else None
-            runner.analyze_only(model_path)
+            refusal_path = sys.argv[2] if len(sys.argv) > 2 else None
+            jailbreak_path = sys.argv[3] if len(sys.argv) > 3 else None
+            runner.analyze_only(refusal_path, jailbreak_path)
 
         else:
-            print("Usage: python src/16-Execute.py [--test|--full|--train-only|--analyze-only]")
+            print("Usage: python src/22-Execute.py [--test|--full|--train-only|--analyze-only]")
             print("\nOptions:")
             print("  --test           Run quick test with reduced samples")
             print("  --full           Run full experiment as configured")
             print("  --train-only     Train on existing data")
-            print("  --analyze-only   Analyze existing model (optionally specify model path)")
+            print("  --analyze-only   Analyze existing models (optionally specify refusal and jailbreak model paths)")
             print("\nExamples:")
-            print("  python src/16-Execute.py --full")
-            print("  python src/16-Execute.py --analyze-only models/refusal_classifier_20251028_1430_best.pt")
+            print("  python src/22-Execute.py --full")
+            print("  python src/22-Execute.py --analyze-only")
+            print("  python src/22-Execute.py --analyze-only models/exp_refusal_best.pt models/exp_jailbreak_best.pt")
 
     else:
         # Interactive mode
@@ -76,10 +78,14 @@ if __name__ == "__main__":
         elif choice == '3':
             runner.train_only()
         elif choice == '4':
-            model_path = input("Model path (press Enter for default): ").strip()
-            if not model_path:
-                model_path = None
-            runner.analyze_only(model_path)
+            print("\nModel paths (press Enter for default):")
+            refusal_path = input("  Refusal model path: ").strip()
+            jailbreak_path = input("  Jailbreak model path: ").strip()
+            if not refusal_path:
+                refusal_path = None
+            if not jailbreak_path:
+                jailbreak_path = None
+            runner.analyze_only(refusal_path, jailbreak_path)
         elif choice == '5':
             print("Exiting...")
         else:

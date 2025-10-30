@@ -119,7 +119,7 @@ class ExperimentRunner:
         """Train only (assumes data already collected)."""
         self._print_experiment_header(
             "Train Only Mode",
-            "Loading existing data and training classifier"
+            "Loading existing data and training BOTH classifiers"
         )
 
         # Check if data exists
@@ -134,34 +134,56 @@ class ExperimentRunner:
         labeled_df = pd.read_pickle(labeled_data_path)
         print(f"✓ Loaded {len(labeled_df)} labeled samples")
 
-        # Get API keys (only need OpenAI for potential adversarial testing)
+        # Get API keys (only need OpenAI for adversarial testing)
         api_keys = {'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for analysis): ")}
 
         # Initialize pipeline
         self.pipeline = RefusalPipeline(api_keys)
 
-        # Run training and analysis
-        train_loader, val_loader, test_loader, test_df = self.pipeline.prepare_datasets(labeled_df)
-        history = self.pipeline.train_classifier(train_loader, val_loader)
-        analysis_results = self.pipeline.run_analyses(test_df)
-        self.pipeline.generate_visualizations(history, analysis_results)
+        # Prepare datasets (returns dict with 'refusal' and 'jailbreak' keys)
+        datasets = self.pipeline.prepare_datasets(labeled_df)
 
-        print("\n✅ Training and analysis complete")
-
-    def analyze_only(self, model_path: str = None):
-        """Analysis only (load existing model)."""
-        self._print_experiment_header(
-            "Analysis Only Mode",
-            "Loading trained model and running analysis"
+        # Train refusal classifier
+        refusal_history = self.pipeline.train_refusal_classifier(
+            datasets['refusal']['train_loader'],
+            datasets['refusal']['val_loader']
         )
 
-        # Check if model exists
-        if model_path is None:
-            model_path = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_best.pt")
+        # Train jailbreak detector
+        jailbreak_history = self.pipeline.train_jailbreak_detector(
+            datasets['jailbreak']['train_loader'],
+            datasets['jailbreak']['val_loader']
+        )
 
-        if not os.path.exists(model_path):
-            print(f"❌ Error: Model not found at {model_path}")
-            print("Please provide model path or train first")
+        # Run analyses (uses test_df from refusal datasets - same for both)
+        analysis_results = self.pipeline.run_analyses(datasets['refusal']['test_df'])
+
+        # Generate visualizations (using refusal history)
+        self.pipeline.generate_visualizations(refusal_history, analysis_results)
+
+        print("\n✅ Training and analysis complete (BOTH classifiers trained)")
+
+    def analyze_only(self, refusal_model_path: str = None, jailbreak_model_path: str = None):
+        """Analysis only (load existing models for BOTH classifiers)."""
+        self._print_experiment_header(
+            "Analysis Only Mode",
+            "Loading trained models and running analysis (BOTH classifiers)"
+        )
+
+        # Determine model paths
+        if refusal_model_path is None:
+            refusal_model_path = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
+        if jailbreak_model_path is None:
+            jailbreak_model_path = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
+
+        # Check if models exist
+        if not os.path.exists(refusal_model_path):
+            print(f"❌ Error: Refusal model not found at {refusal_model_path}")
+            print("Please train models first or provide correct paths")
+            return
+        if not os.path.exists(jailbreak_model_path):
+            print(f"❌ Error: Jailbreak model not found at {jailbreak_model_path}")
+            print("Please train models first or provide correct paths")
             return
 
         # Check if test data exists
@@ -176,29 +198,45 @@ class ExperimentRunner:
         test_df = pd.read_pickle(test_data_path)
         print(f"✓ Loaded {len(test_df)} test samples")
 
-        # Load model
-        print(f"\nLoading model from {model_path}...")
-        model = RefusalClassifier()
-        checkpoint = torch.load(model_path, map_location=DEVICE)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        model = model.to(DEVICE)
-        print(f"✓ Model loaded (Best Val F1: {checkpoint['best_val_f1']:.4f})")
-
         # Initialize tokenizer
         tokenizer = RobertaTokenizer.from_pretrained(MODEL_CONFIG['model_name'])
+
+        # Load refusal classifier
+        print(f"\nLoading refusal classifier from {refusal_model_path}...")
+        refusal_model = RefusalClassifier(num_classes=3)
+        refusal_checkpoint = torch.load(refusal_model_path, map_location=DEVICE)
+        refusal_model.load_state_dict(refusal_checkpoint['model_state_dict'])
+        refusal_model = refusal_model.to(DEVICE)
+        print(f"✓ Refusal classifier loaded (Best Val F1: {refusal_checkpoint['best_val_f1']:.4f})")
+
+        # Load jailbreak detector
+        print(f"\nLoading jailbreak detector from {jailbreak_model_path}...")
+        jailbreak_model = JailbreakDetector(num_classes=2)
+        jailbreak_checkpoint = torch.load(jailbreak_model_path, map_location=DEVICE)
+        jailbreak_model.load_state_dict(jailbreak_checkpoint['model_state_dict'])
+        jailbreak_model = jailbreak_model.to(DEVICE)
+        print(f"✓ Jailbreak detector loaded (Best Val F1: {jailbreak_checkpoint['best_val_f1']:.4f})")
 
         # Get API keys for adversarial testing
         api_keys = {'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for adversarial): ")}
 
         # Run analyses
         print("\n" + "="*60)
-        print("RUNNING ANALYSES")
+        print("RUNNING ANALYSES (BOTH CLASSIFIERS)")
         print("="*60)
 
         analysis_results = {}
 
+        # ═══════════════════════════════════════════════════════
+        # REFUSAL CLASSIFIER ANALYSIS
+        # ═══════════════════════════════════════════════════════
+        print("\n" + "="*60)
+        print("REFUSAL CLASSIFIER ANALYSIS")
+        print("="*60)
+
         # Per-model analysis
-        per_model_analyzer = PerModelAnalyzer(model, tokenizer, DEVICE)
+        print("\n--- Per-Model Analysis ---")
+        per_model_analyzer = PerModelAnalyzer(refusal_model, tokenizer, DEVICE)
         per_model_results = per_model_analyzer.analyze(test_df)
         per_model_analyzer.save_results(
             per_model_results,
@@ -207,7 +245,8 @@ class ExperimentRunner:
         analysis_results['per_model'] = per_model_results
 
         # Confidence analysis
-        confidence_analyzer = ConfidenceAnalyzer(model, tokenizer, DEVICE)
+        print("\n--- Confidence Analysis ---")
+        confidence_analyzer = ConfidenceAnalyzer(refusal_model, tokenizer, DEVICE)
         conf_results, preds, labels, confidences = confidence_analyzer.analyze(test_df)
         confidence_analyzer.save_results(
             conf_results,
@@ -221,7 +260,8 @@ class ExperimentRunner:
         }
 
         # Adversarial testing
-        adversarial_tester = AdversarialTester(model, tokenizer, DEVICE, api_keys['openai'])
+        print("\n--- Adversarial Testing ---")
+        adversarial_tester = AdversarialTester(refusal_model, tokenizer, DEVICE, api_keys['openai'])
         adv_results = adversarial_tester.test_robustness(test_df)
         adversarial_tester.save_results(
             adv_results,
@@ -231,7 +271,7 @@ class ExperimentRunner:
 
         # Attention visualization
         print("\n--- Attention Visualization ---")
-        attention_viz = AttentionVisualizer(model, tokenizer, DEVICE)
+        attention_viz = AttentionVisualizer(refusal_model, tokenizer, DEVICE)
         attention_results = attention_viz.analyze_samples(
             test_df,
             num_samples=INTERPRETABILITY_CONFIG['attention_samples_per_class']
@@ -242,7 +282,7 @@ class ExperimentRunner:
         if INTERPRETABILITY_CONFIG['shap_enabled']:
             print("\n--- SHAP Analysis ---")
             try:
-                shap_analyzer = ShapAnalyzer(model, tokenizer, DEVICE)
+                shap_analyzer = ShapAnalyzer(refusal_model, tokenizer, DEVICE)
                 shap_results = shap_analyzer.analyze_samples(
                     test_df,
                     num_samples=INTERPRETABILITY_CONFIG['shap_samples']
@@ -259,7 +299,31 @@ class ExperimentRunner:
             print("\n--- SHAP Analysis (Disabled) ---")
             analysis_results['shap'] = None
 
+        # ═══════════════════════════════════════════════════════
+        # JAILBREAK DETECTOR ANALYSIS
+        # ═══════════════════════════════════════════════════════
+        print("\n" + "="*60)
+        print("JAILBREAK DETECTOR ANALYSIS")
+        print("="*60)
+
+        jailbreak_analyzer = JailbreakAnalysis(
+            jailbreak_model,
+            refusal_model,
+            tokenizer,
+            DEVICE
+        )
+        jailbreak_results = jailbreak_analyzer.analyze_full(test_df)
+        jailbreak_analyzer.save_results(
+            jailbreak_results,
+            os.path.join(results_path, "jailbreak_analysis.json")
+        )
+        analysis_results['jailbreak'] = jailbreak_results
+
         # Generate visualizations
+        print("\n" + "="*60)
+        print("GENERATING VISUALIZATIONS")
+        print("="*60)
+
         visualizer = Visualizer()
 
         # Confusion matrix
@@ -303,7 +367,7 @@ class ExperimentRunner:
             os.path.join(visualizations_path, "confidence_distributions.png")
         )
 
-        print("\n✅ Analysis complete")
+        print("\n✅ Analysis complete (BOTH classifiers analyzed)")
 
 
 #------------------------------------------------------------------------------
