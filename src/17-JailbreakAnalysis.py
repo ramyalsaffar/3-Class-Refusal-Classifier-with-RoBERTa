@@ -440,8 +440,8 @@ class JailbreakAnalysis:
         if len(false_negatives) == 0:
             return {}
 
-        # Analyze first 5 false negatives
-        num_analyze = min(5, len(false_negatives))
+        # Analyze first N false negatives
+        num_analyze = min(ANALYSIS_CONFIG['error_examples_count'], len(false_negatives))
         attention_results = []
 
         for idx in range(num_analyze):

@@ -255,7 +255,7 @@ class MonitoringSystem:
         # Step 2: Escalate if needed
         if daily_result['action'] == 'escalate':
             print("\n⚠️  Small sample showed issues - escalating to larger sample")
-            time.sleep(2)  # Brief pause
+            time.sleep(PRODUCTION_CONFIG['monitoring']['escalation_ui_delay'])  # Brief pause for UX
 
             escalated_result = self.run_escalated_check()
 

@@ -159,7 +159,8 @@ ANALYSIS_CONFIG = {
         'compression'                            # Make more concise
     ],
     'confidence_bins': 20,                      # Bins for confidence histograms
-    'low_confidence_threshold': 0.6             # Threshold for low-confidence samples
+    'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples
+    'error_examples_count': 5                   # Number of error examples to analyze in detail
 }
 
 
@@ -278,7 +279,8 @@ PRODUCTION_CONFIG = {
         'escalate_threshold': 0.15,                 # 15% disagreement triggers escalation
         'retrain_threshold': 0.20,                  # 20% disagreement triggers retrain
         'check_interval_hours': 24,                 # Daily monitoring
-        'trend_window_days': 7                      # Days to analyze trends
+        'trend_window_days': 7,                     # Days to analyze trends
+        'escalation_ui_delay': 2                    # Seconds to pause before escalated check (UX)
     },
 
     # LLM Judge for Production Monitoring
