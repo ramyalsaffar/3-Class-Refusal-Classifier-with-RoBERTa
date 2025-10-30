@@ -56,23 +56,20 @@ class MonitoringSystem:
         # Get judge labels with progress bar
         print(f"\n2. Running LLM Judge on sample...")
         judge_labels = []
-        judge_confidences = []
 
         for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
                           desc="LLM Judge evaluation"):
-            label, conf = self.judge.label_response(
+            refusal_label, jailbreak_label = self.judge.label_response(
                 response=row['response'],
                 prompt=row['prompt']
             )
-            judge_labels.append(label)
-            judge_confidences.append(conf)
+            judge_labels.append(refusal_label)  # Only use refusal label for monitoring
             time.sleep(PRODUCTION_CONFIG['judge_rate_limit'])
 
         # Update database with judge labels
         self.data_manager.update_with_judge_labels(
             sample_ids=sample_df['id'].tolist(),
-            judge_labels=judge_labels,
-            judge_confidences=judge_confidences
+            judge_labels=judge_labels
         )
 
         # Calculate disagreement rate
@@ -95,8 +92,7 @@ class MonitoringSystem:
             'total_samples': len(sample_df),
             'disagreements': disagreements,
             'disagreement_rate': disagreement_rate,
-            'avg_model_confidence': float(sample_df['confidence'].mean()),
-            'avg_judge_confidence': float(np.mean(judge_confidences))
+            'avg_model_confidence': float(sample_df['confidence'].mean())
         }
 
         self.data_manager.log_monitoring_run(
@@ -142,23 +138,20 @@ class MonitoringSystem:
         # Get judge labels with progress bar
         print(f"\n2. Running LLM Judge on sample (this will take longer)...")
         judge_labels = []
-        judge_confidences = []
 
         for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
                           desc="LLM Judge evaluation (escalated)"):
-            label, conf = self.judge.label_response(
+            refusal_label, jailbreak_label = self.judge.label_response(
                 response=row['response'],
                 prompt=row['prompt']
             )
-            judge_labels.append(label)
-            judge_confidences.append(conf)
+            judge_labels.append(refusal_label)  # Only use refusal label for monitoring
             time.sleep(PRODUCTION_CONFIG['judge_rate_limit'])
 
         # Update database
         self.data_manager.update_with_judge_labels(
             sample_ids=sample_df['id'].tolist(),
-            judge_labels=judge_labels,
-            judge_confidences=judge_confidences
+            judge_labels=judge_labels
         )
 
         # Calculate disagreement rate
@@ -182,7 +175,6 @@ class MonitoringSystem:
             'disagreements': disagreements,
             'disagreement_rate': disagreement_rate,
             'avg_model_confidence': float(sample_df['confidence'].mean()),
-            'avg_judge_confidence': float(np.mean(judge_confidences)),
             'disagreement_by_class': {
                 CLASS_NAMES[i]: sum(
                     1 for pred, judge, true_pred in

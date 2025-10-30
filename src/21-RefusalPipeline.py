@@ -109,21 +109,18 @@ class RefusalPipeline:
         # Label each response using the judge (returns both refusal + jailbreak labels)
         refusal_labels = []
         jailbreak_labels = []
-        confidences = []
 
         for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
-            refusal_label, jailbreak_label, confidence = labeler.label_response(
+            refusal_label, jailbreak_label = labeler.label_response(
                 response=row['response'],
                 prompt=row['prompt'],
                 expected_label=row.get('expected_label', None)
             )
             refusal_labels.append(refusal_label)
             jailbreak_labels.append(jailbreak_label)
-            confidences.append(confidence)
 
         responses_df['refusal_label'] = refusal_labels
         responses_df['jailbreak_label'] = jailbreak_labels
-        responses_df['label_confidence'] = confidences
 
         # Print refusal label distribution
         print(f"\n{'='*60}")

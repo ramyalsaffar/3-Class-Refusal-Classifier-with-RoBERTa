@@ -55,7 +55,6 @@ class DataManager:
                 model_version VARCHAR(50) NOT NULL,
                 latency_ms FLOAT,
                 judge_label INTEGER,
-                judge_confidence FLOAT,
                 is_monitored BOOLEAN DEFAULT FALSE,
                 metadata JSONB
             );
@@ -143,7 +142,7 @@ class DataManager:
 
         query = """
             SELECT id, timestamp, prompt, response, prediction, confidence,
-                   model_version, judge_label, judge_confidence, is_monitored
+                   model_version, judge_label, is_monitored
             FROM predictions_log
             WHERE timestamp > NOW() - INTERVAL '%s hours'
         """
@@ -162,8 +161,7 @@ class DataManager:
         cursor.execute(query, params)
 
         columns = ['id', 'timestamp', 'prompt', 'response', 'prediction',
-                  'confidence', 'model_version', 'judge_label', 'judge_confidence',
-                  'is_monitored']
+                  'confidence', 'model_version', 'judge_label', 'is_monitored']
         df = pd.DataFrame(cursor.fetchall(), columns=columns)
 
         cursor.close()
@@ -215,35 +213,33 @@ class DataManager:
 
         columns = ['id', 'timestamp', 'prompt', 'response', 'prediction',
                   'confidence', 'model_version', 'latency_ms', 'judge_label',
-                  'judge_confidence', 'is_monitored', 'metadata']
+                  'is_monitored', 'metadata']
         df = pd.DataFrame(cursor.fetchall(), columns=columns)
 
         cursor.close()
         return df
 
     def update_with_judge_labels(self, sample_ids: List[int],
-                                judge_labels: List[int],
-                                judge_confidences: List[float]):
+                                judge_labels: List[int]):
         """
         Update samples with LLM judge labels.
 
         Args:
             sample_ids: List of prediction IDs
-            judge_labels: List of judge labels
-            judge_confidences: List of judge confidences
+            judge_labels: List of judge labels (refusal classification)
         """
         cursor = self.conn.cursor()
 
-        for sample_id, label, conf in tqdm(
-            zip(sample_ids, judge_labels, judge_confidences),
+        for sample_id, label in tqdm(
+            zip(sample_ids, judge_labels),
             total=len(sample_ids),
             desc="Updating judge labels"
         ):
             cursor.execute("""
                 UPDATE predictions_log
-                SET judge_label = %s, judge_confidence = %s, is_monitored = TRUE
+                SET judge_label = %s, is_monitored = TRUE
                 WHERE id = %s
-            """, (int(label), float(conf), int(sample_id)))
+            """, (int(label), int(sample_id)))
 
         self.conn.commit()
         cursor.close()

@@ -43,7 +43,6 @@ API_CONFIG = {
     # LLM Judge Settings (for data labeling)
     'judge_temperature': 0.0,                   # Deterministic for consistency
     'judge_max_tokens': 50,                     # Small JSON response
-    'judge_confidence': 0.95,                   # Confidence score for LLM judge
 
     # Batch Sizes
     'prompt_generation_batch_size': 50,         # Batch size for generating prompts
