@@ -399,12 +399,19 @@ class RefusalPipeline:
         return history
 
     def run_analyses(self, test_df: pd.DataFrame) -> Dict:
-        """Step 7: Run all analyses (using refusal classifier)."""
+        """Step 7: Run all analyses for BOTH classifiers."""
         print("\n" + "="*60)
-        print("STEP 7: RUNNING ANALYSES")
+        print("STEP 7: RUNNING ANALYSES (BOTH CLASSIFIERS)")
         print("="*60)
 
         analysis_results = {}
+
+        # ═══════════════════════════════════════════════════════
+        # REFUSAL CLASSIFIER ANALYSIS
+        # ═══════════════════════════════════════════════════════
+        print("\n" + "="*60)
+        print("REFUSAL CLASSIFIER ANALYSIS")
+        print("="*60)
 
         # Per-model analysis
         print("\n--- Per-Model Analysis ---")
@@ -472,6 +479,26 @@ class RefusalPipeline:
         else:
             print("\n--- SHAP Analysis (Disabled) ---")
             analysis_results['shap'] = None
+
+        # ═══════════════════════════════════════════════════════
+        # JAILBREAK DETECTOR ANALYSIS
+        # ═══════════════════════════════════════════════════════
+        print("\n" + "="*60)
+        print("JAILBREAK DETECTOR ANALYSIS")
+        print("="*60)
+
+        jailbreak_analyzer = JailbreakAnalysis(
+            self.jailbreak_model,
+            self.refusal_model,
+            self.tokenizer,
+            DEVICE
+        )
+        jailbreak_results = jailbreak_analyzer.analyze_full(test_df)
+        jailbreak_analyzer.save_results(
+            jailbreak_results,
+            os.path.join(results_path, "jailbreak_analysis.json")
+        )
+        analysis_results['jailbreak'] = jailbreak_results
 
         return analysis_results
 
