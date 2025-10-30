@@ -36,7 +36,7 @@ class ShapAnalyzer:
         all_probs = []
 
         with torch.no_grad():
-            for text in texts:
+            for text in tqdm(texts, desc="Computing predictions for SHAP", leave=False):
                 # Tokenize
                 encoding = self.tokenizer(
                     text,
@@ -193,10 +193,8 @@ class ShapAnalyzer:
 
             class_indices = np.where(class_mask)[0]
 
-            print(f"\nVisualizing {class_name} samples...")
-
             # Visualize first 2 samples from this class
-            for i, idx in enumerate(class_indices[:2]):
+            for i, idx in enumerate(tqdm(class_indices[:2], desc=f"Visualizing {class_name}", leave=False)):
                 text = texts[idx]
                 output_path = os.path.join(
                     output_dir,

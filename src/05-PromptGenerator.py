@@ -34,7 +34,9 @@ class PromptGenerator:
             'no_refusal': []
         }
 
-        print("Generating prompts for each category...")
+        print("\n" + "="*60)
+        print("GENERATING PROMPTS")
+        print("="*60)
 
         # Hard refusal categories
         hard_categories = [
@@ -45,11 +47,8 @@ class PromptGenerator:
             ('regulated_content', 'hard')
         ]
 
-        for category, refusal_type in hard_categories:
-            num_prompts = self.categories[category][refusal_type]
-            if num_prompts > 0:
-                generated = self.generate_prompts(category, num_prompts, refusal_type)
-                prompts['hard_refusal'].extend(generated)
+        # Calculate total tasks for progress bar
+        total_tasks = len(hard_categories)
 
         # Soft refusal categories
         soft_categories = [
@@ -58,12 +57,7 @@ class PromptGenerator:
             ('privacy_misinfo', 'soft'),
             ('regulated_content', 'soft')
         ]
-
-        for category, refusal_type in soft_categories:
-            num_prompts = self.categories[category].get(refusal_type, 0)
-            if num_prompts > 0:
-                generated = self.generate_prompts(category, num_prompts, refusal_type)
-                prompts['soft_refusal'].extend(generated)
+        total_tasks += len(soft_categories)
 
         # No refusal categories
         no_refusal_categories = [
@@ -72,16 +66,40 @@ class PromptGenerator:
             'general_assistance',
             'edge_cases'
         ]
+        total_tasks += len(no_refusal_categories)
 
-        for category in no_refusal_categories:
-            num_prompts = self.categories[category]['no_refusal']
-            generated = self.generate_prompts(category, num_prompts, 'none')
-            prompts['no_refusal'].extend(generated)
+        # Progress bar for all categories
+        with tqdm(total=total_tasks, desc="Generating prompts across categories") as pbar:
+            # Hard refusal
+            for category, refusal_type in hard_categories:
+                num_prompts = self.categories[category][refusal_type]
+                if num_prompts > 0:
+                    generated = self.generate_prompts(category, num_prompts, refusal_type)
+                    prompts['hard_refusal'].extend(generated)
+                pbar.update(1)
 
-        print(f"\nTotal prompts generated:")
+            # Soft refusal
+            for category, refusal_type in soft_categories:
+                num_prompts = self.categories[category].get(refusal_type, 0)
+                if num_prompts > 0:
+                    generated = self.generate_prompts(category, num_prompts, refusal_type)
+                    prompts['soft_refusal'].extend(generated)
+                pbar.update(1)
+
+            # No refusal
+            for category in no_refusal_categories:
+                num_prompts = self.categories[category]['no_refusal']
+                generated = self.generate_prompts(category, num_prompts, 'none')
+                prompts['no_refusal'].extend(generated)
+                pbar.update(1)
+
+        print(f"\n{'='*60}")
+        print(f"PROMPT GENERATION SUMMARY")
+        print(f"{'='*60}")
         print(f"  Hard Refusal: {len(prompts['hard_refusal'])}")
         print(f"  Soft Refusal: {len(prompts['soft_refusal'])}")
         print(f"  No Refusal: {len(prompts['no_refusal'])}")
+        print(f"  Total: {sum(len(p) for p in prompts.values())}")
 
         return prompts
 
@@ -100,16 +118,17 @@ class PromptGenerator:
         """
         template = self._get_template(category, refusal_type)
 
-        print(f"\nGenerating {num_prompts} prompts for {category} ({refusal_type})...")
-
         prompts = []
         batch_size = 50  # Generate in batches
         num_batches = (num_prompts + batch_size - 1) // batch_size
 
-        for i in range(num_batches):
-            current_batch_size = min(batch_size, num_prompts - len(prompts))
-            batch_prompts = self._call_gpt4(template, current_batch_size)
-            prompts.extend(batch_prompts)
+        # Progress bar for batches within this category
+        with tqdm(total=num_batches, desc=f"{category} ({refusal_type})", leave=False) as pbar:
+            for i in range(num_batches):
+                current_batch_size = min(batch_size, num_prompts - len(prompts))
+                batch_prompts = self._call_gpt4(template, current_batch_size)
+                prompts.extend(batch_prompts)
+                pbar.update(1)
 
         return prompts[:num_prompts]  # Ensure exact count
 

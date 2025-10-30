@@ -187,7 +187,8 @@ class AttentionVisualizer:
 
             class_attention_stats = []
 
-            for i, idx in enumerate(sample_indices):
+            # Progress bar for analyzing samples in this class
+            for i, idx in enumerate(tqdm(sample_indices, desc=f"Analyzing {class_name}", leave=False)):
                 row = class_samples.iloc[idx]
                 text = row['response']
 
