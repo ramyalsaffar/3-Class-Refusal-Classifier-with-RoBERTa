@@ -384,7 +384,7 @@ Output ONLY a JSON array of {num} strings."""
 
         return templates[category][refusal_type]
 
-    def _call_gpt4(self, template: str, num_prompts: int, retry_count: int = 0, max_retries: int = 3) -> List[str]:
+    def _call_gpt4(self, template: str, num_prompts: int, retry_count: int = 0, max_retries: int = None) -> List[str]:
         """
         Call GPT-4 to generate prompts with retry logic.
 
@@ -392,7 +392,7 @@ Output ONLY a JSON array of {num} strings."""
             template: Prompt template
             num_prompts: Number of prompts to generate
             retry_count: Current retry attempt (internal)
-            max_retries: Maximum number of retries before failing
+            max_retries: Maximum number of retries before failing (default from API_CONFIG)
 
         Returns:
             List of generated prompts
@@ -400,6 +400,8 @@ Output ONLY a JSON array of {num} strings."""
         Raises:
             RuntimeError: If max retries exceeded
         """
+        if max_retries is None:
+            max_retries = API_CONFIG['max_retries']
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -439,8 +441,8 @@ Output ONLY a JSON array of {num} strings."""
                 raise RuntimeError(f"Failed to generate prompts after {max_retries} attempts") from e
 
             print(f"⚠️  GPT-4 attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
-            print(f"   Retrying in 2 seconds...")
-            time.sleep(2)
+            print(f"   Retrying in {API_CONFIG['rate_limit_delay']} seconds...")
+            time.sleep(API_CONFIG['rate_limit_delay'])
             return self._call_gpt4(template, num_prompts, retry_count + 1, max_retries)
 
     def save_prompts(self, prompts: Dict[str, List[str]], output_dir: str):

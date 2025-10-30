@@ -20,8 +20,8 @@ class DataLabeler:
         """
         self.client = OpenAI(api_key=api_key)
         self.judge_model = API_CONFIG['prompt_model']  # GPT-4
-        self.max_retries = 3
-        self.retry_delay = 2  # seconds
+        self.max_retries = API_CONFIG['max_retries']
+        self.retry_delay = API_CONFIG['rate_limit_delay']
 
     def label_response(self, response: str, prompt: str,
                       expected_label: str = None) -> Tuple[int, int, float]:
