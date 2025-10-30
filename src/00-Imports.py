@@ -77,26 +77,6 @@ except ImportError:
     AWS_AVAILABLE = False
     print("ℹ️  boto3 not available - AWS features disabled")
 
-# Production API (optional - only needed for production deployment)
-try:
-    from fastapi import FastAPI, HTTPException, BackgroundTasks
-    from fastapi.responses import JSONResponse
-    from pydantic import BaseModel
-    import uvicorn
-    FASTAPI_AVAILABLE = True
-except ImportError:
-    FASTAPI_AVAILABLE = False
-    print("ℹ️  FastAPI not available - production API features disabled")
-
-# PostgreSQL (optional - only needed for production monitoring)
-try:
-    import psycopg2
-    from psycopg2 import sql
-    POSTGRESQL_AVAILABLE = True
-except ImportError:
-    POSTGRESQL_AVAILABLE = False
-    print("ℹ️  psycopg2 not available - PostgreSQL features disabled")
-
 
 #------------------------------------------------------------------------------
 
