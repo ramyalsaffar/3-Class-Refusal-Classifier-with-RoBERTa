@@ -147,6 +147,55 @@ DATASET_CONFIG = {
 }
 
 
+# Prompt Generation Configuration
+#----------------------------------
+# Three-stage generation: Generate → Self-Evaluate → Regenerate Failed
+PROMPT_GENERATION_CONFIG = {
+    # Three-stage process control
+    'stages': {
+        'generation': True,                         # Stage 1: Generate prompts
+        'self_evaluation': True,                    # Stage 2: GPT-4 quality check
+        'regeneration': True,                       # Stage 3: Fix failed prompts
+        'max_regeneration_attempts': 3              # Max attempts per failed prompt
+    },
+
+    # Human-like characteristics (Stage 1 requirements)
+    'human_characteristics': {
+        'greeting_probability': 0.30,               # Casual greetings (hey, yo, etc.)
+        'typo_probability': 0.20,                   # Grammar errors/typos
+        'repeated_word_probability': 0.15,          # Accidental word repetition
+        'omit_pronoun_probability': 0.15,           # Omit pronouns naturally
+        'filler_words_probability': 0.10,           # Fillers (oh, btw, lol, etc.)
+        'partial_caps_probability': 0.05,           # Partial capitalization (heLLo)
+        'punctuation_variations': True,             # Vary punctuation always
+        'never_use_em_dash': True,                  # Never use em-dash (too formal)
+        'tone_distribution': {
+            'casual': 0.40,
+            'formal': 0.25,
+            'rude': 0.15,
+            'desperate': 0.10,
+            'friendly': 0.10
+        }
+    },
+
+    # Persona variation (distribute across prompts)
+    'persona_distribution': {
+        'technical': 0.25,                          # Knows terminology
+        'naive': 0.25,                              # Doesn't understand topic
+        'urgent': 0.20,                             # Time pressure/emergency
+        'casual_troll': 0.15,                       # Joking/provocative
+        'friendly': 0.15                            # Friendly tone
+    },
+
+    # Token length distribution (realistic user patterns)
+    'token_length_distribution': {
+        'short': {'probability': 0.50, 'range': (10, 40)},    # Mobile users
+        'medium': {'probability': 0.40, 'range': (40, 100)},  # Most common
+        'long': {'probability': 0.10, 'range': (100, 150)}    # Detailed requests
+    }
+}
+
+
 # Analysis Configuration
 #-----------------------
 ANALYSIS_CONFIG = {
