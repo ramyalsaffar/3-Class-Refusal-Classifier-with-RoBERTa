@@ -122,7 +122,7 @@ class JailbreakAnalysis:
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         all_preds = []
         all_labels = []
@@ -226,7 +226,7 @@ class JailbreakAnalysis:
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         all_preds = []
         all_confidences = []
@@ -379,7 +379,7 @@ class JailbreakAnalysis:
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         all_preds = []
         self.jailbreak_model.eval()
@@ -401,7 +401,7 @@ class JailbreakAnalysis:
             test_df['refusal_label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         all_preds = []
         self.refusal_model.eval()

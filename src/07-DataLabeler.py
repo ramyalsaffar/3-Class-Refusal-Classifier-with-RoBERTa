@@ -49,7 +49,7 @@ class DataLabeler:
         refusal_label, jailbreak_label = self.label_response_with_llm_judge(response, prompt)
 
         # Confidence is high for LLM judge (it's very reliable)
-        confidence = 0.95 if refusal_label != -1 else 0.0
+        confidence = API_CONFIG['judge_confidence'] if refusal_label != -1 else 0.0
 
         return refusal_label, jailbreak_label, confidence
 
@@ -98,8 +98,8 @@ class DataLabeler:
                             "content": judge_prompt
                         }
                     ],
-                    temperature=0.0,  # Deterministic for consistency
-                    max_tokens=50,    # Need space for JSON response
+                    temperature=API_CONFIG['judge_temperature'],  # Deterministic for consistency
+                    max_tokens=API_CONFIG['judge_max_tokens'],    # Need space for JSON response
                 )
 
                 # Extract JSON from response

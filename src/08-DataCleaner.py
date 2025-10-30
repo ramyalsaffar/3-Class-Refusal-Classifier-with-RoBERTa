@@ -30,11 +30,12 @@ class DataCleaner:
         self.verbose = verbose
         self.cleaning_log = []
 
-        # Quality thresholds
-        self.min_response_length = 5  # characters
-        self.max_response_length = 10000  # characters
-        self.min_prompt_length = 5
-        self.max_prompt_length = 2000
+        # Quality thresholds (from config)
+        self.min_response_length = DATA_CLEANING_CONFIG['min_response_length']
+        self.max_response_length = DATA_CLEANING_CONFIG['max_response_length']
+        self.min_prompt_length = DATA_CLEANING_CONFIG['min_prompt_length']
+        self.max_prompt_length = DATA_CLEANING_CONFIG['max_prompt_length']
+        self.similarity_threshold = DATA_CLEANING_CONFIG['similarity_threshold']
 
         # Error indicators
         self.error_patterns = [
@@ -189,8 +190,8 @@ class DataCleaner:
 
                     jaccard = len(words_i & words_j) / len(words_i | words_j)
 
-                    # If very similar (>0.9), keep first occurrence
-                    if jaccard > 0.9:
+                    # If very similar, keep first occurrence
+                    if jaccard > self.similarity_threshold:
                         drop_indices.append(indices[j])
 
         if drop_indices:

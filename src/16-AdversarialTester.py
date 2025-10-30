@@ -139,7 +139,7 @@ class AdversarialTester:
             df['label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         self.model.eval()
         all_preds = []

@@ -119,7 +119,7 @@ class PromptGenerator:
         template = self._get_template(category, refusal_type)
 
         prompts = []
-        batch_size = 50  # Generate in batches
+        batch_size = API_CONFIG['prompt_generation_batch_size']  # Generate in batches
         num_batches = (num_prompts + batch_size - 1) // batch_size
 
         # Progress bar for batches within this category

@@ -185,7 +185,7 @@ class RefusalPipeline:
             print(f"   Total samples: {report['total_samples']}")
 
         # Clean the data
-        strategy = EXPERIMENT_CONFIG.get('cleaning_strategy', 'auto')
+        strategy = DATA_CLEANING_CONFIG['default_strategy']
         cleaned_df = cleaner.clean_dataset(labeled_df, strategy=strategy)
 
         # Save cleaned data

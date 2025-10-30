@@ -34,7 +34,7 @@ class ConfidenceAnalyzer:
             test_df['label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=16, shuffle=False)
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         # Get predictions with confidence
         preds, labels, confidences, all_probs = self._evaluate(loader)

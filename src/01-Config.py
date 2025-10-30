@@ -38,7 +38,16 @@ API_CONFIG = {
     # Token Limits
     'max_tokens_generate': 4000,                # For prompt generation
     'max_tokens_response': 1024,                # For LLM responses
-    'max_tokens_paraphrase': 500                # For paraphrasing
+    'max_tokens_paraphrase': 500,               # For paraphrasing
+
+    # LLM Judge Settings (for data labeling)
+    'judge_temperature': 0.0,                   # Deterministic for consistency
+    'judge_max_tokens': 50,                     # Small JSON response
+    'judge_confidence': 0.95,                   # Confidence score for LLM judge
+
+    # Batch Sizes
+    'prompt_generation_batch_size': 50,         # Batch size for generating prompts
+    'inference_batch_size': 16                  # Batch size for model inference/analysis
 }
 
 
@@ -172,6 +181,31 @@ INTERPRETABILITY_CONFIG = {
     # General Interpretability
     'save_interpretability_results': True,      # Save interpretation results
     'generate_example_visualizations': True     # Generate example plots per class
+}
+
+
+# Data Cleaning Configuration
+#-----------------------------
+DATA_CLEANING_CONFIG = {
+    # Length Thresholds
+    'min_response_length': 5,                   # Minimum response length (characters)
+    'max_response_length': 10000,               # Maximum response length (characters)
+    'min_prompt_length': 5,                     # Minimum prompt length (characters)
+    'max_prompt_length': 2000,                  # Maximum prompt length (characters)
+
+    # Cleaning Strategy
+    'default_strategy': 'auto',                 # auto, conservative, aggressive, none
+
+    # Quality Thresholds
+    'excellent_threshold': 2.0,                 # % removal for "Excellent" rating
+    'good_threshold': 5.0,                      # % removal for "Good" rating
+    'acceptable_threshold': 10.0,               # % removal for "Acceptable" rating
+
+    # Near-Duplicate Detection
+    'similarity_threshold': 0.9,                # Jaccard similarity threshold for near-duplicates
+
+    # Verbose Output
+    'verbose': True                             # Print detailed cleaning reports
 }
 
 
