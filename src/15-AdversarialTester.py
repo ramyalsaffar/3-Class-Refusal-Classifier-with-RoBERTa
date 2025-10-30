@@ -121,7 +121,7 @@ class AdversarialTester:
         original_has_refusal = any(kw in original.lower() for kw in refusal_keywords)
         paraphrase_has_refusal = any(kw in paraphrase.lower() for kw in refusal_keywords)
 
-        # Both should have or not have refusal keywords
+        # Both must have or not have refusal keywords
         if original_has_refusal != paraphrase_has_refusal:
             return False
 
