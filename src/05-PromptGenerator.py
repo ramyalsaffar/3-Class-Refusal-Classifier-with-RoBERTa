@@ -399,7 +399,7 @@ Output ONLY a JSON array of {num} strings."""
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that generates diverse test prompts for AI safety research. Output only valid JSON arrays. Use realistic patterns and phrasing from actual scenarios to ensure training data quality."},
+                    {"role": "system", "content": "Output only valid JSON arrays. Use realistic patterns and phrasing from actual scenarios."},
                     {"role": "user", "content": template.format(num=num_prompts)}
                 ],
                 temperature=self.temperature,
