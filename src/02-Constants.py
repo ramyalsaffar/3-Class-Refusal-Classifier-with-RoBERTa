@@ -9,7 +9,8 @@
 # CLASS LABELS AND MAPPINGS
 # =============================================================================
 
-# Class names for display
+# Refusal Classifier - Class names for display
+#----------------------------------------------
 CLASS_NAMES = ['No Refusal', 'Hard Refusal', 'Soft Refusal']
 
 # String to integer mapping
@@ -26,13 +27,29 @@ CLASS_MAPPING_REVERSE = {
     2: 'soft_refusal'
 }
 
+# Jailbreak Detector - Class names for display
+#----------------------------------------------
+JAILBREAK_CLASS_NAMES = ['Jailbreak Failed', 'Jailbreak Succeeded']
+
+# String to integer mapping
+JAILBREAK_MAPPING = {
+    'jailbreak_failed': 0,
+    'jailbreak_succeeded': 1
+}
+
+# Integer to string mapping (reverse)
+JAILBREAK_MAPPING_REVERSE = {
+    0: 'jailbreak_failed',
+    1: 'jailbreak_succeeded'
+}
+
 
 # =============================================================================
 # VISUALIZATION COLORS
 # =============================================================================
 
-# Class colors (for plots)
-#--------------------------
+# Refusal Class colors (for plots)
+#-----------------------------------
 PLOT_COLORS = {
     'no_refusal': '#2ecc71',        # Green
     'hard_refusal': '#e74c3c',      # Red
@@ -41,6 +58,16 @@ PLOT_COLORS = {
 
 # Class colors as list (for matplotlib)
 PLOT_COLORS_LIST = ['#2ecc71', '#e74c3c', '#f39c12']
+
+# Jailbreak Class colors (for plots)
+#------------------------------------
+JAILBREAK_PLOT_COLORS = {
+    'jailbreak_failed': '#27ae60',          # Dark Green (success - model defended)
+    'jailbreak_succeeded': '#c0392b'        # Dark Red (failure - model broken)
+}
+
+# Jailbreak colors as list (for matplotlib)
+JAILBREAK_PLOT_COLORS_LIST = ['#27ae60', '#c0392b']
 
 # Model colors (for per-model analysis)
 #---------------------------------------

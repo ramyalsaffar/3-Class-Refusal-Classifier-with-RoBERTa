@@ -42,14 +42,25 @@ API_CONFIG = {
 }
 
 
-# Model Configuration (RoBERTa Classifier)
-#------------------------------------------
+# Model Configuration (RoBERTa Classifiers)
+#--------------------------------------------
 MODEL_CONFIG = {
     'model_name': 'roberta-base',               # Pretrained RoBERTa model
-    'num_classes': 3,                           # 0=No Refusal, 1=Hard, 2=Soft
+    'num_classes': 3,                           # Refusal: 0=No Refusal, 1=Hard, 2=Soft
     'max_length': 512,                          # Max sequence length (tokens)
     'dropout': 0.1,                             # Dropout probability
     'freeze_layers': 6                          # Freeze bottom 6 layers (0-11 available)
+}
+
+# Jailbreak Detector Configuration
+#-----------------------------------
+JAILBREAK_CONFIG = {
+    'model_name': 'roberta-base',               # Same base model as refusal classifier
+    'num_classes': 2,                           # 0=Jailbreak Failed, 1=Jailbreak Succeeded
+    'max_length': 512,                          # Max sequence length (tokens)
+    'dropout': 0.1,                             # Dropout probability
+    'freeze_layers': 6,                         # Freeze bottom 6 layers
+    'enabled': True                             # Enable jailbreak detection training
 }
 
 
