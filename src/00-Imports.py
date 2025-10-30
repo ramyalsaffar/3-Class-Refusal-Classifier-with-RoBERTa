@@ -52,7 +52,11 @@ from sklearn.metrics import (
     confusion_matrix,
     f1_score,
     accuracy_score,
-    precision_recall_fscore_support
+    precision_recall_fscore_support,
+    recall_score,
+    precision_score,
+    precision_recall_curve,
+    average_precision_score
 )
 
 # Visualization

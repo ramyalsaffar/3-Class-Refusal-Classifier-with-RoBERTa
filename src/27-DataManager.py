@@ -2,7 +2,8 @@
 #-------------------
 # Smart data retention and PostgreSQL management for production monitoring.
 # Implements intelligent sampling and retention strategies.
-# All imports are in 00-Imports.py
+# NOTE: This is a standalone production script with additional imports.
+# Requires: pip install psycopg2-binary (imports psycopg2 on line 27)
 ###############################################################################
 
 

@@ -144,8 +144,6 @@ class JailbreakAnalysis:
         all_labels = np.array(all_labels)
 
         # Calculate metrics
-        from sklearn.metrics import confusion_matrix, recall_score, precision_score
-
         cm = confusion_matrix(all_labels, all_preds)
 
         # For binary classification:
@@ -423,8 +421,6 @@ class JailbreakAnalysis:
         Calculate Precision-Recall curve.
         Better than ROC for highly imbalanced data.
         """
-        from sklearn.metrics import precision_recall_curve, average_precision_score
-
         # Use confidence as score
         precision, recall, thresholds = precision_recall_curve(labels, confidences)
         avg_precision = average_precision_score(labels, confidences)

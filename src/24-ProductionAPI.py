@@ -2,7 +2,8 @@
 #---------------------
 # FastAPI server for real-time inference with A/B testing support.
 # Logs all predictions to PostgreSQL for monitoring.
-# All imports are in 00-Imports.py
+# NOTE: This is a standalone production script with its own imports.
+# Requires: pip install fastapi uvicorn pydantic
 ###############################################################################
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks

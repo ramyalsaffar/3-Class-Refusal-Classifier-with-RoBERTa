@@ -2,7 +2,7 @@
 #---------------------------
 # Automated retraining with validation, A/B testing, and safe deployment.
 # Triggered when monitoring detects performance degradation.
-# All imports are in 00-Imports.py
+# NOTE: This is a standalone production script - core imports from 00-Imports.py
 ###############################################################################
 
 

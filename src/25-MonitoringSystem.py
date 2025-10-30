@@ -2,7 +2,7 @@
 #------------------------
 # Daily performance monitoring with escalating validation.
 # Detects model drift and triggers retraining when needed.
-# All imports are in 00-Imports.py
+# NOTE: This is a standalone production script - core imports from 00-Imports.py
 ###############################################################################
 
 
