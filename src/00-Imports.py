@@ -182,31 +182,32 @@ exec(open(CodeFilePath+"02-Constants.py").read())
 print("✓ Loaded 02-Constants.py")
 
 
-# Load remaining code files (03-27, excluding 22-27)
+# Load remaining code files (03-28, excluding 23-28)
 #--------------------------------------------------------
-# Files are numbered 00-27:
+# Files are numbered 00-28:
 #   00-Imports.py (this file)
 #   01-Config.py (loaded above)
 #   02-Constants.py (loaded above)
 #   03-AWSConfig.py (AWS configuration)
 #   04-SecretsHandler.py (AWS Secrets Manager)
 #   05-07: Data Collection (PromptGenerator, ResponseCollector, DataLabeler - with dual-task labeling)
-#   08: Dataset (generic PyTorch Dataset - works for both classifiers)
-#   09: RefusalClassifier (3-class: No/Hard/Soft Refusal)
-#   10: JailbreakClassifier (2-class: Jailbreak Failed/Succeeded)
-#   11: WeightedLoss (handles class imbalance)
-#   12: Trainer (generic trainer - works for both classifiers)
-#   13-15: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
-#   16: JailbreakAnalysis (security-critical jailbreak analysis with cross-analysis)
-#   17-18: Interpretability (AttentionVisualizer, ShapAnalyzer)
-#   19: Visualization (Visualizer)
-#   20-21: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
-#   22-Execute.py (main entry point - don't load)
-#   23-Analyze.py (analysis entry point - don't load)
-#   24-ProductionAPI.py (production API server - don't load)
-#   25-MonitoringSystem.py (production monitoring - don't load)
-#   26-RetrainingPipeline.py (production retraining - don't load)
-#   27-DataManager.py (production data management - don't load)
+#   08: DataCleaner (comprehensive data quality validation and cleaning)
+#   09: Dataset (generic PyTorch Dataset - works for both classifiers)
+#   10: RefusalClassifier (3-class: No/Hard/Soft Refusal)
+#   11: JailbreakClassifier (2-class: Jailbreak Failed/Succeeded)
+#   12: WeightedLoss (handles class imbalance)
+#   13: Trainer (generic trainer - works for both classifiers)
+#   14-16: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
+#   17: JailbreakAnalysis (security-critical jailbreak analysis with cross-analysis)
+#   18-19: Interpretability (AttentionVisualizer, ShapAnalyzer)
+#   20: Visualization (Visualizer)
+#   21-22: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
+#   23-Execute.py (main entry point - don't load)
+#   24-Analyze.py (analysis entry point - don't load)
+#   25-ProductionAPI.py (production API server - don't load)
+#   26-MonitoringSystem.py (production monitoring - don't load)
+#   27-RetrainingPipeline.py (production retraining - don't load)
+#   28-DataManager.py (production data management - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
@@ -216,12 +217,12 @@ code_files_ls = [x for x in code_files_ls if x not in [
     "00-Imports.py",      # This file
     "01-Config.py",        # Already loaded
     "02-Constants.py",     # Already loaded
-    "22-Execute.py",       # Execution script
-    "23-Analyze.py",       # Execution script
-    "24-ProductionAPI.py",      # Production API server (load manually)
-    "25-MonitoringSystem.py",   # Production monitoring (load manually)
-    "26-RetrainingPipeline.py", # Production retraining (load manually)
-    "27-DataManager.py"         # Production data management (load manually)
+    "23-Execute.py",       # Execution script
+    "24-Analyze.py",       # Execution script
+    "25-ProductionAPI.py",      # Production API server (load manually)
+    "26-MonitoringSystem.py",   # Production monitoring (load manually)
+    "27-RetrainingPipeline.py", # Production retraining (load manually)
+    "28-DataManager.py"         # Production data management (load manually)
 ]]
 
 # Loop over code files and load them

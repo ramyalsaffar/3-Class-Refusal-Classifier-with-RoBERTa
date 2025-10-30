@@ -41,25 +41,28 @@ class RefusalPipeline:
         # Step 3: Label data (dual-task labeling)
         labeled_df = self.label_data(responses_df)
 
-        # Step 4: Prepare datasets for BOTH classifiers
-        datasets = self.prepare_datasets(labeled_df)
+        # Step 4: Clean data
+        cleaned_df = self.clean_data(labeled_df)
 
-        # Step 5: Train refusal classifier
+        # Step 5: Prepare datasets for BOTH classifiers
+        datasets = self.prepare_datasets(cleaned_df)
+
+        # Step 6: Train refusal classifier
         refusal_history = self.train_refusal_classifier(
             datasets['refusal']['train_loader'],
             datasets['refusal']['val_loader']
         )
 
-        # Step 6: Train jailbreak detector
+        # Step 7: Train jailbreak detector
         jailbreak_history = self.train_jailbreak_detector(
             datasets['jailbreak']['train_loader'],
             datasets['jailbreak']['val_loader']
         )
 
-        # Step 7: Run analyses
+        # Step 8: Run analyses
         analysis_results = self.run_analyses(datasets['refusal']['test_df'])
 
-        # Step 8: Generate visualizations
+        # Step 9: Generate visualizations
         self.generate_visualizations(refusal_history, analysis_results)
 
         print("\n" + "="*60)
@@ -149,9 +152,52 @@ class RefusalPipeline:
 
         return responses_df
 
+    def clean_data(self, labeled_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Step 4: Clean and validate data quality.
+
+        Removes duplicates, outliers, and invalid data before training.
+
+        Args:
+            labeled_df: Labeled DataFrame
+
+        Returns:
+            Cleaned DataFrame
+        """
+        print("\n" + "="*60)
+        print("STEP 4: CLEANING DATA")
+        print("="*60)
+
+        # Initialize cleaner
+        cleaner = DataCleaner(verbose=True)
+
+        # Get outlier report first
+        report = cleaner.get_outlier_report(labeled_df)
+
+        if report['issues_found']:
+            print(f"\n📋 Outlier Report:")
+            print(f"   Total samples: {report['total_samples']}")
+            for issue in report['issues_found']:
+                print(f"   • {issue['type']}: {issue['count']} ({issue['percentage']:.2f}%)")
+            print(f"   Recommendation: {report['recommendation']}")
+        else:
+            print(f"\n✅ No data quality issues detected!")
+            print(f"   Total samples: {report['total_samples']}")
+
+        # Clean the data
+        strategy = EXPERIMENT_CONFIG.get('cleaning_strategy', 'auto')
+        cleaned_df = cleaner.clean_dataset(labeled_df, strategy=strategy)
+
+        # Save cleaned data
+        cleaned_path = os.path.join(data_processed_path, "cleaned_responses.pkl")
+        cleaned_df.to_pickle(cleaned_path)
+        print(f"\n✓ Saved cleaned data to {cleaned_path}")
+
+        return cleaned_df
+
     def prepare_datasets(self, labeled_df: pd.DataFrame) -> Dict:
         """
-        Step 4: Prepare train/val/test datasets for BOTH classifiers.
+        Step 5: Prepare train/val/test datasets for BOTH classifiers.
 
         Returns:
             Dictionary with structure:
@@ -161,7 +207,7 @@ class RefusalPipeline:
             }
         """
         print("\n" + "="*60)
-        print("STEP 4: PREPARING DATASETS (DUAL CLASSIFIERS)")
+        print("STEP 5: PREPARING DATASETS (DUAL CLASSIFIERS)")
         print("="*60)
 
         # Filter out error labels (-1) from refusal labels
