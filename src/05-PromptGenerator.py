@@ -444,13 +444,12 @@ Output ONLY a JSON array of {num} strings."""
             return self._call_gpt4(template, num_prompts, retry_count + 1, max_retries)
 
     def save_prompts(self, prompts: Dict[str, List[str]], output_dir: str):
-        """Save generated prompts to JSON files."""
+        """Save generated prompts to pickle files."""
         os.makedirs(output_dir, exist_ok=True)
 
         for prompt_type, prompt_list in prompts.items():
-            filepath = os.path.join(output_dir, f"prompts_{prompt_type}.json")
-            with open(filepath, 'w') as f:
-                json.dump(prompt_list, f, indent=2)
+            filepath = os.path.join(output_dir, f"prompts_{prompt_type}.pkl")
+            pd.DataFrame({'prompt': prompt_list}).to_pickle(filepath)
             print(f"Saved {len(prompt_list)} prompts to {filepath}")
 
 

@@ -163,8 +163,8 @@ class ResponseCollector:
         for model_name in self.models:
             model_df = df[df['model'] == model_name]
             safe_name = model_name.replace('-', '_').replace('.', '_')
-            filepath = os.path.join(output_dir, f"{safe_name}_responses.json")
-            model_df.to_json(filepath, orient='records', indent=2)
+            filepath = os.path.join(output_dir, f"{safe_name}_responses.pkl")
+            model_df.to_pickle(filepath)
             print(f"Saved {len(model_df)} responses to {filepath}")
 
         # Save combined
