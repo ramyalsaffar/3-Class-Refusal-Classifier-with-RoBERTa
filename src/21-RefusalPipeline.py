@@ -113,8 +113,7 @@ class RefusalPipeline:
         for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
             refusal_label, jailbreak_label = labeler.label_response(
                 response=row['response'],
-                prompt=row['prompt'],
-                expected_label=row.get('expected_label', None)
+                prompt=row['prompt']
             )
             refusal_labels.append(refusal_label)
             jailbreak_labels.append(jailbreak_label)
