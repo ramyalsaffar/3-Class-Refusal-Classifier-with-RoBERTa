@@ -27,3 +27,9 @@ shap>=0.42.0
 # Utilities
 tqdm>=4.65.0
 python-dotenv>=1.0.0
+
+# Production Deployment (Optional)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+pydantic>=2.0.0
+psycopg2-binary>=2.9.0

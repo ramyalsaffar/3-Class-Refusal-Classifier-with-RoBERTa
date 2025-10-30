@@ -209,6 +209,98 @@ AWS_CONFIG = {
 }
 
 
+# Production Configuration (Optional)
+#-------------------------------------
+# Configuration for production deployment with real-time monitoring,
+# A/B testing, and automated retraining pipeline
+PRODUCTION_CONFIG = {
+    # PostgreSQL Database
+    'database': {
+        'host': os.getenv('DB_HOST', 'localhost'),
+        'port': int(os.getenv('DB_PORT', '5432')),
+        'database': os.getenv('DB_NAME', 'refusal_classifier_prod'),
+        'user': os.getenv('DB_USER', 'refusal_admin'),
+        'password': os.getenv('DB_PASSWORD', ''),  # Use env var or secrets manager
+        'pool_size': 10,
+        'max_overflow': 20
+    },
+
+    # Monitoring Thresholds
+    'monitoring': {
+        'daily_check_size': 100,                    # Samples for daily monitoring check
+        'escalated_check_size': 1000,               # Samples for escalated check
+        'warning_threshold': 0.10,                  # 10% disagreement triggers warning
+        'escalate_threshold': 0.15,                 # 15% disagreement triggers escalation
+        'retrain_threshold': 0.20,                  # 20% disagreement triggers retrain
+        'check_interval_hours': 24,                 # Daily monitoring
+        'trend_window_days': 7                      # Days to analyze trends
+    },
+
+    # LLM Judge for Production Monitoring
+    'judge': {
+        'model': 'gpt-4',                           # GPT-4 for high accuracy
+        'temperature': 0.0,                         # Deterministic
+        'max_tokens': 10,                           # Only need score
+        'rate_limit_delay': 0.5,                    # Delay between judge calls
+        'max_retries': 3                            # Retries for failed calls
+    },
+
+    # A/B Testing Configuration
+    'ab_testing': {
+        'enabled': False,                           # Start disabled
+        'stages': [0.05, 0.25, 0.5, 1.0],          # Rollout stages: 5% → 25% → 50% → 100%
+        'min_samples_per_stage': 1000,              # Min samples before next stage
+        'max_degradation': 0.02,                    # Max 2% F1 drop to continue
+        'shadow_mode': False,                       # Shadow mode (log but don't serve)
+        'automatic_rollback': True,                 # Auto-rollback if degradation
+        'manual_promotion': True                    # Require manual promotion (MVP)
+    },
+
+    # Retraining Configuration
+    'retraining': {
+        'enabled': True,                            # Enable automated retraining
+        'schedule': 'weekly',                       # Weekly retraining schedule
+        'trigger_on_drift': True,                   # Trigger if drift detected
+        'validation_f1_threshold': 0.85,            # Min F1 for deployment
+        'validation_confidence_threshold': 0.80,    # Min avg confidence
+        'retain_historical_samples': True,          # Prevent catastrophic forgetting
+        'freeze_layers': 6,                         # Transfer learning (freeze bottom layers)
+        'max_epochs': 5,                            # Max training epochs
+        'early_stopping_patience': 2                # Early stopping patience
+    },
+
+    # Data Retention Strategy
+    'retention': {
+        'recent_days': 7,                           # Recent: keep 100% problematic + 20% correct
+        'recent_problematic_rate': 1.0,             # 100% of problematic samples
+        'recent_correct_rate': 0.2,                 # 20% of correct samples
+        'medium_days': 30,                          # Medium: keep 50% stratified
+        'medium_rate': 0.5,                         # 50% stratified sampling
+        'longterm_days': 180,                       # Long-term: keep 10% representative
+        'longterm_rate': 0.1,                       # 10% representative sampling
+        'archive_after_days': 365                   # Archive after 1 year
+    },
+
+    # API Configuration
+    'api': {
+        'host': os.getenv('API_HOST', '0.0.0.0'),
+        'port': int(os.getenv('API_PORT', '8000')),
+        'workers': int(os.getenv('API_WORKERS', '4')),
+        'timeout': 30,                              # Request timeout (seconds)
+        'max_request_size': 1024 * 1024,           # 1MB max request
+        'enable_cors': True,                        # Enable CORS for frontend
+        'log_level': os.getenv('LOG_LEVEL', 'info')
+    },
+
+    # Cost Control
+    'cost': {
+        'max_daily_judge_calls': 5000,              # Max judge calls per day
+        'alert_daily_cost': 100.0,                  # Alert if daily cost exceeds $100
+        'max_monthly_cost': 2000.0                  # Hard limit: $2000/month
+    }
+}
+
+
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-

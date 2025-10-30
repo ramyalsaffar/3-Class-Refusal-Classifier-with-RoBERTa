@@ -73,6 +73,26 @@ except ImportError:
     AWS_AVAILABLE = False
     print("ℹ️  boto3 not available - AWS features disabled")
 
+# Production API (optional - only needed for production deployment)
+try:
+    from fastapi import FastAPI, HTTPException, BackgroundTasks
+    from fastapi.responses import JSONResponse
+    from pydantic import BaseModel
+    import uvicorn
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    FASTAPI_AVAILABLE = False
+    print("ℹ️  FastAPI not available - production API features disabled")
+
+# PostgreSQL (optional - only needed for production monitoring)
+try:
+    import psycopg2
+    from psycopg2 import sql
+    POSTGRESQL_AVAILABLE = True
+except ImportError:
+    POSTGRESQL_AVAILABLE = False
+    print("ℹ️  psycopg2 not available - PostgreSQL features disabled")
+
 
 #------------------------------------------------------------------------------
 
@@ -180,7 +200,7 @@ print("✓ Loaded 02-Constants.py")
 
 # Load remaining code files (03-21, excluding 20 and 21)
 #--------------------------------------------------------
-# Files are numbered 00-21:
+# Files are numbered 00-25:
 #   00-Imports.py (this file)
 #   01-Config.py (loaded above)
 #   02-Constants.py (loaded above)
@@ -195,6 +215,10 @@ print("✓ Loaded 02-Constants.py")
 #   18-19: Orchestration (RefusalPipeline, ExperimentRunner)
 #   20-Execute.py (main entry point - don't load)
 #   21-Analyze.py (analysis entry point - don't load)
+#   22-ProductionAPI.py (production API server - don't load)
+#   23-MonitoringSystem.py (production monitoring - don't load)
+#   24-RetrainingPipeline.py (production retraining - don't load)
+#   25-DataManager.py (production data management - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
@@ -205,7 +229,11 @@ code_files_ls = [x for x in code_files_ls if x not in [
     "01-Config.py",        # Already loaded
     "02-Constants.py",     # Already loaded
     "20-Execute.py",       # Execution script
-    "21-Analyze.py"        # Execution script
+    "21-Analyze.py",       # Execution script
+    "22-ProductionAPI.py",      # Production API server (load manually)
+    "23-MonitoringSystem.py",   # Production monitoring (load manually)
+    "24-RetrainingPipeline.py", # Production retraining (load manually)
+    "25-DataManager.py"         # Production data management (load manually)
 ]]
 
 # Loop over code files and load them
