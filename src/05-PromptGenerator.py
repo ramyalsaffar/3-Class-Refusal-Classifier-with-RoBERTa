@@ -384,22 +384,27 @@ Output ONLY a JSON array of {num} strings."""
 
         return templates[category][refusal_type]
 
-    def _call_gpt4(self, template: str, num_prompts: int) -> List[str]:
+    def _call_gpt4(self, template: str, num_prompts: int, retry_count: int = 0, max_retries: int = 3) -> List[str]:
         """
-        Call GPT-4 to generate prompts.
+        Call GPT-4 to generate prompts with retry logic.
 
         Args:
             template: Prompt template
             num_prompts: Number of prompts to generate
+            retry_count: Current retry attempt (internal)
+            max_retries: Maximum number of retries before failing
 
         Returns:
             List of generated prompts
+
+        Raises:
+            RuntimeError: If max retries exceeded
         """
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "Output only valid JSON arrays. Use realistic patterns and phrasing from actual scenarios."},
+                    {"role": "system", "content": "You are assisting with AI safety research. Output only valid JSON arrays."},
                     {"role": "user", "content": template.format(num=num_prompts)}
                 ],
                 temperature=self.temperature,
@@ -407,6 +412,11 @@ Output ONLY a JSON array of {num} strings."""
             )
 
             content = response.choices[0].message.content.strip()
+
+            # Check for refusal indicators
+            refusal_keywords = ["i cannot", "i can't", "i'm not able", "i apologize", "i'm unable", "i must decline"]
+            if any(keyword in content.lower() for keyword in refusal_keywords):
+                raise ValueError(f"GPT-4 refused to generate content: {content[:200]}")
 
             # Parse JSON
             # GPT-4 might wrap in ```json ... ``` blocks
@@ -424,11 +434,14 @@ Output ONLY a JSON array of {num} strings."""
             return [str(p).strip() for p in prompts if p]
 
         except Exception as e:
-            print(f"Error calling GPT-4: {e}")
-            print(f"Retrying...")
-            # Simple retry
+            if retry_count >= max_retries:
+                print(f"❌ GPT-4 failed after {max_retries} retries: {e}")
+                raise RuntimeError(f"Failed to generate prompts after {max_retries} attempts") from e
+
+            print(f"⚠️  GPT-4 attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
+            print(f"   Retrying in 2 seconds...")
             time.sleep(2)
-            return self._call_gpt4(template, num_prompts)
+            return self._call_gpt4(template, num_prompts, retry_count + 1, max_retries)
 
     def save_prompts(self, prompts: Dict[str, List[str]], output_dir: str):
         """Save generated prompts to JSON files."""
