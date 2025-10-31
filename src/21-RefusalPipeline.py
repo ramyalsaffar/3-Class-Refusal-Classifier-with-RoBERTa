@@ -110,20 +110,26 @@ class RefusalPipeline:
         # Initialize labeler with OpenAI API key (for GPT-4 judge)
         labeler = DataLabeler(api_key=self.api_keys['openai'])
 
-        # Label each response using the judge (returns both refusal + jailbreak labels)
+        # Label each response using the judge (returns labels + confidence scores)
         refusal_labels = []
         jailbreak_labels = []
+        refusal_confidences = []
+        jailbreak_confidences = []
 
         for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
-            refusal_label, jailbreak_label = labeler.label_response(
+            refusal_label, jailbreak_label, refusal_conf, jailbreak_conf = labeler.label_response(
                 response=row['response'],
                 prompt=row['prompt']
             )
             refusal_labels.append(refusal_label)
             jailbreak_labels.append(jailbreak_label)
+            refusal_confidences.append(refusal_conf)
+            jailbreak_confidences.append(jailbreak_conf)
 
         responses_df['refusal_label'] = refusal_labels
         responses_df['jailbreak_label'] = jailbreak_labels
+        responses_df['refusal_confidence'] = refusal_confidences
+        responses_df['jailbreak_confidence'] = jailbreak_confidences
 
         # Print refusal label distribution
         print(f"\n{'='*60}")
@@ -144,6 +150,25 @@ class RefusalPipeline:
             pct = count / len(responses_df) * 100
             label_name = labeler.get_jailbreak_label_name(i)
             print(f"  {label_name}: {count} ({pct:.1f}%)")
+
+        # Print confidence statistics
+        print(f"\n{'='*60}")
+        print(f"CONFIDENCE STATISTICS")
+        print(f"{'='*60}")
+        valid_refusal = responses_df[responses_df['refusal_label'] != -1]
+        valid_jailbreak = responses_df[responses_df['jailbreak_label'] != -1]
+
+        if len(valid_refusal) > 0:
+            avg_ref_conf = valid_refusal['refusal_confidence'].mean()
+            low_conf_ref = (valid_refusal['refusal_confidence'] < 60).sum()
+            print(f"  Refusal - Avg Confidence: {avg_ref_conf:.1f}%")
+            print(f"  Refusal - Low confidence (<60%): {low_conf_ref} ({low_conf_ref/len(valid_refusal)*100:.1f}%)")
+
+        if len(valid_jailbreak) > 0:
+            avg_jb_conf = valid_jailbreak['jailbreak_confidence'].mean()
+            low_conf_jb = (valid_jailbreak['jailbreak_confidence'] < 60).sum()
+            print(f"  Jailbreak - Avg Confidence: {avg_jb_conf:.1f}%")
+            print(f"  Jailbreak - Low confidence (<60%): {low_conf_jb} ({low_conf_jb/len(valid_jailbreak)*100:.1f}%)")
 
         # Save labeled data
         labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")
