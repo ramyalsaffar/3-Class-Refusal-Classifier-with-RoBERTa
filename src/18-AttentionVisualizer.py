@@ -8,18 +8,24 @@
 class AttentionVisualizer:
     """Visualize attention weights from RoBERTa model."""
 
-    def __init__(self, model, tokenizer, device):
+    def __init__(self, model, tokenizer, device, class_names: List[str] = None):
         """
         Initialize attention visualizer.
 
+        GENERIC: Works with any classifier (RefusalClassifier or JailbreakDetector).
+
         Args:
-            model: Trained RefusalClassifier
+            model: Trained classification model (RefusalClassifier or JailbreakDetector)
             tokenizer: RoBERTa tokenizer
             device: torch device
+            class_names: List of class names (default: uses CLASS_NAMES from config)
         """
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
+        self.class_names = class_names or CLASS_NAMES
+        self.num_classes = len(self.class_names)
+        self.dpi = VISUALIZATION_CONFIG['dpi']
         self.model.eval()
 
     def get_attention_weights(self, text: str):
@@ -119,7 +125,7 @@ class AttentionVisualizer:
         ax1.set_xlabel('Attention Weight', fontsize=11)
         ax1.set_title(
             f'Layer {layer_idx} - [CLS] Token Attention\n'
-            f'Predicted: {CLASS_NAMES[predicted]} (confidence: {confidence:.3f})',
+            f'Predicted: {self.class_names[predicted]} (confidence: {confidence:.3f})',
             fontsize=12, fontweight='bold'
         )
         ax1.grid(axis='x', alpha=0.3)
@@ -140,7 +146,7 @@ class AttentionVisualizer:
         ax2.grid(axis='x', alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
 
         print(f"✓ Saved attention visualization to {output_path}")
@@ -149,6 +155,8 @@ class AttentionVisualizer:
                        output_dir: str = None):
         """
         Analyze attention patterns for multiple samples.
+
+        GENERIC: Works with any number of classes (2, 3, or more).
 
         Args:
             test_df: Test DataFrame
@@ -168,8 +176,8 @@ class AttentionVisualizer:
 
         results = {'by_class': {}, 'examples': []}
 
-        for class_idx in range(3):
-            class_name = CLASS_NAMES[class_idx]
+        for class_idx in range(self.num_classes):
+            class_name = self.class_names[class_idx]
             print(f"\nAnalyzing {class_name} samples...")
 
             # Get samples from this class
@@ -214,7 +222,7 @@ class AttentionVisualizer:
                 results['examples'].append({
                     'text': text[:100] + '...' if len(text) > 100 else text,
                     'true_label': class_name,
-                    'predicted_label': CLASS_NAMES[attention_data['predicted_class']],
+                    'predicted_label': self.class_names[attention_data['predicted_class']],
                     'confidence': float(attention_data['confidence']),
                     'tokens': attention_data['tokens'][:20]  # First 20 tokens
                 })
@@ -269,11 +277,11 @@ class AttentionVisualizer:
             ax.grid(axis='x', alpha=0.3)
 
         plt.suptitle(
-            f'Attention Across All Layers\nPredicted: {CLASS_NAMES[predicted]}',
+            f'Attention Across All Layers\nPredicted: {self.class_names[predicted]}',
             fontsize=14, fontweight='bold', y=0.995
         )
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
 
         print(f"✓ Saved layer comparison to {output_path}")

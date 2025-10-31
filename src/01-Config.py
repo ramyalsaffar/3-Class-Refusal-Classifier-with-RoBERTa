@@ -396,6 +396,15 @@ PRODUCTION_CONFIG = {
     }
 }
 
+# Visualization Configuration
+VISUALIZATION_CONFIG = {
+    'dpi': 150,                      # DPI for all saved plots
+    'figure_format': 'png',          # Output format
+    'style': 'whitegrid',            # Seaborn style
+    'color_palette': 'Set2',
+    'font_scale': 1.0
+}
+
 
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
