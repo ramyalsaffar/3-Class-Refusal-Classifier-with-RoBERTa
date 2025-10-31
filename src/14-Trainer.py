@@ -13,8 +13,10 @@ class Trainer:
         """
         Initialize trainer.
 
+        Generic trainer that works for any classification model.
+
         Args:
-            model: RefusalClassifier model
+            model: Classification model (RefusalClassifier or JailbreakDetector)
             train_loader: Training data loader
             val_loader: Validation data loader
             criterion: Loss function

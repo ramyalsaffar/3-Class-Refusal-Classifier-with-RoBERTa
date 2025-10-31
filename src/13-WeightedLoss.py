@@ -31,13 +31,17 @@ def calculate_class_weights(class_counts: List[int], device: torch.device) -> to
     return torch.FloatTensor(weights).to(device)
 
 
-def get_weighted_criterion(class_counts: List[int], device: torch.device) -> nn.CrossEntropyLoss:
+def get_weighted_criterion(class_counts: List[int], device: torch.device,
+                          class_names: List[str] = None) -> nn.CrossEntropyLoss:
     """
     Get weighted CrossEntropyLoss criterion.
+
+    Generic function that works for any number of classes (binary, 3-class, multi-class).
 
     Args:
         class_counts: List of sample counts per class
         device: torch device
+        class_names: Optional list of class names for display (default: Class 0, Class 1, ...)
 
     Returns:
         nn.CrossEntropyLoss with class weights
@@ -45,9 +49,11 @@ def get_weighted_criterion(class_counts: List[int], device: torch.device) -> nn.
     class_weights = calculate_class_weights(class_counts, device)
 
     print(f"Class weights: {class_weights.cpu().numpy()}")
-    print(f"  Class 0 (No Refusal): {class_weights[0]:.3f}")
-    print(f"  Class 1 (Hard Refusal): {class_weights[1]:.3f}")
-    print(f"  Class 2 (Soft Refusal): {class_weights[2]:.3f}")
+
+    # Generic printing for any number of classes
+    for i, weight in enumerate(class_weights):
+        class_label = class_names[i] if class_names and i < len(class_names) else f"Class {i}"
+        print(f"  {class_label}: {weight:.3f}")
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 

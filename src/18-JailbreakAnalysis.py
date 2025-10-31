@@ -32,8 +32,9 @@ class JailbreakAnalysis:
         self.tokenizer = tokenizer
         self.device = device
 
-        # Reuse existing analyzers
-        self.confidence_analyzer = ConfidenceAnalyzer(jailbreak_model, tokenizer, device)
+        # Reuse existing analyzers (with jailbreak-specific class names)
+        jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
+        self.confidence_analyzer = ConfidenceAnalyzer(jailbreak_model, tokenizer, device, jailbreak_class_names)
         self.attention_viz = AttentionVisualizer(jailbreak_model, tokenizer, device)
 
     def analyze_full(self, test_df: pd.DataFrame) -> Dict:

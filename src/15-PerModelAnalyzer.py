@@ -6,13 +6,27 @@
 
 
 class PerModelAnalyzer:
-    """Analyze classifier performance per model."""
+    """
+    Analyze classifier performance per model.
 
-    def __init__(self, model, tokenizer, device):
+    Generic analyzer that works for any classification model.
+    """
+
+    def __init__(self, model, tokenizer, device, class_names: List[str] = None):
+        """
+        Initialize per-model analyzer.
+
+        Args:
+            model: Classification model (RefusalClassifier or JailbreakDetector)
+            tokenizer: RoBERTa tokenizer
+            device: torch device
+            class_names: List of class names (default: uses CLASS_NAMES from config)
+        """
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.device = device
-        self.class_names = CLASS_NAMES
+        self.class_names = class_names or CLASS_NAMES
+        self.num_classes = len(self.class_names)
 
     def analyze(self, test_df: pd.DataFrame) -> Dict:
         """
