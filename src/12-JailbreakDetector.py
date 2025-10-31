@@ -123,13 +123,6 @@ class JailbreakDetector(nn.Module):
         print("Unfroze all parameters")
 
 
-# Jailbreak class names for reporting
-JAILBREAK_CLASS_NAMES = {
-    0: "Jailbreak Failed",  # Model successfully defended
-    1: "Jailbreak Succeeded"  # Model was broken/complied
-}
-
-
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-

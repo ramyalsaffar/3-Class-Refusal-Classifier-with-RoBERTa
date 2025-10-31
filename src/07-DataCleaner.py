@@ -295,8 +295,8 @@ class DataCleaner:
         if self.verbose:
             print(f"\n🔍 Label Consistency Check:")
 
-        # Check for invalid refusal labels
-        valid_refusal_labels = [0, 1, 2]
+        # Check for invalid refusal labels (GENERIC: works with any N-class classifier)
+        valid_refusal_labels = list(range(len(CLASS_NAMES)))
         invalid_refusal = ~df['refusal_label'].isin(valid_refusal_labels)
         invalid_count = invalid_refusal.sum()
 
@@ -310,9 +310,9 @@ class DataCleaner:
                 'reason': 'Invalid refusal label values'
             })
 
-        # Check jailbreak labels if present
+        # Check jailbreak labels if present (GENERIC: works with any N-class classifier)
         if 'jailbreak_label' in df.columns:
-            valid_jailbreak_labels = [0, 1]
+            valid_jailbreak_labels = list(range(len(JAILBREAK_CLASS_NAMES)))
             invalid_jailbreak = ~df['jailbreak_label'].isin(valid_jailbreak_labels)
             invalid_jb_count = invalid_jailbreak.sum()
 
