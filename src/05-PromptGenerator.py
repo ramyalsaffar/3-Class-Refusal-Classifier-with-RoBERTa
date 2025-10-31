@@ -617,7 +617,7 @@ OUTPUT FORMAT (MUST be valid JSON):
 ]
 
 THRESHOLD: ≥80% passes, <80% fails.
-Be HARSH but FAIR. Real humans are messy, imperfect, and unpredictable."""
+Be HARSH but FAIR."""
 
         try:
             response = self.client.chat.completions.create(
