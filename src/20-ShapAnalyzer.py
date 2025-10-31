@@ -242,10 +242,10 @@ class ShapAnalyzer:
             print(f"⚠️  Could not create summary plot: {e}")
 
         # Save results
-        results_path = os.path.join(output_dir, "shap_analysis_results.json")
-        with open(results_path, 'w') as f:
+        results_json_path = os.path.join(output_dir, "shap_analysis_results.json")
+        with open(results_json_path, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"\n✓ Saved SHAP analysis to {results_path}")
+        print(f"\n✓ Saved SHAP analysis to {results_json_path}")
 
         return results
 

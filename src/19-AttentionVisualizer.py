@@ -231,10 +231,10 @@ class AttentionVisualizer:
             print(f"  Attention entropy: {results['by_class'][class_name]['avg_entropy']:.4f}")
 
         # Save results
-        results_path = os.path.join(output_dir, "attention_analysis_results.json")
-        with open(results_path, 'w') as f:
+        results_json_path = os.path.join(output_dir, "attention_analysis_results.json")
+        with open(results_json_path, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"\n✓ Saved attention analysis to {results_path}")
+        print(f"\n✓ Saved attention analysis to {results_json_path}")
 
         return results
 
