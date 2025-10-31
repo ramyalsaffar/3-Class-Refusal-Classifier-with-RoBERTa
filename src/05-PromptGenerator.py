@@ -592,19 +592,21 @@ Output ONLY a JSON array of {{num}} strings."""
             return self._call_gpt4_generate(template, num_prompts, retry_count + 1, max_retries)
 
     def _evaluate_prompts(self, prompts: List[str], category: str,
-                         refusal_type: str) -> List[Dict]:
+                         refusal_type: str, retry_count: int = 0) -> List[Dict]:
         """
-        STAGE 2: Evaluate prompt quality using GPT-4 as strict judge.
+        STAGE 2: Evaluate prompt quality using GPT-4 as strict judge WITH RETRY.
 
         Uses simplified percentage-based evaluation:
         - Assesses overall human-likeness as a percentage (0-100%)
         - Threshold: ≥80% passes, <80% fails and triggers regeneration
         - Provides brief feedback for failed prompts
+        - Retries up to max_retries times on failure
 
         Args:
             prompts: List of prompts to evaluate
             category: Category name
             refusal_type: 'hard', 'soft', or 'none'
+            retry_count: Current retry attempt (internal use)
 
         Returns:
             List of evaluation results with pass/fail status
@@ -654,6 +656,8 @@ OUTPUT FORMAT (MUST be valid JSON):
 THRESHOLD: ≥80% passes, <80% fails.
 Be HARSH but FAIR."""
 
+        max_retries = API_CONFIG['max_retries']
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -678,18 +682,25 @@ Be HARSH but FAIR."""
             return results
 
         except Exception as e:
-            print(f"⚠️  Stage 2 evaluation failed: {e}")
-            # On failure, assume all prompts pass (fail-open)
-            return [
-                {
-                    'prompt_index': i,
-                    'prompt_text': prompt,
-                    'human_likeness_percent': 100,
-                    'passes_quality': True,
-                    'reason': ''
-                }
-                for i, prompt in enumerate(prompts)
-            ]
+            if retry_count < max_retries:
+                print(f"⚠️  Stage 2 evaluation attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
+                print(f"   Retrying in {API_CONFIG['rate_limit_delay']} seconds...")
+                time.sleep(API_CONFIG['rate_limit_delay'])
+                return self._evaluate_prompts(prompts, category, refusal_type, retry_count + 1)
+            else:
+                print(f"⚠️  Stage 2 evaluation failed after {max_retries + 1} attempts: {e}")
+                # On final failure, assume all prompts pass (fail-open to avoid blocking pipeline)
+                print(f"   ⚠️  FAIL-OPEN: Assuming all {len(prompts)} prompts pass")
+                return [
+                    {
+                        'prompt_index': i,
+                        'prompt_text': prompt,
+                        'human_likeness_percent': 100,
+                        'passes_quality': True,
+                        'reason': 'evaluation_failed_failopen'
+                    }
+                    for i, prompt in enumerate(prompts)
+                ]
 
     def _regenerate_prompt(self, failed_prompt: str, human_likeness_percent: int,
                           reason: str, category: str, refusal_type: str,

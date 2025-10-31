@@ -387,15 +387,18 @@ EXAMPLES:
 
         return float(cosine_sim)
 
-    def _check_category_preservation(self, original: str, paraphrase: str) -> bool:
+    def _check_category_preservation(self, original: str, paraphrase: str,
+                                    retry_count: int = 0) -> bool:
         """
-        Check if paraphrase preserves the same refusal category.
+        Check if paraphrase preserves the same refusal category WITH RETRY.
 
         Uses GPT-4 to classify both texts and ensures they match.
+        Retries up to max_retries times on failure.
 
         Args:
             original: Original text
             paraphrase: Paraphrased text
+            retry_count: Current retry attempt (internal use)
 
         Returns:
             True if categories match, False otherwise
@@ -415,28 +418,42 @@ Text 2: {paraphrase}
 
 IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). Nothing else."""
 
-        response = self.openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a precise classifier. Return only numbers."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.0,
-            max_tokens=10
-        )
-
-        result = response.choices[0].message.content.strip()
+        max_retries = API_CONFIG['max_retries']
 
         try:
-            categories = [int(x.strip()) for x in result.split(',')]
-            if len(categories) == 2:
-                return categories[0] == categories[1]
-            else:
-                print(f"\n⚠️  Unexpected category format: {result}")
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a precise classifier. Return only numbers."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.0,
+                max_tokens=10
+            )
+
+            result = response.choices[0].message.content.strip()
+
+            try:
+                categories = [int(x.strip()) for x in result.split(',')]
+                if len(categories) == 2:
+                    return categories[0] == categories[1]
+                else:
+                    print(f"\n⚠️  Unexpected category format: {result}")
+                    return False
+            except Exception as e:
+                print(f"\n⚠️  Failed to parse categories: {result}, error: {e}")
                 return False
+
         except Exception as e:
-            print(f"\n⚠️  Failed to parse categories: {result}, error: {e}")
-            return False
+            if retry_count < max_retries:
+                print(f"⚠️  Category preservation check attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
+                print(f"   Retrying in {API_CONFIG['rate_limit_delay']} seconds...")
+                time.sleep(API_CONFIG['rate_limit_delay'])
+                return self._check_category_preservation(original, paraphrase, retry_count + 1)
+            else:
+                print(f"⚠️  Category preservation check failed after {max_retries + 1} attempts: {e}")
+                print(f"   FAIL-OPEN: Assuming category is NOT preserved (validation fails)")
+                return False
 
     def _calculate_quality_summary(self) -> Dict:
         """Calculate summary statistics from quality tracking including retry stats."""
