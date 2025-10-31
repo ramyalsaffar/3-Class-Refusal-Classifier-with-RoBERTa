@@ -29,6 +29,7 @@ class AdversarialTester:
         self.min_semantic_similarity = 0.85  # Cosine similarity threshold
         self.min_length_ratio = 0.3
         self.max_length_ratio = 3.0
+        self.max_paraphrase_attempts = 3  # Retry up to 3 times
 
         # Quality tracking
         self.quality_stats = {
@@ -38,7 +39,13 @@ class AdversarialTester:
             'length_failures': 0,
             'successful_paraphrases': 0,
             'fallback_to_original': 0,
-            'avg_semantic_similarity': []
+            'avg_semantic_similarity': [],
+            # Retry statistics
+            'succeeded_first_try': 0,
+            'succeeded_after_retry': 0,
+            'total_retries': 0,
+            'failed_all_retries': 0,
+            'retry_distribution': {}  # {attempt_number: count}
         }
 
     def test_robustness(self, test_df: pd.DataFrame, num_samples: int = None) -> Dict:
@@ -66,7 +73,13 @@ class AdversarialTester:
             'length_failures': 0,
             'successful_paraphrases': 0,
             'fallback_to_original': 0,
-            'avg_semantic_similarity': []
+            'avg_semantic_similarity': [],
+            # Retry statistics
+            'succeeded_first_try': 0,
+            'succeeded_after_retry': 0,
+            'total_retries': 0,
+            'failed_all_retries': 0,
+            'retry_distribution': {}
         }
 
         # Sample from test set
@@ -113,42 +126,78 @@ class AdversarialTester:
         return results
 
     def _test_dimension(self, df: pd.DataFrame, dimension: str) -> float:
-        """Test one paraphrasing dimension with quality tracking."""
+        """Test one paraphrasing dimension with quality tracking and retry logic."""
         paraphrased_texts = []
 
         for text in tqdm(df['response'].tolist(), desc=f"Paraphrasing ({dimension})"):
-            self.quality_stats['total_attempts'] += 1
+            paraphrase_succeeded = False
+            final_paraphrase = None
 
-            try:
-                paraphrase = self._generate_paraphrase(text, dimension)
-                validation_result = self._validate_paraphrase(text, paraphrase)
+            # Try paraphrasing up to max_paraphrase_attempts times
+            for attempt in range(self.max_paraphrase_attempts):
+                self.quality_stats['total_attempts'] += 1
 
-                if validation_result['valid']:
-                    paraphrased_texts.append(paraphrase)
-                    self.quality_stats['successful_paraphrases'] += 1
-                    if validation_result['semantic_similarity'] is not None:
-                        self.quality_stats['avg_semantic_similarity'].append(
-                            validation_result['semantic_similarity']
-                        )
-                else:
-                    # Fallback to original
-                    paraphrased_texts.append(text)
-                    self.quality_stats['fallback_to_original'] += 1
+                try:
+                    paraphrase = self._generate_paraphrase(text, dimension)
+                    validation_result = self._validate_paraphrase(text, paraphrase)
 
-                    # Track failure reasons
-                    if not validation_result['length_ok']:
-                        self.quality_stats['length_failures'] += 1
-                    if not validation_result['semantic_ok']:
-                        self.quality_stats['semantic_similarity_failures'] += 1
-                    if not validation_result['category_ok']:
-                        self.quality_stats['category_preservation_failures'] += 1
+                    if validation_result['valid']:
+                        # SUCCESS!
+                        final_paraphrase = paraphrase
+                        paraphrase_succeeded = True
+                        self.quality_stats['successful_paraphrases'] += 1
 
-                time.sleep(API_CONFIG['rate_limit_delay'])
+                        # Track which attempt succeeded
+                        if attempt == 0:
+                            self.quality_stats['succeeded_first_try'] += 1
+                        else:
+                            self.quality_stats['succeeded_after_retry'] += 1
+                            self.quality_stats['total_retries'] += attempt
 
-            except Exception as e:
-                print(f"\n⚠️  Error paraphrasing: {e}")
+                        # Track retry distribution
+                        attempt_key = f'attempt_{attempt + 1}'
+                        self.quality_stats['retry_distribution'][attempt_key] = \
+                            self.quality_stats['retry_distribution'].get(attempt_key, 0) + 1
+
+                        # Track semantic similarity
+                        if validation_result['semantic_similarity'] is not None:
+                            self.quality_stats['avg_semantic_similarity'].append(
+                                validation_result['semantic_similarity']
+                            )
+
+                        break  # Success, no need to retry
+
+                    else:
+                        # Validation failed, will retry if attempts remain
+                        if attempt == 0:
+                            # Track failure reasons on first attempt only (to avoid double counting)
+                            if not validation_result['length_ok']:
+                                self.quality_stats['length_failures'] += 1
+                            if not validation_result['semantic_ok']:
+                                self.quality_stats['semantic_similarity_failures'] += 1
+                            if not validation_result['category_ok']:
+                                self.quality_stats['category_preservation_failures'] += 1
+
+                        # Continue to next retry
+                        continue
+
+                except Exception as e:
+                    if attempt == 0:
+                        print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}): {e}")
+                    # Continue to next retry
+                    continue
+
+            # After all attempts
+            if paraphrase_succeeded:
+                paraphrased_texts.append(final_paraphrase)
+            else:
+                # Failed all attempts - fallback to original
                 paraphrased_texts.append(text)
                 self.quality_stats['fallback_to_original'] += 1
+                self.quality_stats['failed_all_retries'] += 1
+
+            # Rate limiting
+            time.sleep(API_CONFIG['rate_limit_delay'])
 
         # Create paraphrased dataframe
         paraphrased_df = df.copy()
@@ -390,20 +439,31 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
             return False
 
     def _calculate_quality_summary(self) -> Dict:
-        """Calculate summary statistics from quality tracking."""
+        """Calculate summary statistics from quality tracking including retry stats."""
         total = self.quality_stats['total_attempts']
+        total_texts = self.quality_stats['succeeded_first_try'] + \
+                      self.quality_stats['succeeded_after_retry'] + \
+                      self.quality_stats['failed_all_retries']
 
-        if total == 0:
+        if total == 0 or total_texts == 0:
             return {
                 'success_rate': 0.0,
                 'fallback_rate': 0.0,
                 'avg_semantic_similarity': 0.0,
-                'failure_breakdown': {}
+                'failure_breakdown': {},
+                'retry_stats': {}
             }
 
+        # Calculate retry effectiveness
+        avg_retries = (
+            self.quality_stats['total_retries'] / self.quality_stats['succeeded_after_retry']
+            if self.quality_stats['succeeded_after_retry'] > 0
+            else 0.0
+        )
+
         summary = {
-            'success_rate': self.quality_stats['successful_paraphrases'] / total * 100,
-            'fallback_rate': self.quality_stats['fallback_to_original'] / total * 100,
+            'success_rate': self.quality_stats['successful_paraphrases'] / total_texts * 100,
+            'fallback_rate': self.quality_stats['fallback_to_original'] / total_texts * 100,
             'avg_semantic_similarity': (
                 np.mean(self.quality_stats['avg_semantic_similarity'])
                 if self.quality_stats['avg_semantic_similarity']
@@ -415,36 +475,88 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
                 'category_failures': self.quality_stats['category_preservation_failures']
             },
             'total_attempts': total,
+            'total_texts': total_texts,
             'successful': self.quality_stats['successful_paraphrases'],
-            'fallback': self.quality_stats['fallback_to_original']
+            'fallback': self.quality_stats['fallback_to_original'],
+            # Retry statistics
+            'retry_stats': {
+                'succeeded_first_try': self.quality_stats['succeeded_first_try'],
+                'succeeded_first_try_pct': self.quality_stats['succeeded_first_try'] / total_texts * 100,
+                'succeeded_after_retry': self.quality_stats['succeeded_after_retry'],
+                'succeeded_after_retry_pct': self.quality_stats['succeeded_after_retry'] / total_texts * 100,
+                'failed_all_retries': self.quality_stats['failed_all_retries'],
+                'failed_all_retries_pct': self.quality_stats['failed_all_retries'] / total_texts * 100,
+                'avg_retries_when_needed': avg_retries,
+                'max_attempts_allowed': self.max_paraphrase_attempts,
+                'retry_distribution': self.quality_stats['retry_distribution']
+            }
         }
 
         return summary
 
     def _print_quality_stats(self, stats: Dict):
-        """Print quality statistics in readable format."""
+        """Print quality statistics in readable format with retry analysis."""
         print(f"\n{'='*60}")
         print(f"PARAPHRASE QUALITY STATISTICS")
         print(f"{'='*60}")
         print(f"Total paraphrase attempts: {stats['total_attempts']}")
+        print(f"Total unique texts processed: {stats['total_texts']}")
         print(f"Successful paraphrases: {stats['successful']} ({stats['success_rate']:.1f}%)")
         print(f"Fallback to original: {stats['fallback']} ({stats['fallback_rate']:.1f}%)")
         print(f"Avg semantic similarity: {stats['avg_semantic_similarity']:.3f}")
 
-        print(f"\nFailure Breakdown:")
+        # Retry statistics
+        if 'retry_stats' in stats and stats['retry_stats']:
+            retry = stats['retry_stats']
+            print(f"\n{'='*60}")
+            print(f"RETRY EFFECTIVENESS")
+            print(f"{'='*60}")
+            print(f"Succeeded on 1st try: {retry['succeeded_first_try']} ({retry['succeeded_first_try_pct']:.1f}%)")
+            print(f"Succeeded after retry: {retry['succeeded_after_retry']} ({retry['succeeded_after_retry_pct']:.1f}%)")
+            print(f"Failed all {retry['max_attempts_allowed']} attempts: {retry['failed_all_retries']} ({retry['failed_all_retries_pct']:.1f}%)")
+
+            if retry['succeeded_after_retry'] > 0:
+                print(f"Avg retries when needed: {retry['avg_retries_when_needed']:.2f}")
+
+            # Retry distribution
+            if retry['retry_distribution']:
+                print(f"\nRetry Distribution:")
+                for attempt_key in sorted(retry['retry_distribution'].keys()):
+                    count = retry['retry_distribution'][attempt_key]
+                    attempt_num = attempt_key.split('_')[1]
+                    print(f"  Succeeded on attempt {attempt_num}: {count}")
+
+        print(f"\n{'='*60}")
+        print(f"FAILURE BREAKDOWN (First Attempt Only)")
+        print(f"{'='*60}")
         failures = stats['failure_breakdown']
-        print(f"  Length check failures: {failures['length_failures']}")
-        print(f"  Semantic similarity failures: {failures['semantic_failures']}")
-        print(f"  Category preservation failures: {failures['category_failures']}")
+        print(f"Length check failures: {failures['length_failures']}")
+        print(f"Semantic similarity failures: {failures['semantic_failures']}")
+        print(f"Category preservation failures: {failures['category_failures']}")
 
         # Warnings
+        print(f"\n{'='*60}")
         if stats['success_rate'] < 70:
-            print(f"\n⚠️  WARNING: Low success rate ({stats['success_rate']:.1f}%)")
+            print(f"⚠️  WARNING: Low success rate ({stats['success_rate']:.1f}%)")
             print(f"   Consider adjusting paraphrasing prompts or thresholds")
+        else:
+            print(f"✅ Success rate is good ({stats['success_rate']:.1f}%)")
 
         if stats['avg_semantic_similarity'] < 0.90:
-            print(f"\n⚠️  WARNING: Low semantic similarity ({stats['avg_semantic_similarity']:.3f})")
+            print(f"⚠️  WARNING: Low semantic similarity ({stats['avg_semantic_similarity']:.3f})")
             print(f"   Paraphrases may be drifting from original meaning")
+        else:
+            print(f"✅ Semantic similarity is good ({stats['avg_semantic_similarity']:.3f})")
+
+        # Retry effectiveness warning
+        if 'retry_stats' in stats and stats['retry_stats']:
+            retry = stats['retry_stats']
+            if retry['succeeded_after_retry_pct'] > 30:
+                print(f"💡 INFO: {retry['succeeded_after_retry_pct']:.1f}% succeeded after retry")
+                print(f"   Retries are significantly improving quality!")
+            if retry['failed_all_retries_pct'] > 20:
+                print(f"⚠️  WARNING: {retry['failed_all_retries_pct']:.1f}% failed all {retry['max_attempts_allowed']} attempts")
+                print(f"   Consider increasing max_paraphrase_attempts or adjusting prompts")
 
     def _evaluate_samples(self, df: pd.DataFrame) -> float:
         """Evaluate F1 on samples."""
