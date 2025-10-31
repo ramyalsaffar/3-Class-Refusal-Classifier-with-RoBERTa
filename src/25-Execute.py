@@ -75,8 +75,16 @@ if __name__ == "__main__":
             runner.quick_test()
         elif choice == '2':
             runner.full_experiment()
+            print("\n" + "="*60)
+            print("💡 TIP: Generate PDF reports with:")
+            print("   python src/Analyze.py --auto --generate-report")
+            print("="*60)
         elif choice == '3':
             runner.train_only()
+            print("\n" + "="*60)
+            print("💡 TIP: Analyze results with:")
+            print("   python src/Analyze.py --auto")
+            print("="*60)
         elif choice == '4':
             print("\nModel paths (press Enter for default):")
             refusal_path = input("  Refusal model path: ").strip()
@@ -85,7 +93,33 @@ if __name__ == "__main__":
                 refusal_path = None
             if not jailbreak_path:
                 jailbreak_path = None
-            runner.analyze_only(refusal_path, jailbreak_path)
+            result = runner.analyze_only(refusal_path, jailbreak_path)
+
+            # Offer to generate report
+            if result:
+                print("\n" + "="*60)
+                generate = input("📄 Generate PDF report? (y/n): ").strip().lower()
+                if generate == 'y':
+                    print("\n📊 Report Options:")
+                    print("1. Performance Report")
+                    print("2. Executive Summary")
+                    print("3. Both")
+                    report_choice = input("Select (1-3, default: 3): ").strip()
+
+                    report_type_map = {'1': 'performance', '2': 'executive', '3': 'all'}
+                    report_type = report_type_map.get(report_choice, 'all')
+
+                    # Import report generation function
+                    import sys
+                    sys.path.append(os.path.dirname(__file__))
+                    from importlib import import_module
+                    analyze_module = import_module('26-Analyze', package=None)
+
+                    try:
+                        analyze_module._generate_reports(result, report_type)
+                    except Exception as e:
+                        print(f"❌ Report generation failed: {e}")
+                        print("   Use: python src/Analyze.py --auto --generate-report")
         elif choice == '5':
             print("Exiting...")
         else:

@@ -5,6 +5,15 @@
 # NOTE: This is a standalone production script - core imports from 00-Imports.py
 ###############################################################################
 
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 class RetrainingPipeline:
     """Automated retraining pipeline with A/B testing and validation."""
@@ -85,8 +94,13 @@ class RetrainingPipeline:
         print("\n" + "="*80)
         print("STEP 3: TRAINING NEW MODEL")
         print("="*80)
+        logger.info("Starting model training")
 
-        model = RefusalClassifier().to(DEVICE)
+        # GENERIC: Determine number of classes from data
+        num_classes = len(train_df['label'].unique())
+        logger.info(f"Training model with {num_classes} classes")
+
+        model = RefusalClassifier(num_classes=num_classes).to(DEVICE)
 
         # Load current model weights as starting point (transfer learning)
         current_version = self.data_manager.get_active_model_version()
@@ -94,6 +108,7 @@ class RetrainingPipeline:
             current_path = os.path.join(models_path, f"{current_version}.pt")
             if os.path.exists(current_path):
                 print(f"✓ Loading current model {current_version} as starting point")
+                logger.info(f"Loading checkpoint from {current_version}")
                 checkpoint = torch.load(current_path, map_location=DEVICE)
                 model.load_state_dict(checkpoint['model_state_dict'])
 
@@ -102,7 +117,8 @@ class RetrainingPipeline:
 
         # Training setup
         train_labels = [label for _, label in train_dataset]
-        class_counts = [train_labels.count(i) for i in range(3)]
+        # GENERIC: Dynamic class count
+        class_counts = [train_labels.count(i) for i in range(num_classes)]
         criterion = get_weighted_criterion(class_counts, DEVICE)
 
         optimizer = AdamW(
@@ -118,9 +134,18 @@ class RetrainingPipeline:
             num_training_steps=num_training_steps
         )
 
-        # Train
-        trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, scheduler, DEVICE)
-        history = trainer.train()
+        # Train with error handling
+        try:
+            trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, scheduler, DEVICE)
+            history = trainer.train()
+            logger.info("Training completed successfully")
+        except Exception as e:
+            logger.error(f"Training failed: {e}")
+            return {
+                'status': 'failed',
+                'reason': 'training_failed',
+                'error': str(e)
+            }
 
         # Step 4: Validate new model
         print("\n" + "="*80)
@@ -150,11 +175,13 @@ class RetrainingPipeline:
         torch.save({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
+            'num_classes': num_classes,  # ADDED: Save num_classes for generic loading
             'training_history': history,
             'validation_metrics': validation_metrics,
             'training_date': datetime.now().isoformat(),
             'reason': reason
         }, model_path)
+        logger.info(f"Model checkpoint saved to {model_path}")
 
         print(f"✓ Saved new model: {new_version}")
 
@@ -250,11 +277,13 @@ class RetrainingPipeline:
         accuracy = accuracy_score(all_labels, all_preds)
         per_class_f1 = f1_score(all_labels, all_preds, average=None)
 
+        # GENERIC: Dynamic class count
+        num_classes = model.num_classes
         metrics = {
             'f1_score': float(f1),
             'accuracy': float(accuracy),
             'avg_confidence': float(np.mean(all_confs)),
-            'per_class_f1': {CLASS_NAMES[i]: float(per_class_f1[i]) for i in range(3)}
+            'per_class_f1': {CLASS_NAMES[i]: float(per_class_f1[i]) for i in range(num_classes)}
         }
 
         print(f"\nValidation Results:")
@@ -292,20 +321,25 @@ class RetrainingPipeline:
         """
         print(f"\nStarting A/B test for {new_version}")
         print(f"Gradual rollout stages: {self.ab_test_stages}")
+        logger.info(f"Deploying {new_version} for A/B testing")
 
-        cursor = self.data_manager.conn.cursor()
-
-        # Set initial traffic percentage
+        # Set initial traffic percentage with error handling
         initial_traffic = self.ab_test_stages[0]
 
-        cursor.execute("""
-            UPDATE model_versions
-            SET traffic_percentage = %s
-            WHERE version = %s
-        """, (initial_traffic, new_version))
-
-        self.data_manager.conn.commit()
-        cursor.close()
+        try:
+            cursor = self.data_manager.conn.cursor()
+            cursor.execute("""
+                UPDATE model_versions
+                SET traffic_percentage = %s
+                WHERE version = %s
+            """, (initial_traffic, new_version))
+            self.data_manager.conn.commit()
+            cursor.close()
+            logger.info(f"Set traffic percentage to {initial_traffic*100}%")
+        except Exception as e:
+            logger.error(f"Failed to set A/B test traffic: {e}")
+            self.data_manager.conn.rollback()
+            raise
 
         print(f"\n✓ Deployed challenger with {initial_traffic*100}% traffic")
         print(f"\n{'='*80}")
@@ -337,18 +371,21 @@ class RetrainingPipeline:
         if new_traffic > 1.0 or new_traffic < 0.0:
             raise ValueError("Traffic must be between 0.0 and 1.0")
 
-        cursor = self.data_manager.conn.cursor()
-
-        cursor.execute("""
-            UPDATE model_versions
-            SET traffic_percentage = %s
-            WHERE version = %s AND is_challenger = TRUE
-        """, (new_traffic, challenger_version))
-
-        self.data_manager.conn.commit()
-        cursor.close()
-
-        print(f"✓ Increased traffic to {challenger_version}: {new_traffic*100}%")
+        try:
+            cursor = self.data_manager.conn.cursor()
+            cursor.execute("""
+                UPDATE model_versions
+                SET traffic_percentage = %s
+                WHERE version = %s AND is_challenger = TRUE
+            """, (new_traffic, challenger_version))
+            self.data_manager.conn.commit()
+            cursor.close()
+            logger.info(f"Increased traffic to {challenger_version}: {new_traffic*100}%")
+            print(f"✓ Increased traffic to {challenger_version}: {new_traffic*100}%")
+        except Exception as e:
+            logger.error(f"Failed to increase traffic: {e}")
+            self.data_manager.conn.rollback()
+            raise
 
         if new_traffic >= 1.0:
             print("   Challenger is now receiving 100% of traffic")

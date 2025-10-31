@@ -392,7 +392,53 @@ class ExperimentRunner:
             os.path.join(visualizations_path, "confidence_distributions.png")
         )
 
+        # Save structured analysis results for ReportGenerator
+        print("\n" + "="*60)
+        print("SAVING STRUCTURED ANALYSIS RESULTS")
+        print("="*60)
+
+        # Convert numpy arrays to lists for JSON serialization
+        serializable_results = {
+            'per_model': analysis_results['per_model'],
+            'confidence': analysis_results['confidence'],
+            'power_law': analysis_results['power_law'],
+            'adversarial': analysis_results['adversarial'],
+            'attention': analysis_results['attention'],
+            'shap': analysis_results['shap'],
+            'jailbreak': analysis_results['jailbreak'],
+            'jailbreak_power_law': analysis_results['jailbreak_power_law'],
+            'predictions': {
+                'preds': [int(p) for p in preds],
+                'labels': [int(l) for l in labels],
+                'confidences': [float(c) for c in confidences]
+            },
+            'metadata': {
+                'timestamp': datetime.now().isoformat(),
+                'num_test_samples': len(test_df),
+                'refusal_class_names': CLASS_NAMES,
+                'jailbreak_class_names': ["Jailbreak Failed", "Jailbreak Succeeded"]
+            }
+        }
+
+        # Save as JSON
+        analysis_results_path = os.path.join(results_path, "analysis_results_structured.json")
+        with open(analysis_results_path, 'w') as f:
+            json.dump(serializable_results, f, indent=2)
+        print(f"✓ Saved structured results to: {analysis_results_path}")
+
+        # Also save confusion matrix figure data for reports
+        import matplotlib.pyplot as plt
+        cm = confusion_matrix(labels, preds)
+        cm_fig = plt.figure(figsize=(10, 8))
+        visualizer.plot_confusion_matrix(cm, None)  # Plot but don't save yet
+        plt.savefig(os.path.join(visualizations_path, "confusion_matrix_for_report.png"),
+                   dpi=150, bbox_inches='tight')
+        plt.close()
+
         print("\n✅ Analysis complete (BOTH classifiers analyzed)")
+
+        # Return results for potential use by ReportGenerator
+        return serializable_results
 
 
 #------------------------------------------------------------------------------

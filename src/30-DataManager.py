@@ -6,6 +6,15 @@
 # Requires: pip install psycopg2-binary (imports psycopg2 on line 27)
 ###############################################################################
 
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 
 class DataManager:
     """Manage production data with smart retention strategies."""
@@ -170,7 +179,8 @@ class DataManager:
     def sample_for_monitoring(self, sample_size: int = 100,
                             hours: int = 24) -> pd.DataFrame:
         """
-        Sample predictions for monitoring (stratified by prediction class).
+        GENERIC: Sample predictions for monitoring (stratified by prediction class).
+        Works with any number of classes.
 
         Args:
             sample_size: Number of samples to return
@@ -181,35 +191,28 @@ class DataManager:
         """
         cursor = self.conn.cursor()
 
-        # Get stratified sample (balanced across classes)
-        samples_per_class = sample_size // 3
+        # GENERIC: Get stratified sample (balanced across all classes)
+        num_classes = len(CLASS_NAMES)
+        samples_per_class = sample_size // num_classes
+        logger.info(f"Sampling {samples_per_class} per class ({num_classes} classes)")
 
-        query = """
-            (SELECT * FROM predictions_log
-             WHERE timestamp > NOW() - INTERVAL '%s hours'
-             AND prediction = 0
-             AND is_monitored = FALSE
-             ORDER BY RANDOM()
-             LIMIT %s)
-            UNION ALL
-            (SELECT * FROM predictions_log
-             WHERE timestamp > NOW() - INTERVAL '%s hours'
-             AND prediction = 1
-             AND is_monitored = FALSE
-             ORDER BY RANDOM()
-             LIMIT %s)
-            UNION ALL
-            (SELECT * FROM predictions_log
-             WHERE timestamp > NOW() - INTERVAL '%s hours'
-             AND prediction = 2
-             AND is_monitored = FALSE
-             ORDER BY RANDOM()
-             LIMIT %s)
-        """
+        # Build dynamic query for all classes
+        query_parts = []
+        params = []
+        for class_id in range(num_classes):
+            query_parts.append("""
+                (SELECT * FROM predictions_log
+                 WHERE timestamp > NOW() - INTERVAL '%s hours'
+                 AND prediction = %s
+                 AND is_monitored = FALSE
+                 ORDER BY RANDOM()
+                 LIMIT %s)
+            """)
+            params.extend([hours, class_id, samples_per_class])
 
-        cursor.execute(query, [hours, samples_per_class,
-                              hours, samples_per_class,
-                              hours, samples_per_class])
+        query = " UNION ALL ".join(query_parts)
+
+        cursor.execute(query, params)
 
         columns = ['id', 'timestamp', 'prompt', 'response', 'prediction',
                   'confidence', 'model_version', 'latency_ms', 'judge_label',
@@ -295,8 +298,10 @@ class DataManager:
         print(f"   - Collected {len(recent_correct)} correct samples")
 
         # Medium-term: 8-30 days (50% sample, stratified)
+        # GENERIC: Dynamic class count
+        num_classes = len(CLASS_NAMES)
         print("\n2. Medium-term data (8-30 days): 50% stratified sample")
-        for label in [0, 1, 2]:
+        for label in range(num_classes):
             cursor.execute("""
                 SELECT prompt, response, judge_label as label
                 FROM predictions_log
@@ -313,7 +318,7 @@ class DataManager:
 
         # Long-term: 31-180 days (10% sample, stratified)
         print("\n3. Long-term data (31-180 days): 10% representative sample")
-        for label in [0, 1, 2]:
+        for label in range(num_classes):
             cursor.execute("""
                 SELECT prompt, response, judge_label as label
                 FROM predictions_log
@@ -340,7 +345,9 @@ class DataManager:
         print(f"RETRAINING DATA SUMMARY")
         print(f"{'='*60}")
         print(f"Total samples: {len(df)}")
-        for i in range(3):
+        logger.info(f"Collected {len(df)} samples for retraining")
+        # GENERIC: Dynamic class count
+        for i in range(num_classes):
             count = (df['label'] == i).sum()
             pct = count / len(df) * 100 if len(df) > 0 else 0
             print(f"  {CLASS_NAMES[i]}: {count} ({pct:.1f}%)")

@@ -119,6 +119,111 @@ def validate_file_exists(file_path: str, file_type: str) -> bool:
 
 
 # =============================================================================
+# REPORT GENERATION
+# =============================================================================
+
+def _generate_reports(analysis_results: Dict, report_type: str):
+    """
+    Generate PDF reports using ReportGenerator.
+
+    Args:
+        analysis_results: Analysis results from ExperimentRunner
+        report_type: Type of report ('performance', 'interpretability', 'executive', 'all')
+    """
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    report_generator = ReportGenerator(class_names=analysis_results['metadata']['refusal_class_names'])
+
+    # Load visualization figures
+    import matplotlib.pyplot as plt
+    from matplotlib import image as mpimg
+
+    if report_type in ['performance', 'all']:
+        print("\n📊 Generating Performance Report...")
+
+        # Load figures
+        cm_fig = plt.figure(figsize=(10, 8))
+        cm_img = mpimg.imread(os.path.join(visualizations_path, "confusion_matrix.png"))
+        plt.imshow(cm_img)
+        plt.axis('off')
+
+        training_curves_fig = plt.figure(figsize=(12, 5))
+        # Note: Training curves would need to be loaded from history
+        plt.text(0.5, 0.5, "Training curves not available in analysis-only mode",
+                ha='center', va='center', fontsize=14)
+        plt.axis('off')
+
+        class_dist_fig = plt.figure(figsize=(10, 6))
+        plt.text(0.5, 0.5, "Class distribution: See per_class_f1.png",
+                ha='center', va='center', fontsize=14)
+        plt.axis('off')
+
+        # Extract metrics
+        metrics = {
+            'accuracy': analysis_results['confidence'].get('overall_accuracy', 0),
+            'macro_f1': analysis_results['per_model'].get('analysis', {}).get('macro_avg', {}).get('f1-score', 0),
+            'weighted_f1': analysis_results['per_model'].get('analysis', {}).get('weighted_avg', {}).get('f1-score', 0),
+            'macro_precision': analysis_results['per_model'].get('analysis', {}).get('macro_avg', {}).get('precision', 0),
+            'macro_recall': analysis_results['per_model'].get('analysis', {}).get('macro_avg', {}).get('recall', 0),
+        }
+
+        # Add per-class metrics
+        for i, class_name in enumerate(analysis_results['metadata']['refusal_class_names']):
+            class_metrics = analysis_results['per_model'].get(class_name, {})
+            metrics[f'class_{i}_precision'] = class_metrics.get('precision', 0)
+            metrics[f'class_{i}_recall'] = class_metrics.get('recall', 0)
+            metrics[f'class_{i}_f1'] = class_metrics.get('f1-score', 0)
+            metrics[f'class_{i}_support'] = class_metrics.get('support', 0)
+
+        output_path = os.path.join(reports_path, f"performance_report_{timestamp}.pdf")
+        report_generator.generate_model_performance_report(
+            model_name="Refusal Classifier",
+            metrics=metrics,
+            confusion_matrix_fig=cm_fig,
+            training_curves_fig=training_curves_fig,
+            class_distribution_fig=class_dist_fig,
+            output_path=output_path
+        )
+        plt.close('all')
+
+    if report_type in ['executive', 'all']:
+        print("\n📊 Generating Executive Summary...")
+
+        # Key metrics
+        key_metrics = {
+            'Overall Accuracy': f"{analysis_results['confidence'].get('overall_accuracy', 0):.2%}",
+            'Weighted F1 Score': f"{analysis_results['per_model'].get('analysis', {}).get('weighted_avg', {}).get('f1-score', 0):.4f}",
+            'Test Samples': analysis_results['metadata']['num_test_samples'],
+            'Avg Confidence': f"{analysis_results['confidence'].get('avg_confidence', 0):.4f}",
+        }
+
+        # Performance chart
+        perf_fig = plt.figure(figsize=(10, 6))
+        perf_img = mpimg.imread(os.path.join(visualizations_path, "per_class_f1.png"))
+        plt.imshow(perf_img)
+        plt.axis('off')
+
+        # Recommendations
+        recommendations = [
+            "Model shows strong performance on test set",
+            "Monitor confidence distributions in production",
+            "Consider retraining if accuracy drops below 85%",
+            "Implement A/B testing before major model updates"
+        ]
+
+        output_path = os.path.join(reports_path, f"executive_summary_{timestamp}.pdf")
+        report_generator.generate_executive_summary(
+            model_name="Refusal Classifier",
+            key_metrics=key_metrics,
+            performance_chart_fig=perf_fig,
+            recommendations=recommendations,
+            output_path=output_path
+        )
+        plt.close('all')
+
+    print(f"\n✅ Reports saved to: {reports_path}")
+
+
+# =============================================================================
 # INTERACTIVE MODE
 # =============================================================================
 
@@ -210,18 +315,21 @@ def interactive_mode():
         print(f"    Will use default test data from data/splits/test.pkl")
         print(f"    TODO: Add test data override to ExperimentRunner.analyze_only()")
 
-    runner.analyze_only(refusal_path, jailbreak_path)
+    analysis_results = runner.analyze_only(refusal_path, jailbreak_path)
 
     # Generate report if requested
-    if generate_report:
+    if generate_report and analysis_results:
         print("\n" + "="*60)
         print("📄 GENERATING PDF REPORT")
         print("="*60)
         print(f"\nReport type: {report_type}")
         print(f"Output location: {reports_path}")
-        print("\n⚠️  Note: Report generation integration coming soon!")
-        print("    TODO: Integrate ReportGenerator with ExperimentRunner results")
-        print("    The ReportGenerator module has been created at src/ReportGenerator.py")
+
+        try:
+            _generate_reports(analysis_results, report_type)
+        except Exception as e:
+            print(f"\n❌ Report generation failed: {e}")
+            print("   Analysis results are still available in results/ directory")
 
 
 # =============================================================================
@@ -262,18 +370,21 @@ if __name__ == "__main__":
 
         # Run analysis
         runner = ExperimentRunner()
-        runner.analyze_only(args.refusal_model, args.jailbreak_model)
+        analysis_results = runner.analyze_only(args.refusal_model, args.jailbreak_model)
 
         # Generate report if requested
-        if args.generate_report:
+        if args.generate_report and analysis_results:
             print("\n" + "="*60)
             print("📄 GENERATING PDF REPORT")
             print("="*60)
             print(f"\nReport type: {args.report_type}")
             print(f"Output location: {reports_path}")
-            print("\n⚠️  Note: Report generation integration coming soon!")
-            print("    TODO: Integrate ReportGenerator with ExperimentRunner results")
-            print("    The ReportGenerator module has been created at src/ReportGenerator.py")
+
+            try:
+                _generate_reports(analysis_results, args.report_type)
+            except Exception as e:
+                print(f"\n❌ Report generation failed: {e}")
+                print("   Analysis results are still available in results/ directory")
 
     else:
         # Interactive mode
