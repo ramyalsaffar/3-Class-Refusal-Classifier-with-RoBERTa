@@ -4,7 +4,7 @@
 # 1. Error Concentration (Pareto): Do 20% of categories cause 80% of errors?
 # 2. Confidence Distribution: Do confidence scores follow power law?
 # 3. Attention Distribution: Do few tokens dominate attention?
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 

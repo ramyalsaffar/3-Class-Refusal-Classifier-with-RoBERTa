@@ -176,57 +176,57 @@ print("\n" + "="*60)
 print("LOADING CONFIGURATION")
 print("="*60)
 
-exec(open(CodeFilePath+"01-Config.py").read())
-print("✓ Loaded 01-Config.py")
+exec(open(CodeFilePath+"02-Config.py").read())
+print("✓ Loaded 02-Config.py")
 
-exec(open(CodeFilePath+"02-Constants.py").read())
-print("✓ Loaded 02-Constants.py")
+exec(open(CodeFilePath+"03-Constants.py").read())
+print("✓ Loaded 03-Constants.py")
 
 
-# Load remaining code files (03-30, excluding 25-30)
+# Load remaining code files (04-31, excluding 26-31)
 #--------------------------------------------------------
-# Files are numbered 00-30:
-#   00-Imports.py (this file)
-#   01-Config.py (loaded above)
-#   02-Constants.py (loaded above)
-#   03-AWSConfig.py (AWS configuration)
-#   04-SecretsHandler.py (AWS Secrets Manager)
-#   05-06: Data Collection (PromptGenerator, ResponseCollector)
-#   07: DataCleaner (comprehensive data quality validation and cleaning)
-#   08: DataLabeler (dual-task labeling: refusal + jailbreak detection)
-#   09: LabelingQualityAnalyzer (analyze judge confidence and labeling quality)
-#   10: ClassificationDataset (generic PyTorch Dataset - works for both classifiers)
-#   11: RefusalClassifier (3-class: No/Hard/Soft Refusal)
-#   12: JailbreakDetector (2-class: Jailbreak Failed/Succeeded)
-#   13: Trainer (generic trainer with weighted loss - works for both classifiers)
-#   14-16: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
-#   17: JailbreakAnalysis (security-critical jailbreak analysis with cross-analysis)
-#   18-19: Interpretability (AttentionVisualizer, ShapAnalyzer)
-#   20: PowerLawAnalyzer (Pareto, confidence distribution, attention power laws)
-#   21: Visualizer (basic plotting functions)
-#   22: ReportGenerator (professional PDF reports with reportlab)
-#   23-24: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
-#   25-Execute.py (main entry point - don't load)
-#   26-Analyze.py (analysis entry point - don't load)
-#   27-ProductionAPI.py (production API server - don't load)
-#   28-MonitoringSystem.py (production monitoring - don't load)
-#   29-RetrainingPipeline.py (production retraining - don't load)
-#   30-DataManager.py (production data management - don't load)
+# Files are numbered 01-31:
+#   01-Imports.py (this file)
+#   02-Config.py (loaded above)
+#   03-Constants.py (loaded above)
+#   04-AWSConfig.py (AWS configuration)
+#   05-SecretsHandler.py (AWS Secrets Manager)
+#   06-07: Data Collection (PromptGenerator, ResponseCollector)
+#   08: DataCleaner (comprehensive data quality validation and cleaning)
+#   09: DataLabeler (dual-task labeling: refusal + jailbreak detection)
+#   10: LabelingQualityAnalyzer (analyze judge confidence and labeling quality)
+#   11: ClassificationDataset (generic PyTorch Dataset - works for both classifiers)
+#   12: RefusalClassifier (3-class: No/Hard/Soft Refusal)
+#   13: JailbreakDetector (2-class: Jailbreak Failed/Succeeded)
+#   14: Trainer (generic trainer with weighted loss - works for both classifiers)
+#   15-17: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
+#   18: JailbreakAnalysis (security-critical jailbreak analysis with cross-analysis)
+#   19-20: Interpretability (AttentionVisualizer, ShapAnalyzer)
+#   21: PowerLawAnalyzer (Pareto, confidence distribution, attention power laws)
+#   22: Visualizer (basic plotting functions)
+#   23: ReportGenerator (professional PDF reports with reportlab)
+#   24-25: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
+#   26-Execute.py (main entry point - don't load)
+#   27-Analyze.py (analysis entry point - don't load)
+#   28-ProductionAPI.py (production API server - don't load)
+#   29-MonitoringSystem.py (production monitoring - don't load)
+#   30-RetrainingPipeline.py (production retraining - don't load)
+#   31-DataManager.py (production data management - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
 
 # Remove files we don't want to auto-load
 code_files_ls = [x for x in code_files_ls if x not in [
-    "00-Imports.py",      # This file
-    "01-Config.py",        # Already loaded
-    "02-Constants.py",     # Already loaded
-    "25-Execute.py",       # Execution script
-    "26-Analyze.py",       # Execution script
-    "27-ProductionAPI.py",      # Production API server (load manually)
-    "28-MonitoringSystem.py",   # Production monitoring (load manually)
-    "29-RetrainingPipeline.py", # Production retraining (load manually)
-    "30-DataManager.py"         # Production data management (load manually)
+    "01-Imports.py",      # This file
+    "02-Config.py",        # Already loaded
+    "03-Constants.py",     # Already loaded
+    "26-Execute.py",       # Execution script
+    "27-Analyze.py",       # Execution script
+    "28-ProductionAPI.py",      # Production API server (load manually)
+    "29-MonitoringSystem.py",   # Production monitoring (load manually)
+    "30-RetrainingPipeline.py", # Production retraining (load manually)
+    "31-DataManager.py"         # Production data management (load manually)
 ]]
 
 # Loop over code files and load them

@@ -1,7 +1,7 @@
 # RoBERTa Classifier Model
 #-------------------------
 # Fine-tuned RoBERTa for 3-class refusal classification.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 

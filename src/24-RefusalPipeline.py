@@ -2,7 +2,7 @@
 #-----------------------
 # Main pipeline orchestrator for the complete refusal classification pipeline.
 # Trains TWO independent classifiers: Refusal Classifier + Jailbreak Detector.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 

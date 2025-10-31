@@ -2,7 +2,7 @@
 #------------------------
 # Manages different experiment execution modes.
 # Adapted from Alignment Tax project.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 

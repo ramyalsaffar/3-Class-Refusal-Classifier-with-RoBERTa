@@ -4,7 +4,7 @@
 # Outputs TWO labels: refusal classification AND jailbreak success detection.
 # Includes prompts in evaluation for production-level accuracy.
 # NO hardcoded patterns - the judge evaluates each response contextually.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 

@@ -1,7 +1,7 @@
 # ResponseCollector Module
 #-------------------------
 # Collects responses from multiple LLM APIs (Claude, GPT-5, Gemini).
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 

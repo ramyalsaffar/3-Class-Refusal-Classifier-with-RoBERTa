@@ -2,7 +2,7 @@
 #-------------------------
 # Fine-tuned RoBERTa for binary jailbreak success detection.
 # Detects when adversarial attacks successfully bypass AI safety mechanisms.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
