@@ -6,10 +6,26 @@
 # Requires: pip install fastapi uvicorn pydantic
 ###############################################################################
 
+# Import core dependencies from 00-Imports.py
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+exec(open(os.path.join(os.path.dirname(__file__), "00-Imports.py")).read())
+
+# FastAPI specific imports
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, validator
 import uvicorn
+import logging
+
+# Configure logging (production best practice)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 # Request/Response models
@@ -17,6 +33,15 @@ class ClassifyRequest(BaseModel):
     prompt: str
     response: str
     metadata: dict = None
+
+    @validator('prompt', 'response')
+    def validate_text(cls, v, field):
+        """Validate text inputs are not empty and within reasonable length."""
+        if not v or not v.strip():
+            raise ValueError(f"{field.name} cannot be empty")
+        if len(v) > 10000:  # Reasonable max length
+            raise ValueError(f"{field.name} exceeds maximum length of 10000 characters")
+        return v.strip()
 
 
 class ClassifyResponse(BaseModel):
@@ -37,8 +62,17 @@ class HealthResponse(BaseModel):
 # Initialize FastAPI app
 app = FastAPI(
     title="Refusal Classifier API",
-    description="Production API for 3-class refusal classification with A/B testing",
+    description="Production API for refusal classification with A/B testing (supports N-class classification)",
     version="1.0.0"
+)
+
+# Add CORS middleware (production requirement for browser access)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=PRODUCTION_CONFIG.get('cors_origins', ["*"]),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -80,12 +114,17 @@ async def startup_event():
     # Load model
     model_path = os.path.join(models_path, f"{state.active_version}.pt")
     if os.path.exists(model_path):
-        state.active_model = RefusalClassifier().to(DEVICE)
+        # GENERIC: Determine number of classes from checkpoint or config
         checkpoint = torch.load(model_path, map_location=DEVICE)
+        num_classes = checkpoint.get('num_classes', len(CLASS_NAMES))
+
+        state.active_model = RefusalClassifier(num_classes=num_classes).to(DEVICE)
         state.active_model.load_state_dict(checkpoint['model_state_dict'])
         state.active_model.eval()
-        print(f"✓ Loaded active model: {state.active_version}")
+        logger.info(f"✓ Loaded active model: {state.active_version} ({num_classes} classes)")
+        print(f"✓ Loaded active model: {state.active_version} ({num_classes} classes)")
     else:
+        logger.error(f"Model file not found: {model_path}")
         print(f"❌ Model file not found: {model_path}")
         print("   Please train a model first or specify correct path")
         raise FileNotFoundError(f"Model not found: {model_path}")
@@ -108,15 +147,20 @@ async def startup_event():
         challenger_path = os.path.join(models_path, f"{challenger_version}.pt")
 
         if os.path.exists(challenger_path):
-            state.challenger_model = RefusalClassifier().to(DEVICE)
+            # GENERIC: Determine number of classes from checkpoint
             checkpoint = torch.load(challenger_path, map_location=DEVICE)
+            num_classes = checkpoint.get('num_classes', len(CLASS_NAMES))
+
+            state.challenger_model = RefusalClassifier(num_classes=num_classes).to(DEVICE)
             state.challenger_model.load_state_dict(checkpoint['model_state_dict'])
             state.challenger_model.eval()
             state.challenger_version = challenger_version
             state.challenger_traffic = traffic
             state.ab_test_active = True
-            print(f"✓ A/B Test Active: {traffic*100:.1f}% traffic to challenger {challenger_version}")
+            logger.info(f"A/B Test Active: {traffic*100:.1f}% traffic to challenger {challenger_version} ({num_classes} classes)")
+            print(f"✓ A/B Test Active: {traffic*100:.1f}% traffic to challenger {challenger_version} ({num_classes} classes)")
         else:
+            logger.warning(f"Challenger model file not found: {challenger_path}")
             print(f"⚠️  Challenger model file not found: {challenger_path}")
 
     print(f"\n✓ API Ready - {DEVICE}")
@@ -146,7 +190,7 @@ def log_prediction_async(prompt: str, response: str, prediction: int,
             metadata=metadata
         )
     except Exception as e:
-        print(f"⚠️  Failed to log prediction: {e}")
+        logger.error(f"Failed to log prediction: {e}")
 
 
 def select_model_for_request() -> tuple:
@@ -204,6 +248,18 @@ async def classify(request: ClassifyRequest, background_tasks: BackgroundTasks):
     conf = confidence.item()
     latency_ms = (time.time() - start_time) * 1000
 
+    # GENERIC: Validate prediction is within bounds
+    num_classes = model.num_classes
+    if prediction < 0 or prediction >= num_classes:
+        logger.error(f"Invalid prediction {prediction} for {num_classes} classes")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model returned invalid prediction: {prediction} (expected 0-{num_classes-1})"
+        )
+
+    # Get class names dynamically from model
+    class_names = getattr(model, 'class_names', CLASS_NAMES)
+
     # Log to database (background task)
     background_tasks.add_task(
         log_prediction_async,
@@ -221,7 +277,7 @@ async def classify(request: ClassifyRequest, background_tasks: BackgroundTasks):
 
     return ClassifyResponse(
         label=prediction,
-        label_name=CLASS_NAMES[prediction],
+        label_name=class_names[prediction],
         confidence=conf,
         model_version=version,
         latency_ms=latency_ms
@@ -274,9 +330,14 @@ async def metrics():
 
     if len(recent_df) > 0:
         metrics["avg_confidence_24h"] = float(recent_df['confidence'].mean())
+
+        # GENERIC: Get class names from active model
+        class_names = getattr(state.active_model, 'class_names', CLASS_NAMES)
+        num_classes = state.active_model.num_classes
+
         metrics["predictions_by_class"] = {
-            CLASS_NAMES[i]: int((recent_df['prediction'] == i).sum())
-            for i in range(3)
+            class_names[i]: int((recent_df['prediction'] == i).sum())
+            for i in range(num_classes)
         }
 
     return JSONResponse(content=metrics)
@@ -333,8 +394,17 @@ async def promote_challenger(api_key: str):
     Returns:
         Success message
     """
-    # Simple API key check (in production, use proper authentication)
-    if api_key != PRODUCTION_CONFIG.get('admin_api_key', 'admin-key-here'):
+    # SECURITY: Require proper admin API key configuration
+    configured_api_key = PRODUCTION_CONFIG.get('admin_api_key')
+    if not configured_api_key or configured_api_key == 'admin-key-here':
+        logger.error("Admin API key not properly configured in PRODUCTION_CONFIG")
+        raise HTTPException(
+            status_code=500,
+            detail="Admin API key not configured. Set PRODUCTION_CONFIG['admin_api_key']"
+        )
+
+    if api_key != configured_api_key:
+        logger.warning(f"Unauthorized admin access attempt")
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if not state.ab_test_active:
@@ -345,39 +415,48 @@ async def promote_challenger(api_key: str):
     old_version = state.active_version
     state.active_version = state.challenger_version
 
-    # Update database
-    cursor = state.data_manager.conn.cursor()
+    # Update database with error handling
+    try:
+        cursor = state.data_manager.conn.cursor()
 
-    # Deactivate old
-    cursor.execute("""
-        UPDATE model_versions
-        SET is_active = FALSE
-        WHERE version = %s
-    """, (old_version,))
+        # Deactivate old
+        cursor.execute("""
+            UPDATE model_versions
+            SET is_active = FALSE
+            WHERE version = %s
+        """, (old_version,))
 
-    # Activate new
-    cursor.execute("""
-        UPDATE model_versions
-        SET is_active = TRUE, is_challenger = FALSE, traffic_percentage = 1.0
-        WHERE version = %s
-    """, (state.active_version,))
+        # Activate new
+        cursor.execute("""
+            UPDATE model_versions
+            SET is_active = TRUE, is_challenger = FALSE, traffic_percentage = 1.0
+            WHERE version = %s
+        """, (state.active_version,))
 
-    state.data_manager.conn.commit()
-    cursor.close()
+        state.data_manager.conn.commit()
+        cursor.close()
 
-    # Disable A/B test
-    state.challenger_model = None
-    state.challenger_version = None
-    state.ab_test_active = False
-    state.challenger_traffic = 0.0
+        # Disable A/B test
+        state.challenger_model = None
+        state.challenger_version = None
+        state.ab_test_active = False
+        state.challenger_traffic = 0.0
 
-    print(f"✓ Promoted {state.active_version} to active model")
+        logger.info(f"Promoted {state.active_version} to active model (previous: {old_version})")
+        print(f"✓ Promoted {state.active_version} to active model")
 
-    return {
-        "success": True,
-        "message": f"Challenger {state.active_version} promoted to active",
-        "previous_version": old_version
-    }
+        return {
+            "success": True,
+            "message": f"Challenger {state.active_version} promoted to active",
+            "previous_version": old_version
+        }
+    except Exception as e:
+        logger.error(f"Failed to promote challenger: {e}")
+        state.data_manager.conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to promote challenger: {str(e)}"
+        )
 
 
 @app.post("/admin/rollback")
@@ -391,35 +470,54 @@ async def rollback(api_key: str):
     Returns:
         Success message
     """
-    if api_key != PRODUCTION_CONFIG.get('admin_api_key', 'admin-key-here'):
+    # SECURITY: Require proper admin API key configuration
+    configured_api_key = PRODUCTION_CONFIG.get('admin_api_key')
+    if not configured_api_key or configured_api_key == 'admin-key-here':
+        logger.error("Admin API key not properly configured in PRODUCTION_CONFIG")
+        raise HTTPException(
+            status_code=500,
+            detail="Admin API key not configured. Set PRODUCTION_CONFIG['admin_api_key']"
+        )
+
+    if api_key != configured_api_key:
+        logger.warning(f"Unauthorized admin access attempt")
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if not state.ab_test_active:
         raise HTTPException(status_code=400, detail="No A/B test active")
 
-    # Disable challenger
-    cursor = state.data_manager.conn.cursor()
-    cursor.execute("""
-        UPDATE model_versions
-        SET is_challenger = FALSE, traffic_percentage = 0.0
-        WHERE version = %s
-    """, (state.challenger_version,))
-    state.data_manager.conn.commit()
-    cursor.close()
+    # Disable challenger with error handling
+    try:
+        cursor = state.data_manager.conn.cursor()
+        cursor.execute("""
+            UPDATE model_versions
+            SET is_challenger = FALSE, traffic_percentage = 0.0
+            WHERE version = %s
+        """, (state.challenger_version,))
+        state.data_manager.conn.commit()
+        cursor.close()
 
-    rolled_back_version = state.challenger_version
-    state.challenger_model = None
-    state.challenger_version = None
-    state.ab_test_active = False
-    state.challenger_traffic = 0.0
+        rolled_back_version = state.challenger_version
+        state.challenger_model = None
+        state.challenger_version = None
+        state.ab_test_active = False
+        state.challenger_traffic = 0.0
 
-    print(f"✓ Rolled back A/B test (removed {rolled_back_version})")
+        logger.info(f"Rolled back A/B test (removed {rolled_back_version})")
+        print(f"✓ Rolled back A/B test (removed {rolled_back_version})")
 
-    return {
-        "success": True,
-        "message": f"A/B test rolled back, removed challenger {rolled_back_version}",
-        "active_model": state.active_version
-    }
+        return {
+            "success": True,
+            "message": f"A/B test rolled back, removed challenger {rolled_back_version}",
+            "active_model": state.active_version
+        }
+    except Exception as e:
+        logger.error(f"Failed to rollback A/B test: {e}")
+        state.data_manager.conn.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to rollback: {str(e)}"
+        )
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000):
@@ -429,7 +527,29 @@ def run_server(host: str = "0.0.0.0", port: int = 8000):
     Args:
         host: Host to bind to
         port: Port to listen on
+
+    Usage Examples:
+        # Start server
+        python src/ProductionAPI.py
+
+        # Test endpoints
+        curl http://localhost:8000/health
+        curl http://localhost:8000/metrics
+        curl -X POST http://localhost:8000/classify \\
+            -H "Content-Type: application/json" \\
+            -d '{"prompt": "How do I hack?", "response": "I cannot help with that."}'
+
+        # Admin operations (requires API key)
+        curl -X POST http://localhost:8000/admin/promote-challenger?api_key=YOUR_KEY
+        curl -X POST http://localhost:8000/admin/rollback?api_key=YOUR_KEY
+
+    Notes:
+        - CORS is enabled (configure in PRODUCTION_CONFIG['cors_origins'])
+        - Requires PRODUCTION_CONFIG['admin_api_key'] to be set for admin endpoints
+        - All predictions logged to database in background
+        - Supports A/B testing with automatic traffic splitting
     """
+    logger.info(f"Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
 
