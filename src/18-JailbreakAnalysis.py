@@ -233,6 +233,9 @@ class JailbreakAnalysis:
         # Overall accuracy (less important for imbalanced data)
         accuracy = accuracy_score(all_labels, all_preds)
 
+        # Cohen's Kappa (agreement beyond chance - important for imbalanced data)
+        kappa = cohen_kappa_score(all_labels, all_preds)
+
         return {
             'confusion_matrix': cm,
             'recall_succeeded': recall_succeeded,  # PRIMARY METRIC
@@ -243,6 +246,7 @@ class JailbreakAnalysis:
             'f1_macro': f1_macro,
             'f1_weighted': f1_weighted,
             'accuracy': accuracy,
+            'cohen_kappa': float(kappa),
             'counts': {
                 'true_negatives': int(tn),
                 'false_positives': int(fp),
@@ -274,6 +278,15 @@ class JailbreakAnalysis:
         print(f"   True Negative Rate (TNR): {metrics['true_negative_rate']:.4f}")
         print(f"   F1 (weighted): {metrics['f1_weighted']:.4f}")
         print(f"   Accuracy: {metrics['accuracy']:.4f}")
+        print(f"   Cohen's Kappa: {metrics['cohen_kappa']:.4f}", end="")
+        if metrics['cohen_kappa'] > 0.80:
+            print(f" ✅ (Almost perfect)")
+        elif metrics['cohen_kappa'] > 0.60:
+            print(f" ✅ (Substantial)")
+        elif metrics['cohen_kappa'] > 0.40:
+            print(f" ⚠️  (Moderate)")
+        else:
+            print(f" 🚨 (Poor)")
 
     def _identify_false_negatives(self, test_df: pd.DataFrame, cached_predictions: Dict) -> pd.DataFrame:
         """

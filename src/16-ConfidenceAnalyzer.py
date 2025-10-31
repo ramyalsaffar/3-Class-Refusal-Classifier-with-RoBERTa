@@ -56,12 +56,16 @@ class ConfidenceAnalyzer:
         # Calculate metrics
         correct = np.array(preds) == np.array(labels)
 
+        # Calculate Cohen's Kappa (agreement beyond chance)
+        kappa = cohen_kappa_score(labels, preds)
+
         results = {
             'overall': {
                 'mean_confidence': float(np.mean(confidences)),
                 'std_confidence': float(np.std(confidences)),
                 'mean_confidence_correct': float(np.mean([c for c, cor in zip(confidences, correct) if cor])),
-                'mean_confidence_incorrect': float(np.mean([c for c, cor in zip(confidences, correct) if not cor]))
+                'mean_confidence_incorrect': float(np.mean([c for c, cor in zip(confidences, correct) if not cor])),
+                'cohen_kappa': float(kappa)
             },
             'per_class': {}
         }
@@ -82,6 +86,18 @@ class ConfidenceAnalyzer:
         print(f"\nOverall Mean Confidence: {results['overall']['mean_confidence']:.3f}")
         print(f"Correct Predictions: {results['overall']['mean_confidence_correct']:.3f}")
         print(f"Incorrect Predictions: {results['overall']['mean_confidence_incorrect']:.3f}")
+
+        print(f"\n📊 Cohen's Kappa: {results['overall']['cohen_kappa']:.4f}")
+        if kappa > 0.80:
+            print(f"   ✅ Almost perfect agreement (κ > 0.80)")
+        elif kappa > 0.60:
+            print(f"   ✅ Substantial agreement (κ > 0.60)")
+        elif kappa > 0.40:
+            print(f"   ⚠️  Moderate agreement (κ > 0.40)")
+        elif kappa > 0.20:
+            print(f"   ⚠️  Fair agreement (κ > 0.20)")
+        else:
+            print(f"   🚨 Poor agreement (κ ≤ 0.20)")
 
         print("\nPer-Class Mean Confidence:")
         for class_name, metrics in results['per_class'].items():

@@ -259,6 +259,17 @@ class ExperimentRunner:
             'confidences': confidences
         }
 
+        # Power law analysis
+        print("\n--- Power Law Analysis ---")
+        power_law_analyzer = PowerLawAnalyzer(refusal_model, tokenizer, DEVICE)
+        power_law_results = power_law_analyzer.analyze_all(
+            test_df,
+            np.array(preds),
+            np.array(confidences),
+            output_dir=visualizations_path
+        )
+        analysis_results['power_law'] = power_law_results
+
         # Adversarial testing
         print("\n--- Adversarial Testing ---")
         adversarial_tester = AdversarialTester(refusal_model, tokenizer, DEVICE, api_keys['openai'])
@@ -318,6 +329,20 @@ class ExperimentRunner:
             os.path.join(results_path, "jailbreak_analysis.json")
         )
         analysis_results['jailbreak'] = jailbreak_results
+
+        # Power law analysis for jailbreak detector
+        print("\n--- Power Law Analysis (Jailbreak) ---")
+        jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
+        jailbreak_power_law_analyzer = PowerLawAnalyzer(
+            jailbreak_model, tokenizer, DEVICE, jailbreak_class_names
+        )
+        jailbreak_power_law_results = jailbreak_power_law_analyzer.analyze_all(
+            test_df,
+            jailbreak_results['predictions']['preds'],
+            jailbreak_results['predictions']['confidences'],
+            output_dir=visualizations_path
+        )
+        analysis_results['jailbreak_power_law'] = jailbreak_power_law_results
 
         # Generate visualizations
         print("\n" + "="*60)

@@ -208,7 +208,8 @@ ANALYSIS_CONFIG = {
     ],
     'confidence_bins': 20,                      # Bins for confidence histograms
     'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples
-    'error_examples_count': 5                   # Number of error examples to analyze in detail
+    'error_examples_count': 5,                  # Number of error examples to analyze in detail
+    'attention_sample_size': 100                # Samples for power law attention analysis
 }
 
 

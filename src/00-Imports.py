@@ -56,7 +56,8 @@ from sklearn.metrics import (
     recall_score,
     precision_score,
     precision_recall_curve,
-    average_precision_score
+    average_precision_score,
+    cohen_kappa_score
 )
 
 # Visualization
