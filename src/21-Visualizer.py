@@ -42,11 +42,14 @@ class Visualizer:
         classes = list(f1_scores.keys())
         scores = list(f1_scores.values())
 
-        bars = plt.bar(classes, scores, color=self.class_colors, alpha=0.8, edgecolor='black')
+        # Use modulo for color cycling if we have more classes than colors
+        colors = [self.class_colors[i % len(self.class_colors)] for i in range(len(classes))]
+        bars = plt.bar(classes, scores, color=colors, alpha=0.8, edgecolor='black')
         plt.ylabel('F1 Score', fontsize=12)
         plt.title('Per-Class F1 Scores', fontsize=16, fontweight='bold')
         plt.ylim([0, 1])
-        plt.axhline(y=0.8, color='red', linestyle='--', alpha=0.5, label='Target (0.80)')
+        f1_target = VISUALIZATION_CONFIG['f1_target']
+        plt.axhline(y=f1_target, color='red', linestyle='--', alpha=0.5, label=f'Target ({f1_target:.2f})')
 
         # Add value labels on bars
         for bar in bars:
@@ -117,7 +120,7 @@ class Visualizer:
 
         # Add drop percentage
         for i, (orig, para) in enumerate(zip([original_f1] * len(dimensions), paraphrased_f1)):
-            drop = (orig - para) / orig * 100
+            drop = (orig - para) / orig * 100 if orig > 0 else 0
             ax.text(i, max(orig, para) + 0.02, f'-{drop:.1f}%',
                    ha='center', fontsize=9, color='red')
 

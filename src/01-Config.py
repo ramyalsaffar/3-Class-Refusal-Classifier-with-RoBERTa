@@ -402,7 +402,8 @@ VISUALIZATION_CONFIG = {
     'figure_format': 'png',          # Output format
     'style': 'whitegrid',            # Seaborn style
     'color_palette': 'Set2',
-    'font_scale': 1.0
+    'font_scale': 1.0,
+    'f1_target': 0.8                 # Target F1 score threshold for visualization
 }
 
 
