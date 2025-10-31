@@ -5,11 +5,11 @@
 # Provides both command-line and interactive interfaces.
 #
 # Usage:
-#   python src/16-Execute.py                # Interactive mode
-#   python src/16-Execute.py --test         # Quick test
-#   python src/16-Execute.py --full         # Full experiment
-#   python src/16-Execute.py --train-only   # Train only
-#   python src/16-Execute.py --analyze-only [model_path]  # Analyze only
+#   python src/Execute.py                # Interactive mode
+#   python src/Execute.py --test         # Quick test
+#   python src/Execute.py --full         # Full experiment
+#   python src/Execute.py --train-only   # Train only
+#   python src/Execute.py --analyze-only [model_path]  # Analyze only
 #
 ###############################################################################
 
@@ -40,16 +40,16 @@ if __name__ == "__main__":
             runner.analyze_only(refusal_path, jailbreak_path)
 
         else:
-            print("Usage: python src/22-Execute.py [--test|--full|--train-only|--analyze-only]")
+            print("Usage: python src/Execute.py [--test|--full|--train-only|--analyze-only]")
             print("\nOptions:")
             print("  --test           Run quick test with reduced samples")
             print("  --full           Run full experiment as configured")
             print("  --train-only     Train on existing data")
             print("  --analyze-only   Analyze existing models (optionally specify refusal and jailbreak model paths)")
             print("\nExamples:")
-            print("  python src/22-Execute.py --full")
-            print("  python src/22-Execute.py --analyze-only")
-            print("  python src/22-Execute.py --analyze-only models/exp_refusal_best.pt models/exp_jailbreak_best.pt")
+            print("  python src/Execute.py --full")
+            print("  python src/Execute.py --analyze-only")
+            print("  python src/Execute.py --analyze-only models/exp_refusal_best.pt models/exp_jailbreak_best.pt")
 
     else:
         # Interactive mode
