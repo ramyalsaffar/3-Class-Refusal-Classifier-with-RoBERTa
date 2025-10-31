@@ -134,7 +134,7 @@ class AdversarialTester:
 
     def _evaluate_samples(self, df: pd.DataFrame) -> float:
         """Evaluate F1 on samples."""
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             df['response'].tolist(),
             df['label'].tolist(),
             self.tokenizer

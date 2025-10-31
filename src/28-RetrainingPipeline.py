@@ -61,17 +61,17 @@ class RetrainingPipeline:
         # Create dataloaders
         tokenizer = RobertaTokenizer.from_pretrained(MODEL_CONFIG['model_name'])
 
-        train_dataset = RefusalDataset(
+        train_dataset = ClassificationDataset(
             train_df['response'].tolist(),
             train_df['label'].tolist(),
             tokenizer
         )
-        val_dataset = RefusalDataset(
+        val_dataset = ClassificationDataset(
             val_df['response'].tolist(),
             val_df['label'].tolist(),
             tokenizer
         )
-        test_dataset = RefusalDataset(
+        test_dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['label'].tolist(),
             tokenizer

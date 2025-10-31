@@ -117,7 +117,7 @@ class JailbreakAnalysis:
         - F1 Score (weighted for imbalance)
         """
         # Get predictions
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
@@ -221,7 +221,7 @@ class JailbreakAnalysis:
         These are CRITICAL failures that must be manually reviewed.
         """
         # Get predictions
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
@@ -374,7 +374,7 @@ class JailbreakAnalysis:
 
     def _get_jailbreak_predictions(self, test_df: pd.DataFrame) -> np.ndarray:
         """Get jailbreak detector predictions."""
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
@@ -396,7 +396,7 @@ class JailbreakAnalysis:
 
     def _get_refusal_predictions(self, test_df: pd.DataFrame) -> np.ndarray:
         """Get refusal classifier predictions."""
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['refusal_label'].tolist(),
             self.tokenizer

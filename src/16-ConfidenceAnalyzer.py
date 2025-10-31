@@ -29,7 +29,7 @@ class ConfidenceAnalyzer:
         print("="*50)
 
         # Create dataset
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['label'].tolist(),
             self.tokenizer

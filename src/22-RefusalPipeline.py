@@ -297,19 +297,19 @@ class RefusalPipeline:
 
         # Prepare datasets for REFUSAL CLASSIFIER
         print("\n--- Preparing Refusal Classifier Datasets ---")
-        refusal_train_dataset = RefusalDataset(
+        refusal_train_dataset = ClassificationDataset(
             train_df['response'].tolist(),
             train_df['refusal_label'].tolist(),
             self.tokenizer
         )
 
-        refusal_val_dataset = RefusalDataset(
+        refusal_val_dataset = ClassificationDataset(
             val_df['response'].tolist(),
             val_df['refusal_label'].tolist(),
             self.tokenizer
         )
 
-        refusal_test_dataset = RefusalDataset(
+        refusal_test_dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['refusal_label'].tolist(),
             self.tokenizer
@@ -326,19 +326,19 @@ class RefusalPipeline:
 
         # Prepare datasets for JAILBREAK DETECTOR
         print("\n--- Preparing Jailbreak Detector Datasets ---")
-        jailbreak_train_dataset = RefusalDataset(
+        jailbreak_train_dataset = ClassificationDataset(
             train_df['response'].tolist(),
             train_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
 
-        jailbreak_val_dataset = RefusalDataset(
+        jailbreak_val_dataset = ClassificationDataset(
             val_df['response'].tolist(),
             val_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
 
-        jailbreak_test_dataset = RefusalDataset(
+        jailbreak_test_dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['jailbreak_label'].tolist(),
             self.tokenizer

@@ -36,7 +36,7 @@ class PerModelAnalyzer:
             model_df = test_df[test_df['model'] == model_name]
 
             # Create dataset and loader
-            dataset = RefusalDataset(
+            dataset = ClassificationDataset(
                 model_df['response'].tolist(),
                 model_df['label'].tolist(),
                 self.tokenizer

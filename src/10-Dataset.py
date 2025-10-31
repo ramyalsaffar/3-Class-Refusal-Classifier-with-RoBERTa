@@ -1,12 +1,12 @@
 # PyTorch Dataset Module
 #-----------------------
-# Custom Dataset class for refusal classification.
+# Generic Dataset class for classification tasks (refusal & jailbreak).
 # All imports are in 00-Imports.py
 ###############################################################################
 
 
-class RefusalDataset(Dataset):
-    """PyTorch Dataset for refusal classification."""
+class ClassificationDataset(Dataset):
+    """Generic PyTorch Dataset for classification tasks (refusal & jailbreak)."""
 
     def __init__(self, texts: List[str], labels: List[int],
                  tokenizer: RobertaTokenizer, max_length: int = None):
