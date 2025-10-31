@@ -170,6 +170,22 @@ class RefusalPipeline:
             print(f"  Jailbreak - Avg Confidence: {avg_jb_conf:.1f}%")
             print(f"  Jailbreak - Low confidence (<60%): {low_conf_jb} ({low_conf_jb/len(valid_jailbreak)*100:.1f}%)")
 
+        # Analyze labeling quality
+        print(f"\n{'='*60}")
+        print("LABELING QUALITY ANALYSIS")
+        print(f"{'='*60}")
+        quality_analyzer = LabelingQualityAnalyzer(verbose=True)
+        quality_results = quality_analyzer.analyze_full(responses_df)
+
+        # Save quality analysis results
+        quality_analysis_path = os.path.join(results_path, "labeling_quality_analysis.json")
+        quality_analyzer.save_results(quality_results, quality_analysis_path)
+
+        # Export low-confidence samples for review
+        if quality_results['low_confidence']['low_both_count'] > 0:
+            flagged_samples_path = os.path.join(results_path, "flagged_samples_for_review.csv")
+            quality_analyzer.export_flagged_samples(responses_df, flagged_samples_path, threshold=60)
+
         # Save labeled data
         labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")
         responses_df.to_pickle(labeled_path)
