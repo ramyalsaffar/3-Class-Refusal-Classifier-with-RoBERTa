@@ -158,8 +158,8 @@ class ExperimentRunner:
         # Run analyses (uses test_df from refusal datasets - same for both)
         analysis_results = self.pipeline.run_analyses(datasets['refusal']['test_df'])
 
-        # Generate visualizations (using refusal history)
-        self.pipeline.generate_visualizations(refusal_history, analysis_results)
+        # Generate visualizations (using both histories)
+        self.pipeline.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
 
         print("\n✅ Training and analysis complete (BOTH classifiers trained)")
 
@@ -261,7 +261,7 @@ class ExperimentRunner:
 
         # Power law analysis
         print("\n--- Power Law Analysis ---")
-        power_law_analyzer = PowerLawAnalyzer(refusal_model, tokenizer, DEVICE)
+        power_law_analyzer = PowerLawAnalyzer(refusal_model, tokenizer, DEVICE, class_names=CLASS_NAMES)
         power_law_results = power_law_analyzer.analyze_all(
             test_df,
             np.array(preds),
@@ -282,7 +282,7 @@ class ExperimentRunner:
 
         # Attention visualization
         print("\n--- Attention Visualization ---")
-        attention_viz = AttentionVisualizer(refusal_model, tokenizer, DEVICE)
+        attention_viz = AttentionVisualizer(refusal_model, tokenizer, DEVICE, class_names=CLASS_NAMES)
         attention_results = attention_viz.analyze_samples(
             test_df,
             num_samples=INTERPRETABILITY_CONFIG['attention_samples_per_class']
@@ -293,7 +293,7 @@ class ExperimentRunner:
         if INTERPRETABILITY_CONFIG['shap_enabled']:
             print("\n--- SHAP Analysis ---")
             try:
-                shap_analyzer = ShapAnalyzer(refusal_model, tokenizer, DEVICE)
+                shap_analyzer = ShapAnalyzer(refusal_model, tokenizer, DEVICE, class_names=CLASS_NAMES)
                 shap_results = shap_analyzer.analyze_samples(
                     test_df,
                     num_samples=INTERPRETABILITY_CONFIG['shap_samples']
@@ -334,7 +334,7 @@ class ExperimentRunner:
         print("\n--- Power Law Analysis (Jailbreak) ---")
         jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
         jailbreak_power_law_analyzer = PowerLawAnalyzer(
-            jailbreak_model, tokenizer, DEVICE, jailbreak_class_names
+            jailbreak_model, tokenizer, DEVICE, class_names=jailbreak_class_names
         )
         jailbreak_power_law_results = jailbreak_power_law_analyzer.analyze_all(
             test_df,
