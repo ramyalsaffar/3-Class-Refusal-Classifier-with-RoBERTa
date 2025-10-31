@@ -63,7 +63,7 @@ class RefusalPipeline:
         analysis_results = self.run_analyses(datasets['refusal']['test_df'])
 
         # Step 9: Generate visualizations
-        self.generate_visualizations(refusal_history, analysis_results)
+        self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
 
         print("\n" + "="*60)
         print("✅ PIPELINE COMPLETE (DUAL CLASSIFIERS TRAINED)")
@@ -369,9 +369,9 @@ class RefusalPipeline:
         }
 
     def train_refusal_classifier(self, train_loader, val_loader) -> Dict:
-        """Step 5: Train RoBERTa refusal classifier (3 classes)."""
+        """Step 6: Train RoBERTa refusal classifier (3 classes)."""
         print("\n" + "="*60)
-        print("STEP 5: TRAINING REFUSAL CLASSIFIER (3 CLASSES)")
+        print("STEP 6: TRAINING REFUSAL CLASSIFIER (3 CLASSES)")
         print("="*60)
 
         # Initialize model
@@ -387,7 +387,7 @@ class RefusalPipeline:
         for batch in train_loader:
             train_labels.extend(batch['label'].tolist())
 
-        class_counts = [train_labels.count(i) for i in range(3)]
+        class_counts = [train_labels.count(i) for i in range(self.refusal_model.num_classes)]
         print(f"\nClass distribution in training set:")
         for i, count in enumerate(class_counts):
             print(f"  Class {i} ({CLASS_NAMES[i]}): {count}")
@@ -419,18 +419,20 @@ class RefusalPipeline:
             DEVICE
         )
 
-        history = trainer.train(
-            model_save_path=os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
-        )
-
-        print(f"\n✓ Refusal classifier training complete")
-
-        return history
+        try:
+            history = trainer.train(
+                model_save_path=os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
+            )
+            print(f"\n✓ Refusal classifier training complete")
+            return history
+        except Exception as e:
+            print(f"\n❌ Refusal classifier training failed: {e}")
+            raise
 
     def train_jailbreak_detector(self, train_loader, val_loader) -> Dict:
-        """Step 6: Train RoBERTa jailbreak detector (2 classes)."""
+        """Step 7: Train RoBERTa jailbreak detector (2 classes)."""
         print("\n" + "="*60)
-        print("STEP 6: TRAINING JAILBREAK DETECTOR (2 CLASSES)")
+        print("STEP 7: TRAINING JAILBREAK DETECTOR (2 CLASSES)")
         print("="*60)
 
         # Initialize model
@@ -446,7 +448,7 @@ class RefusalPipeline:
         for batch in train_loader:
             train_labels.extend(batch['label'].tolist())
 
-        class_counts = [train_labels.count(i) for i in range(2)]
+        class_counts = [train_labels.count(i) for i in range(self.jailbreak_model.num_classes)]
         print(f"\nClass distribution in training set:")
         print(f"  Class 0 (Jailbreak Failed): {class_counts[0]}")
         print(f"  Class 1 (Jailbreak Succeeded): {class_counts[1]}")
@@ -478,19 +480,27 @@ class RefusalPipeline:
             DEVICE
         )
 
-        history = trainer.train(
-            model_save_path=os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
-        )
-
-        print(f"\n✓ Jailbreak detector training complete")
-
-        return history
+        try:
+            history = trainer.train(
+                model_save_path=os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
+            )
+            print(f"\n✓ Jailbreak detector training complete")
+            return history
+        except Exception as e:
+            print(f"\n❌ Jailbreak detector training failed: {e}")
+            raise
 
     def run_analyses(self, test_df: pd.DataFrame) -> Dict:
-        """Step 7: Run all analyses for BOTH classifiers."""
+        """Step 8: Run all analyses for BOTH classifiers."""
         print("\n" + "="*60)
-        print("STEP 7: RUNNING ANALYSES (BOTH CLASSIFIERS)")
+        print("STEP 8: RUNNING ANALYSES (BOTH CLASSIFIERS)")
         print("="*60)
+
+        # Validate models exist
+        if self.refusal_model is None:
+            raise RuntimeError("Refusal model not trained! Run train_refusal_classifier() first.")
+        if self.jailbreak_model is None:
+            raise RuntimeError("Jailbreak model not trained! Run train_jailbreak_detector() first.")
 
         analysis_results = {}
 
@@ -540,7 +550,7 @@ class RefusalPipeline:
 
         # Attention visualization
         print("\n--- Attention Visualization ---")
-        attention_viz = AttentionVisualizer(self.refusal_model, self.tokenizer, DEVICE)
+        attention_viz = AttentionVisualizer(self.refusal_model, self.tokenizer, DEVICE, class_names=CLASS_NAMES)
         attention_results = attention_viz.analyze_samples(
             test_df,
             num_samples=INTERPRETABILITY_CONFIG['attention_samples_per_class']
@@ -551,7 +561,7 @@ class RefusalPipeline:
         if INTERPRETABILITY_CONFIG['shap_enabled']:
             print("\n--- SHAP Analysis ---")
             try:
-                shap_analyzer = ShapAnalyzer(self.refusal_model, self.tokenizer, DEVICE)
+                shap_analyzer = ShapAnalyzer(self.refusal_model, self.tokenizer, DEVICE, class_names=CLASS_NAMES)
                 shap_results = shap_analyzer.analyze_samples(
                     test_df,
                     num_samples=INTERPRETABILITY_CONFIG['shap_samples']
@@ -567,6 +577,17 @@ class RefusalPipeline:
         else:
             print("\n--- SHAP Analysis (Disabled) ---")
             analysis_results['shap'] = None
+
+        # Power Law Analysis
+        print("\n--- Power Law Analysis ---")
+        power_law_analyzer = PowerLawAnalyzer(self.refusal_model, self.tokenizer, DEVICE, class_names=CLASS_NAMES)
+        power_law_results = power_law_analyzer.analyze_all(
+            test_df,
+            np.array(preds),
+            np.array(confidences),
+            output_dir=visualizations_path
+        )
+        analysis_results['power_law'] = power_law_results
 
         # ═══════════════════════════════════════════════════════
         # JAILBREAK DETECTOR ANALYSIS
@@ -588,20 +609,40 @@ class RefusalPipeline:
         )
         analysis_results['jailbreak'] = jailbreak_results
 
+        # Power Law Analysis (Jailbreak Detector)
+        print("\n--- Power Law Analysis (Jailbreak) ---")
+        jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
+        jailbreak_power_law_analyzer = PowerLawAnalyzer(
+            self.jailbreak_model, self.tokenizer, DEVICE, class_names=jailbreak_class_names
+        )
+        jailbreak_power_law_results = jailbreak_power_law_analyzer.analyze_all(
+            test_df,
+            jailbreak_results['predictions']['preds'],
+            jailbreak_results['predictions']['confidences'],
+            output_dir=visualizations_path
+        )
+        analysis_results['jailbreak_power_law'] = jailbreak_power_law_results
+
         return analysis_results
 
-    def generate_visualizations(self, history: Dict, analysis_results: Dict):
-        """Step 8: Generate all visualizations."""
+    def generate_visualizations(self, refusal_history: Dict, jailbreak_history: Dict, analysis_results: Dict):
+        """Step 9: Generate all visualizations for both classifiers."""
         print("\n" + "="*60)
-        print("STEP 8: GENERATING VISUALIZATIONS")
+        print("STEP 9: GENERATING VISUALIZATIONS")
         print("="*60)
 
         visualizer = Visualizer()
 
-        # Training curves
+        # Training curves - Refusal Classifier
         visualizer.plot_training_curves(
-            history,
-            os.path.join(visualizations_path, "training_curves.png")
+            refusal_history,
+            os.path.join(visualizations_path, "refusal_training_curves.png")
+        )
+
+        # Training curves - Jailbreak Detector
+        visualizer.plot_training_curves(
+            jailbreak_history,
+            os.path.join(visualizations_path, "jailbreak_training_curves.png")
         )
 
         # Confusion matrix
