@@ -42,8 +42,14 @@ Examples:
   # Use custom test data
   python src/Analyze.py --test-data data/custom_test.pkl
 
+  # Generate PDF reports
+  python src/Analyze.py --auto --generate-report
+  python src/Analyze.py --auto --generate-report --report-type performance
+  python src/Analyze.py --auto --generate-report --report-type interpretability
+  python src/Analyze.py --auto --generate-report --report-type executive
+
   # Combine options
-  python src/Analyze.py --refusal-model models/refusal.pt --test-data data/test.pkl
+  python src/Analyze.py --refusal-model models/refusal.pt --test-data data/test.pkl --generate-report
         '''
     )
 
@@ -72,6 +78,20 @@ Examples:
         '--auto',
         action='store_true',
         help='Automatically use default model paths without prompting'
+    )
+
+    parser.add_argument(
+        '--generate-report',
+        action='store_true',
+        help='Generate comprehensive PDF report after analysis'
+    )
+
+    parser.add_argument(
+        '--report-type',
+        type=str,
+        choices=['performance', 'interpretability', 'executive', 'all'],
+        default='all',
+        help='Type of report to generate (default: all)'
     )
 
     return parser.parse_args()
@@ -152,12 +172,28 @@ def interactive_mode():
     if test_data_path and not validate_file_exists(test_data_path, "Test data"):
         return
 
+    # Ask about report generation
+    print("\nReport Generation:")
+    generate_report = input("  Generate PDF report? (y/n, default: n): ").strip().lower() == 'y'
+
+    report_type = 'all'
+    if generate_report:
+        print("  Report types:")
+        print("    1. Performance only")
+        print("    2. Interpretability only")
+        print("    3. Executive summary only")
+        print("    4. All reports (default)")
+        choice = input("  Select (1-4, default: 4): ").strip()
+        report_type_map = {'1': 'performance', '2': 'interpretability', '3': 'executive', '4': 'all'}
+        report_type = report_type_map.get(choice, 'all')
+
     # Confirm and run
     print("\n" + "-"*60)
     print("Ready to analyze:")
     print(f"  Refusal model: {refusal_path or 'default'}")
     print(f"  Jailbreak model: {jailbreak_path or 'default'}")
     print(f"  Test data: {test_data_path or 'default'}")
+    print(f"  Generate report: {'Yes (' + report_type + ')' if generate_report else 'No'}")
     print("-"*60)
 
     confirm = input("\nProceed with analysis? (y/n): ").strip().lower()
@@ -175,6 +211,17 @@ def interactive_mode():
         print(f"    TODO: Add test data override to ExperimentRunner.analyze_only()")
 
     runner.analyze_only(refusal_path, jailbreak_path)
+
+    # Generate report if requested
+    if generate_report:
+        print("\n" + "="*60)
+        print("📄 GENERATING PDF REPORT")
+        print("="*60)
+        print(f"\nReport type: {report_type}")
+        print(f"Output location: {reports_path}")
+        print("\n⚠️  Note: Report generation integration coming soon!")
+        print("    TODO: Integrate ReportGenerator with ExperimentRunner results")
+        print("    The ReportGenerator module has been created at src/ReportGenerator.py")
 
 
 # =============================================================================
@@ -205,6 +252,7 @@ if __name__ == "__main__":
         print(f"  Refusal model: {args.refusal_model or 'default'}")
         print(f"  Jailbreak model: {args.jailbreak_model or 'default'}")
         print(f"  Test data: {args.test_data or 'default'}")
+        print(f"  Generate report: {'Yes (' + args.report_type + ')' if args.generate_report else 'No'}")
 
         # Warn if custom test data provided
         if args.test_data:
@@ -215,6 +263,17 @@ if __name__ == "__main__":
         # Run analysis
         runner = ExperimentRunner()
         runner.analyze_only(args.refusal_model, args.jailbreak_model)
+
+        # Generate report if requested
+        if args.generate_report:
+            print("\n" + "="*60)
+            print("📄 GENERATING PDF REPORT")
+            print("="*60)
+            print(f"\nReport type: {args.report_type}")
+            print(f"Output location: {reports_path}")
+            print("\n⚠️  Note: Report generation integration coming soon!")
+            print("    TODO: Integrate ReportGenerator with ExperimentRunner results")
+            print("    The ReportGenerator module has been created at src/ReportGenerator.py")
 
     else:
         # Interactive mode

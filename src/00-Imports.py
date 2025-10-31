@@ -183,9 +183,9 @@ exec(open(CodeFilePath+"02-Constants.py").read())
 print("✓ Loaded 02-Constants.py")
 
 
-# Load remaining code files (03-29, excluding 24-29)
+# Load remaining code files (03-30, excluding 25-30)
 #--------------------------------------------------------
-# Files are numbered 00-29:
+# Files are numbered 00-30:
 #   00-Imports.py (this file)
 #   01-Config.py (loaded above)
 #   02-Constants.py (loaded above)
@@ -204,13 +204,14 @@ print("✓ Loaded 02-Constants.py")
 #   18-19: Interpretability (AttentionVisualizer, ShapAnalyzer)
 #   20: PowerLawAnalyzer (Pareto, confidence distribution, attention power laws)
 #   21: Visualizer (basic plotting functions)
-#   22-23: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
-#   24-Execute.py (main entry point - don't load)
-#   25-Analyze.py (analysis entry point - don't load)
-#   26-ProductionAPI.py (production API server - don't load)
-#   27-MonitoringSystem.py (production monitoring - don't load)
-#   28-RetrainingPipeline.py (production retraining - don't load)
-#   29-DataManager.py (production data management - don't load)
+#   22: ReportGenerator (professional PDF reports with reportlab)
+#   23-24: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
+#   25-Execute.py (main entry point - don't load)
+#   26-Analyze.py (analysis entry point - don't load)
+#   27-ProductionAPI.py (production API server - don't load)
+#   28-MonitoringSystem.py (production monitoring - don't load)
+#   29-RetrainingPipeline.py (production retraining - don't load)
+#   30-DataManager.py (production data management - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
@@ -220,12 +221,12 @@ code_files_ls = [x for x in code_files_ls if x not in [
     "00-Imports.py",      # This file
     "01-Config.py",        # Already loaded
     "02-Constants.py",     # Already loaded
-    "24-Execute.py",       # Execution script
-    "25-Analyze.py",       # Execution script
-    "26-ProductionAPI.py",      # Production API server (load manually)
-    "27-MonitoringSystem.py",   # Production monitoring (load manually)
-    "28-RetrainingPipeline.py", # Production retraining (load manually)
-    "29-DataManager.py"         # Production data management (load manually)
+    "25-Execute.py",       # Execution script
+    "26-Analyze.py",       # Execution script
+    "27-ProductionAPI.py",      # Production API server (load manually)
+    "28-MonitoringSystem.py",   # Production monitoring (load manually)
+    "29-RetrainingPipeline.py", # Production retraining (load manually)
+    "30-DataManager.py"         # Production data management (load manually)
 ]]
 
 # Loop over code files and load them
