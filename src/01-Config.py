@@ -320,31 +320,33 @@ PRODUCTION_CONFIG = {
         'max_overflow': 20
     },
 
-    # Monitoring Thresholds
-    'monitoring': {
-        'daily_check_size': 100,                    # Samples for daily monitoring check
-        'escalated_check_size': 1000,               # Samples for escalated check
+    # Monitoring Thresholds (used by MonitoringSystem)
+    'monitoring_thresholds': {
+        'small_sample_size': 100,                   # Samples for daily monitoring check
+        'large_sample_size': 1000,                  # Samples for escalated check
         'warning_threshold': 0.10,                  # 10% disagreement triggers warning
         'escalate_threshold': 0.15,                 # 15% disagreement triggers escalation
         'retrain_threshold': 0.20,                  # 20% disagreement triggers retrain
         'check_interval_hours': 24,                 # Daily monitoring
-        'trend_window_days': 7,                     # Days to analyze trends
-        'escalation_ui_delay': 2                    # Seconds to pause before escalated check (UX)
+        'trend_window_days': 7                      # Days to analyze trends
     },
+
+    # Rate limiting and delays (root level for easy access)
+    'judge_rate_limit': 1.0,                        # Delay between LLM judge calls (seconds)
+    'escalation_ui_delay': 2.0,                     # Seconds to pause before escalated check (UX)
 
     # LLM Judge for Production Monitoring
     'judge': {
         'model': 'gpt-4',                           # GPT-4 for high accuracy
         'temperature': 0.0,                         # Deterministic
         'max_tokens': 10,                           # Only need score
-        'rate_limit_delay': 0.5,                    # Delay between judge calls
         'max_retries': 3                            # Retries for failed calls
     },
 
     # A/B Testing Configuration
+    'ab_test_stages': [0.05, 0.25, 0.5, 1.0],      # Gradual rollout stages: 5% → 25% → 50% → 100%
     'ab_testing': {
         'enabled': False,                           # Start disabled
-        'stages': [0.05, 0.25, 0.5, 1.0],          # Rollout stages: 5% → 25% → 50% → 100%
         'min_samples_per_stage': 1000,              # Min samples before next stage
         'max_degradation': 0.02,                    # Max 2% F1 drop to continue
         'shadow_mode': False,                       # Shadow mode (log but don't serve)
@@ -352,13 +354,17 @@ PRODUCTION_CONFIG = {
         'manual_promotion': True                    # Require manual promotion (MVP)
     },
 
+    # Validation Thresholds (used by RetrainingPipeline)
+    'validation_thresholds': {
+        'min_f1_score': 0.85,                       # Min F1 score for model deployment
+        'min_avg_confidence': 0.80                  # Min average confidence score
+    },
+
     # Retraining Configuration
     'retraining': {
         'enabled': True,                            # Enable automated retraining
         'schedule': 'weekly',                       # Weekly retraining schedule
         'trigger_on_drift': True,                   # Trigger if drift detected
-        'validation_f1_threshold': 0.85,            # Min F1 for deployment
-        'validation_confidence_threshold': 0.80,    # Min avg confidence
         'retain_historical_samples': True,          # Prevent catastrophic forgetting
         'freeze_layers': 6,                         # Transfer learning (freeze bottom layers)
         'max_epochs': 5,                            # Max training epochs
