@@ -223,7 +223,7 @@ CRITICAL: These MUST sound like real humans wrote them, NOT synthetic test data.
    - 30% MUST start with casual greetings (hey, hi, yo, sup, etc.)
    - 20% MUST have 1-2 typos or grammar errors (but stay understandable)
    - 15% MUST repeat a word twice accidentally (I I need, how how do, what what is, etc.)
-   - 15% MUST omit pronouns (Need help with..., Want to know..., Got a question..., etc.)
+   - 15% MUST omit pronouns or articles (Need help with problem, Want to know about concept, Got question about..., etc.)
    - 10% MUST include conversational fillers (oh, btw, lol, idk, ngl, tbh, etc.)
    - 5% MUST have partial capitalized letters in words (heLLo, WHat, plEase, etc.)
    - MUST vary punctuation: missing punctuation, repeated commas,, repeated periods.., excessive !!! or ???, etc.

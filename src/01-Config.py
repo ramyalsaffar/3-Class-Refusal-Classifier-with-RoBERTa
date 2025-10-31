@@ -164,7 +164,7 @@ PROMPT_GENERATION_CONFIG = {
         'greeting_probability': 0.30,               # Casual greetings (hey, yo, etc.)
         'typo_probability': 0.20,                   # Grammar errors/typos
         'repeated_word_probability': 0.15,          # Accidental word repetition
-        'omit_pronoun_probability': 0.15,           # Omit pronouns naturally
+        'omit_pronoun_probability': 0.15,           # Omit pronouns or articles
         'filler_words_probability': 0.10,           # Fillers (oh, btw, lol, etc.)
         'partial_caps_probability': 0.05,           # Partial capitalization (heLLo)
         'punctuation_variations': True,             # Vary punctuation always
