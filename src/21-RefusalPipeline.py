@@ -38,14 +38,14 @@ class RefusalPipeline:
         # Step 2: Collect responses
         responses_df = self.collect_responses(prompts)
 
-        # Step 3: Label data (dual-task labeling)
-        labeled_df = self.label_data(responses_df)
+        # Step 3: Clean data (remove invalid responses before labeling)
+        cleaned_df = self.clean_data(responses_df)
 
-        # Step 4: Clean data
-        cleaned_df = self.clean_data(labeled_df)
+        # Step 4: Label data (dual-task labeling - only clean data)
+        labeled_df = self.label_data(cleaned_df)
 
         # Step 5: Prepare datasets for BOTH classifiers
-        datasets = self.prepare_datasets(cleaned_df)
+        datasets = self.prepare_datasets(labeled_df)
 
         # Step 6: Train refusal classifier
         refusal_history = self.train_refusal_classifier(
@@ -98,9 +98,13 @@ class RefusalPipeline:
         return responses_df
 
     def label_data(self, responses_df: pd.DataFrame) -> pd.DataFrame:
-        """Step 3: Label responses using LLM Judge (dual-task)."""
+        """
+        Step 4: Label responses using LLM Judge (dual-task).
+
+        Labels ONLY clean data (after cleaning), saving API costs.
+        """
         print("\n" + "="*60)
-        print("STEP 3: LABELING DATA WITH LLM JUDGE (DUAL-TASK)")
+        print("STEP 4: LABELING DATA WITH LLM JUDGE (DUAL-TASK)")
         print("="*60)
 
         # Initialize labeler with OpenAI API key (for GPT-4 judge)
@@ -148,27 +152,28 @@ class RefusalPipeline:
 
         return responses_df
 
-    def clean_data(self, labeled_df: pd.DataFrame) -> pd.DataFrame:
+    def clean_data(self, responses_df: pd.DataFrame) -> pd.DataFrame:
         """
-        Step 4: Clean and validate data quality.
+        Step 3: Clean and validate data quality BEFORE labeling.
 
-        Removes duplicates, outliers, and invalid data before training.
+        Removes duplicates, outliers, and invalid data before expensive labeling.
+        This saves API costs by not labeling garbage data.
 
         Args:
-            labeled_df: Labeled DataFrame
+            responses_df: Raw responses DataFrame (unlabeled)
 
         Returns:
-            Cleaned DataFrame
+            Cleaned DataFrame ready for labeling
         """
         print("\n" + "="*60)
-        print("STEP 4: CLEANING DATA")
+        print("STEP 3: CLEANING DATA (BEFORE LABELING)")
         print("="*60)
 
         # Initialize cleaner
         cleaner = DataCleaner(verbose=True)
 
         # Get outlier report first
-        report = cleaner.get_outlier_report(labeled_df)
+        report = cleaner.get_outlier_report(responses_df)
 
         if report['issues_found']:
             print(f"\n📋 Outlier Report:")
@@ -182,7 +187,7 @@ class RefusalPipeline:
 
         # Clean the data
         strategy = DATA_CLEANING_CONFIG['default_strategy']
-        cleaned_df = cleaner.clean_dataset(labeled_df, strategy=strategy)
+        cleaned_df = cleaner.clean_dataset(responses_df, strategy=strategy)
 
         # Save cleaned data
         cleaned_path = os.path.join(data_processed_path, "cleaned_responses.pkl")
