@@ -29,7 +29,9 @@ class PromptGenerator:
         self.stats = {
             'total_generated': 0,
             'total_failed': 0,
-            'total_regenerated': 0,
+            'total_regeneration_attempts': 0,
+            'total_regenerated_success': 0,
+            'total_regenerated_failed': 0,
             'quality_pass_rate': 0.0
         }
 
@@ -119,7 +121,9 @@ class PromptGenerator:
         print(f"{'='*60}")
         print(f"  Total generated: {self.stats['total_generated']}")
         print(f"  Failed quality check: {self.stats['total_failed']}")
-        print(f"  Regenerated: {self.stats['total_regenerated']}")
+        print(f"  Regeneration attempts: {self.stats['total_regeneration_attempts']}")
+        print(f"  Regenerated successfully: {self.stats['total_regenerated_success']}")
+        print(f"  Regenerated but still failed: {self.stats['total_regenerated_failed']}")
         print(f"  Quality pass rate: {self.stats['quality_pass_rate']:.1f}%")
 
         return prompts
@@ -171,19 +175,49 @@ class PromptGenerator:
 
                     self.stats['total_failed'] += len(failed_prompts)
 
-                    # STAGE 3: Regenerate failed prompts (if enabled)
+                    # STAGE 3: Regenerate failed prompts with re-evaluation loop (if enabled)
                     if self.gen_config['stages']['regeneration'] and failed_prompts:
+                        max_attempts = self.gen_config['stages']['max_regeneration_attempts']
+
                         for failed in failed_prompts:
-                            regenerated = self._regenerate_prompt(
-                                failed['prompt_text'],
-                                failed['human_likeness_percent'],
-                                failed['reason'],
-                                category,
-                                refusal_type
-                            )
-                            if regenerated:
-                                passed_prompts.append(regenerated)
-                                self.stats['total_regenerated'] += 1
+                            prompt_regenerated = False
+
+                            # Try regenerating up to max_attempts times
+                            for attempt in range(max_attempts):
+                                self.stats['total_regeneration_attempts'] += 1
+
+                                # Regenerate the prompt
+                                regenerated = self._regenerate_prompt(
+                                    failed['prompt_text'],
+                                    failed['human_likeness_percent'],
+                                    failed['reason'],
+                                    category,
+                                    refusal_type,
+                                    attempt
+                                )
+
+                                if not regenerated:
+                                    continue  # Regeneration failed, skip this attempt
+
+                                # Re-evaluate the regenerated prompt
+                                eval_results = self._evaluate_prompts([regenerated], category, refusal_type)
+
+                                if eval_results and eval_results[0]['passes_quality']:
+                                    # Success! Regenerated prompt passed evaluation
+                                    passed_prompts.append(regenerated)
+                                    self.stats['total_regenerated_success'] += 1
+                                    prompt_regenerated = True
+                                    break  # Exit attempt loop, move to next failed prompt
+                                else:
+                                    # Still failed, update feedback for next attempt
+                                    if eval_results:
+                                        failed['human_likeness_percent'] = eval_results[0]['human_likeness_percent']
+                                        failed['reason'] = eval_results[0]['reason']
+
+                            # After all attempts, if still not regenerated, count as failed
+                            if not prompt_regenerated:
+                                self.stats['total_regenerated_failed'] += 1
+                                print(f"⚠️  Failed to regenerate prompt after {max_attempts} attempts")
 
                     all_prompts.extend(passed_prompts)
                 else:
@@ -194,7 +228,8 @@ class PromptGenerator:
 
         # Calculate quality pass rate
         if self.stats['total_generated'] > 0:
-            pass_count = self.stats['total_generated'] - self.stats['total_failed'] + self.stats['total_regenerated']
+            # Pass count = initially passed + successfully regenerated
+            pass_count = (self.stats['total_generated'] - self.stats['total_failed']) + self.stats['total_regenerated_success']
             self.stats['quality_pass_rate'] = (pass_count / self.stats['total_generated']) * 100
 
         return all_prompts[:num_prompts]  # Ensure exact count

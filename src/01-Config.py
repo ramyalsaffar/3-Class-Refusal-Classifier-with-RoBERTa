@@ -156,7 +156,7 @@ PROMPT_GENERATION_CONFIG = {
         'generation': True,                         # Stage 1: Generate prompts
         'self_evaluation': True,                    # Stage 2: GPT-4 quality check
         'regeneration': True,                       # Stage 3: Fix failed prompts
-        'max_regeneration_attempts': 3              # Max attempts per failed prompt
+        'max_regeneration_attempts': 5              # Max attempts per failed prompt
     },
 
     # Human-like characteristics (Stage 1 requirements)
