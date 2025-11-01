@@ -188,13 +188,12 @@ exec(open(CodeFilePath+"03-Constants.py").read())
 print("✓ Loaded 03-Constants.py")
 
 
-# Load remaining code files (04-35, excluding 30-35)
+# Load remaining code files (05-35, excluding 30-35)
 #--------------------------------------------------------
 # Files are numbered 01-35:
 #   01-Imports.py (this file)
-#   02-Config.py (loaded above)
+#   02-Config.py (loaded above) - includes AWS_CONFIG
 #   03-Constants.py (loaded above)
-#   04-AWSConfig.py (AWS configuration)
 #   05-SecretsHandler.py (AWS Secrets Manager)
 #   06-07: Data Collection (PromptGenerator, ResponseCollector)
 #   08: DataCleaner (comprehensive data quality validation and cleaning)

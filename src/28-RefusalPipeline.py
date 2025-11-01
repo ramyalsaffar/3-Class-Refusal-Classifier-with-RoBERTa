@@ -649,6 +649,52 @@ class RefusalPipeline:
         correlation_analyzer.visualize_correlation(output_dir=visualizations_path)
         analysis_results['correlation'] = correlation_results
 
+        # ═══════════════════════════════════════════════════════
+        # ERROR ANALYSIS (Phase 2)
+        # ═══════════════════════════════════════════════════════
+        print("\n" + "="*60)
+        print("ERROR ANALYSIS: REFUSAL CLASSIFIER")
+        print("="*60)
+
+        # Create test dataset for error analysis
+        refusal_test_dataset = ClassificationDataset(
+            test_df['response'].tolist(),
+            test_df['refusal_label'].tolist(),
+            self.tokenizer
+        )
+
+        # Run comprehensive error analysis (7 modules)
+        refusal_error_results = run_error_analysis(
+            model=self.refusal_model,
+            dataset=refusal_test_dataset,
+            tokenizer=self.tokenizer,
+            device=DEVICE,
+            class_names=CLASS_NAMES,
+            task_type='refusal'
+        )
+        analysis_results['error_analysis_refusal'] = refusal_error_results
+
+        # Error analysis for jailbreak detector
+        print("\n" + "="*60)
+        print("ERROR ANALYSIS: JAILBREAK DETECTOR")
+        print("="*60)
+
+        jailbreak_test_dataset = ClassificationDataset(
+            test_df['response'].tolist(),
+            test_df['jailbreak_label'].tolist(),
+            self.tokenizer
+        )
+
+        jailbreak_error_results = run_error_analysis(
+            model=self.jailbreak_model,
+            dataset=jailbreak_test_dataset,
+            tokenizer=self.tokenizer,
+            device=DEVICE,
+            class_names=JAILBREAK_CLASS_NAMES,
+            task_type='jailbreak'
+        )
+        analysis_results['error_analysis_jailbreak'] = jailbreak_error_results
+
         return analysis_results
 
     def generate_visualizations(self, refusal_history: Dict, jailbreak_history: Dict, analysis_results: Dict):
