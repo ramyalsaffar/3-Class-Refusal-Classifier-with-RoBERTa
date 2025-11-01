@@ -58,27 +58,28 @@ A production-ready, fine-tuned RoBERTa model for detecting refusal patterns in L
 │   ├── 11-ClassificationDataset.py # PyTorch Dataset
 │   ├── 12-RefusalClassifier.py     # 3-class RoBERTa model
 │   ├── 13-JailbreakDetector.py     # 2-class RoBERTa model
-│   ├── 14-Trainer.py               # Generic trainer with weighted loss
-│   ├── 15-PerModelAnalyzer.py      # Per-model performance analysis
-│   ├── 16-ConfidenceAnalyzer.py    # Confidence score analysis
-│   ├── 17-AdversarialTester.py     # Paraphrasing robustness tests
-│   ├── 18-JailbreakAnalysis.py     # Security analysis
-│   ├── 19-AttentionVisualizer.py   # Attention heatmaps
-│   ├── 20-ShapAnalyzer.py          # SHAP interpretability
-│   ├── 21-PowerLawAnalyzer.py      # Power law analysis
-│   ├── 22-Visualizer.py            # Basic plotting functions
-│   ├── 23-ReportGenerator.py       # PDF report generation
-│   ├── 24-RefusalPipeline.py       # Main training pipeline
-│   ├── 25-ExperimentRunner.py      # Experiment orchestration
-│   ├── 26-Execute.py               # Main entry point
-│   ├── 27-Analyze.py               # Analysis script
-│   ├── 28-ProductionAPI.py         # FastAPI server
-│   ├── 29-MonitoringSystem.py      # Production monitoring
-│   ├── 30-RetrainingPipeline.py    # Automated retraining
-│   ├── 31-DataManager.py           # Production data management
-│   ├── 32-CrossValidator.py        # K-fold cross-validation (Phase 2)
-│   ├── 33-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
-│   └── 34-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
+│   ├── 14-Trainer.py               # Standard trainer with weighted loss
+│   ├── 15-CrossValidator.py        # K-fold cross-validation (Phase 2)
+│   ├── 16-PerModelAnalyzer.py      # Per-model performance analysis
+│   ├── 17-ConfidenceAnalyzer.py    # Confidence score analysis
+│   ├── 18-AdversarialTester.py     # Paraphrasing robustness tests
+│   ├── 19-JailbreakAnalysis.py     # Security-focused jailbreak analysis
+│   ├── 20-CorrelationAnalysis.py   # Refusal ↔ Jailbreak correlation (Phase 2)
+│   ├── 21-AttentionVisualizer.py   # Attention heatmaps
+│   ├── 22-ShapAnalyzer.py          # SHAP interpretability
+│   ├── 23-PowerLawAnalyzer.py      # Power law analysis
+│   ├── 24-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
+│   ├── 25-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
+│   ├── 26-Visualizer.py            # Basic plotting functions
+│   ├── 27-ReportGenerator.py       # PDF report generation
+│   ├── 28-RefusalPipeline.py       # Main training pipeline
+│   ├── 29-ExperimentRunner.py      # Experiment orchestration
+│   ├── 30-Execute.py               # Main entry point
+│   ├── 31-Analyze.py               # Analysis script
+│   ├── 32-ProductionAPI.py         # FastAPI server
+│   ├── 33-MonitoringSystem.py      # Production monitoring
+│   ├── 34-RetrainingPipeline.py    # Automated retraining
+│   └── 35-DataManager.py           # Production data management
 ├── data/                           # Created automatically
 ├── models/                         # Created automatically
 ├── results/                        # Created automatically
