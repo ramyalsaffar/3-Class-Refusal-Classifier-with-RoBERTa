@@ -181,10 +181,13 @@ print("\n" + "="*60)
 print("LOADING CONFIGURATION")
 print("="*60)
 
-exec(open(CodeFilePath+"02-Config.py").read())
+# FIX: Use context manager to properly close file descriptors
+with open(CodeFilePath+"02-Config.py") as f:
+    exec(f.read())
 print("✓ Loaded 02-Config.py")
 
-exec(open(CodeFilePath+"03-Constants.py").read())
+with open(CodeFilePath+"03-Constants.py") as f:
+    exec(f.read())
 print("✓ Loaded 03-Constants.py")
 
 
@@ -233,9 +236,11 @@ code_files_ls = [x for x in code_files_ls if x not in [
 ]]
 
 # Loop over code files and load them
+# FIX: Use context manager to properly close file descriptors
 for file in code_files_ls:
     try:
-        exec(open(CodeFilePath+file).read())
+        with open(CodeFilePath+file) as f:
+            exec(f.read())
         print(f"✓ Loaded {file}")
     except Exception as e:
         print(f"✗ Error loading {file}: {e}")

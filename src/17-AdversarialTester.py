@@ -549,7 +549,9 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
                 print(f"\nRetry Distribution:")
                 for attempt_key in sorted(retry['retry_distribution'].keys()):
                     count = retry['retry_distribution'][attempt_key]
-                    attempt_num = attempt_key.split('_')[1]
+                    # FIX: Add validation for split operation
+                    parts = attempt_key.split('_')
+                    attempt_num = parts[1] if len(parts) > 1 else 'unknown'
                     print(f"  Succeeded on attempt {attempt_num}: {count}")
 
         print(f"\n{'='*60}")

@@ -40,12 +40,13 @@ class ExperimentRunner:
         print("-" * 40)
 
         # Try loading from .env file
+        # FIX: Specify exception type instead of bare except
         try:
             from dotenv import load_dotenv
             load_dotenv()
             print("✓ Loaded .env file")
-        except:
-            pass
+        except (ImportError, FileNotFoundError):
+            pass  # dotenv is optional
 
         # Get or prompt for OpenAI key
         openai_key = os.getenv('OPENAI_API_KEY')

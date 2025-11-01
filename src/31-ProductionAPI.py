@@ -10,7 +10,9 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-exec(open(os.path.join(os.path.dirname(__file__), "01-Imports.py")).read())
+# FIX: Use context manager to properly close file descriptor
+with open(os.path.join(os.path.dirname(__file__), "01-Imports.py")) as f:
+    exec(f.read())
 
 # FastAPI specific imports
 from fastapi import FastAPI, HTTPException, BackgroundTasks

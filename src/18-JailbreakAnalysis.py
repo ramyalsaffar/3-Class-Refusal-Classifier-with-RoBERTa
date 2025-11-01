@@ -157,7 +157,7 @@ class JailbreakAnalysis:
 
                 jailbreak_preds.extend(preds)
                 jailbreak_confidences.extend(confidences)
-                jailbreak_labels.extend(labels.numpy())
+                jailbreak_labels.extend(labels.cpu().numpy())  # FIX: Added .cpu() before .numpy()
 
         # 2. Refusal model inference (for cross-analysis)
         dataset = ClassificationDataset(

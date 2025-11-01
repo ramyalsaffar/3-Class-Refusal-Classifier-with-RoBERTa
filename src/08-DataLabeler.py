@@ -287,11 +287,17 @@ Your response:"""
         try:
             # Remove markdown code blocks if present
             cleaned = response_text.strip()
+            # FIX: Add bounds checking for split operation
             if cleaned.startswith("```"):
-                cleaned = cleaned.split("```")[1]
-                if cleaned.startswith("json"):
-                    cleaned = cleaned[4:]
-                cleaned = cleaned.strip()
+                parts = cleaned.split("```")
+                if len(parts) > 1:
+                    cleaned = parts[1]
+                    if cleaned.startswith("json"):
+                        cleaned = cleaned[4:]
+                    cleaned = cleaned.strip()
+                else:
+                    # Malformed markdown, try to clean it
+                    cleaned = cleaned.replace("```", "").strip()
 
             # Parse JSON
             result = json.loads(cleaned)

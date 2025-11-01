@@ -153,7 +153,11 @@ class PowerLawAnalyzer:
         # Calculate cumulative percentages
         total_errors = error_counts['sum'].sum()
         error_counts['cumulative_errors'] = error_counts['sum'].cumsum()
-        error_counts['cumulative_pct'] = (error_counts['cumulative_errors'] / total_errors * 100)
+        # FIX: Protect against division by zero when model has perfect performance
+        if total_errors > 0:
+            error_counts['cumulative_pct'] = (error_counts['cumulative_errors'] / total_errors * 100)
+        else:
+            error_counts['cumulative_pct'] = 0
 
         # Find what % of groups cause 80% of errors
         groups_80pct = (error_counts['cumulative_pct'] <= 80).sum()

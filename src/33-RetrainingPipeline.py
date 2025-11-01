@@ -269,7 +269,7 @@ class RetrainingPipeline:
                 confidence, preds = torch.max(probs, dim=1)
 
                 all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(labels.numpy())
+                all_labels.extend(labels.cpu().numpy())  # FIX: Added .cpu() before .numpy()
                 all_confs.extend(confidence.cpu().numpy())
 
         # Calculate metrics

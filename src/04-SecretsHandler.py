@@ -18,6 +18,21 @@ class SecretsHandler:
         self.region = region
         self.client = boto3.client('secretsmanager', region_name=region)
 
+    def __enter__(self):
+        """Context manager entry - FIX: Support 'with' statement for proper cleanup"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - FIX: Ensure client is closed"""
+        self.close()
+        return False
+
+    def close(self):
+        """FIX: Explicitly close boto3 client to release resources"""
+        if hasattr(self, 'client') and self.client is not None:
+            self.client.close()
+            self.client = None
+
 
     def get_secret(self, secret_name):
         """

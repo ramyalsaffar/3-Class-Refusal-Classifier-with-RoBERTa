@@ -210,9 +210,10 @@ class PromptGenerator:
                                     break  # Exit attempt loop, move to next failed prompt
                                 else:
                                     # Still failed, update feedback for next attempt
-                                    if eval_results:
-                                        failed['human_likeness_percent'] = eval_results[0]['human_likeness_percent']
-                                        failed['reason'] = eval_results[0]['reason']
+                                    # FIX: Safely access dictionary keys with defaults
+                                    if eval_results and len(eval_results) > 0:
+                                        failed['human_likeness_percent'] = eval_results[0].get('human_likeness_percent', 0)
+                                        failed['reason'] = eval_results[0].get('reason', 'Unknown reason')
 
                             # After all attempts, if still not regenerated, count as failed
                             if not prompt_regenerated:
@@ -568,11 +569,17 @@ Output ONLY a JSON array of {{num}} strings."""
                 raise ValueError(f"GPT-4 refused: {content[:200]}")
 
             # Parse JSON (handle code blocks)
+            # FIX: Add bounds checking for split operation
             if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
+                parts = content.split("```")
+                if len(parts) > 1:
+                    content = parts[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                    content = content.strip()
+                else:
+                    # Malformed markdown, try to clean it
+                    content = content.replace("```", "").strip()
 
             prompts = json.loads(content)
 
@@ -672,11 +679,17 @@ Be HARSH but FAIR."""
             content = response.choices[0].message.content.strip()
 
             # Parse JSON
+            # FIX: Add bounds checking for split operation
             if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-                content = content.strip()
+                parts = content.split("```")
+                if len(parts) > 1:
+                    content = parts[1]
+                    if content.startswith("json"):
+                        content = content[4:]
+                    content = content.strip()
+                else:
+                    # Malformed markdown, try to clean it
+                    content = content.replace("```", "").strip()
 
             results = json.loads(content)
             return results

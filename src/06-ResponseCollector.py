@@ -93,9 +93,10 @@ class ResponseCollector:
 
         df = pd.DataFrame(all_data)
         print(f"\nCollected {len(df)} total responses")
-        print(f"  Claude: {len(df[df['model'] == 'claude-sonnet-4.5'])}")
-        print(f"  GPT-5: {len(df[df['model'] == 'gpt-5'])}")
-        print(f"  Gemini: {len(df[df['model'] == 'gemini-2.5-flash'])}")
+        # WHY: Use config values instead of hardcoded model names
+        print(f"  Claude: {len(df[df['model'] == API_CONFIG['response_models']['claude']])}")
+        print(f"  GPT-5: {len(df[df['model'] == API_CONFIG['response_models']['gpt5']])}")
+        print(f"  Gemini: {len(df[df['model'] == API_CONFIG['response_models']['gemini']])}")
 
         return df
 
@@ -112,11 +113,12 @@ class ResponseCollector:
         """
         for attempt in range(self.max_retries):
             try:
-                if model_name == "claude-sonnet-4.5":
+                # WHY: Use config values instead of hardcoded model names
+                if model_name == API_CONFIG['response_models']['claude']:
                     return self._query_claude(prompt)
-                elif model_name == "gpt-5":
+                elif model_name == API_CONFIG['response_models']['gpt5']:
                     return self._query_gpt5(prompt)
-                elif model_name == "gemini-2.5-flash":
+                elif model_name == API_CONFIG['response_models']['gemini']:
                     return self._query_gemini(prompt)
                 else:
                     raise ValueError(f"Unknown model: {model_name}")
