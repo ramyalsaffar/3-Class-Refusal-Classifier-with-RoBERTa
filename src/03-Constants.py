@@ -71,10 +71,11 @@ JAILBREAK_PLOT_COLORS_LIST = ['#27ae60', '#c0392b']
 
 # Model colors (for per-model analysis)
 #---------------------------------------
+# WHY: Matches DATASET_CONFIG['models'] naming convention
 MODEL_COLORS = {
-    'claude-sonnet-4.5': '#3498db',     # Blue
-    'gpt-5': '#9b59b6',                  # Purple
-    'gemini-2.5-flash': '#e67e22'        # Orange
+    'claude-sonnet-4-20250514': '#3498db',     # Blue
+    'gpt-5': '#9b59b6',                         # Purple
+    'gemini-2.5-flash': '#e67e22'               # Orange
 }
 
 

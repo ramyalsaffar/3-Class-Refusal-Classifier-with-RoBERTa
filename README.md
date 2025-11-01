@@ -125,21 +125,21 @@ export AWS_SECRET_ACCESS_KEY="your-aws-secret"
 ### **3. Run Quick Test**
 
 ```bash
-python src/26-Execute.py --test
+python src/30-Execute.py --test
 ```
 
 ### **4. Run Full Experiment**
 
 ```bash
 # Interactive mode
-python src/26-Execute.py
+python src/30-Execute.py
 
 # CLI modes
-python src/26-Execute.py --full         # Full pipeline
-python src/26-Execute.py --train-only   # Training only
-python src/26-Execute.py --analyze-only # Analysis only
-python src/26-Execute.py --cv           # Cross-validation mode (Phase 2)
-python src/26-Execute.py --cv 10        # Cross-validation with 10 folds
+python src/30-Execute.py --full         # Full pipeline
+python src/30-Execute.py --train-only   # Training only
+python src/30-Execute.py --analyze-only # Analysis only
+python src/30-Execute.py --cv           # Cross-validation mode (Phase 2)
+python src/30-Execute.py --cv 10        # Cross-validation with 10 folds
 ```
 
 ---
@@ -270,17 +270,17 @@ curl http://localhost:8000/health
 
 ```bash
 # Full experiment with all stages
-python src/26-Execute.py --full
+python src/30-Execute.py --full
 
 # Cross-validation with hypothesis testing and error analysis (Phase 2)
-python src/26-Execute.py --cv           # 5-fold CV (default)
-python src/26-Execute.py --cv 10        # 10-fold CV
+python src/30-Execute.py --cv           # 5-fold CV (default)
+python src/30-Execute.py --cv 10        # 10-fold CV
 
 # Analyze existing models with PDF reports
-python src/27-Analyze.py --auto --generate-report
+python src/31-Analyze.py --auto --generate-report
 
 # Specify custom models
-python src/27-Analyze.py --refusal-model models/my_model.pt \
+python src/31-Analyze.py --refusal-model models/my_model.pt \
                          --jailbreak-model models/jailbreak.pt \
                          --generate-report --report-type performance
 ```
@@ -289,7 +289,7 @@ python src/27-Analyze.py --refusal-model models/my_model.pt \
 
 ```bash
 # Start production server
-python src/28-ProductionAPI.py
+python src/32-ProductionAPI.py
 
 # Test classification endpoint
 curl -X POST http://localhost:8000/classify \
@@ -371,13 +371,13 @@ All settings are centralized in `src/02-Config.py`:
 
 ```bash
 # Quick test (reduced samples)
-python src/26-Execute.py --test
+python src/30-Execute.py --test
 
 # Train only (uses existing data)
-python src/26-Execute.py --train-only
+python src/30-Execute.py --train-only
 
 # Analyze only (uses existing models)
-python src/26-Execute.py --analyze-only
+python src/30-Execute.py --analyze-only
 ```
 
 ---
@@ -388,13 +388,13 @@ Generate professional PDF reports:
 
 ```bash
 # All reports (performance + interpretability + executive summary)
-python src/27-Analyze.py --auto --generate-report --report-type all
+python src/31-Analyze.py --auto --generate-report --report-type all
 
 # Performance report only
-python src/27-Analyze.py --auto --generate-report --report-type performance
+python src/31-Analyze.py --auto --generate-report --report-type performance
 
 # Executive summary only
-python src/27-Analyze.py --auto --generate-report --report-type executive
+python src/31-Analyze.py --auto --generate-report --report-type executive
 ```
 
 Reports are saved to `reports/` directory.

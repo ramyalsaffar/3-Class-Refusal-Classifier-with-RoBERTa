@@ -114,6 +114,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# Install system dependencies (curl for healthcheck)
+# WHY: curl is needed for Docker HEALTHCHECK command
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install only API dependencies
 # WHY: Minimal dependencies for faster startup and smaller image
 RUN pip install --no-cache-dir \

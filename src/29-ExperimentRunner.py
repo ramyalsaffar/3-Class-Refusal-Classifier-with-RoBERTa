@@ -102,20 +102,20 @@ class ExperimentRunner:
 
         # Override pipeline behavior for quick test
         print("\n🚀 Quick test mode active - using reduced dataset")
-        print(f"   Prompts per category: {EXPERIMENT_CONFIG['test_sample_size']}")
-        print(f"   Total prompts: {EXPERIMENT_CONFIG['test_sample_size'] * 6}")  # 6 categories
+        print(f"   Test sample size: {EXPERIMENT_CONFIG['test_sample_size']}")
+        print(f"   Reduced total prompts: {EXPERIMENT_CONFIG['test_sample_size']}")
 
-        # Temporarily override config for quick testing
-        # WHY: Reduce number of prompts to speed up data collection
-        original_prompt_config = PROMPT_GENERATION_CONFIG.copy()
-        PROMPT_GENERATION_CONFIG['num_prompts_per_category'] = EXPERIMENT_CONFIG['test_sample_size']
+        # Temporarily override dataset config for quick testing
+        # WHY: Reduce total prompts to speed up data collection and testing
+        original_total_prompts = DATASET_CONFIG['total_prompts']
+        DATASET_CONFIG['total_prompts'] = EXPERIMENT_CONFIG['test_sample_size']
 
         try:
             self.pipeline.run_full_pipeline()
         finally:
             # Restore original config
             # WHY: Prevent config pollution affecting other modes
-            PROMPT_GENERATION_CONFIG.update(original_prompt_config)
+            DATASET_CONFIG['total_prompts'] = original_total_prompts
 
     def full_experiment(self):
         """Run full experiment as configured."""
@@ -523,7 +523,7 @@ class ExperimentRunner:
 
         # Prepare refusal dataset
         refusal_texts = labeled_df['response'].tolist()
-        refusal_labels = labeled_df['refusal_class'].tolist()
+        refusal_labels = labeled_df['refusal_label'].tolist()  # Fixed: was 'refusal_class'
         refusal_dataset = ClassificationDataset(refusal_texts, refusal_labels, tokenizer)
 
         # Step 1: Hypothesis testing on refusal dataset
@@ -567,7 +567,7 @@ class ExperimentRunner:
 
         # Prepare jailbreak dataset
         jailbreak_texts = labeled_df['response'].tolist()
-        jailbreak_labels = labeled_df['jailbreak_class'].tolist()
+        jailbreak_labels = labeled_df['jailbreak_label'].tolist()  # Fixed: was 'jailbreak_class'
         jailbreak_dataset = ClassificationDataset(jailbreak_texts, jailbreak_labels, tokenizer)
 
         # Step 1: Hypothesis testing on jailbreak dataset

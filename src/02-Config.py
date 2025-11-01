@@ -95,7 +95,8 @@ DATASET_CONFIG = {
     'total_prompts': 2000,                      # Total prompts to generate
 
     # Models to collect responses from (3 models × 2000 prompts = 6000 responses)
-    'models': ['claude-sonnet-4.5', 'gpt-5', 'gemini-2.5-flash'],
+    # WHY: Uses same naming convention as API_CONFIG['response_models']
+    'models': ['claude-sonnet-4-20250514', 'gpt-5', 'gemini-2.5-flash'],
 
     # Train/Val/Test splits
     'train_split': 0.7,                         # 70% training
@@ -371,7 +372,8 @@ PRODUCTION_CONFIG = {
         'early_stopping_patience': 2                # Early stopping patience
     },
 
-    # Data Retention Strategy
+    # Data Retention Strategy (Implemented in 35-DataManager.py)
+    # WHY: Comprehensive strategy to balance storage costs with data quality
     'retention': {
         'recent_days': 7,                           # Recent: keep 100% problematic + 20% correct
         'recent_problematic_rate': 1.0,             # 100% of problematic samples
@@ -391,10 +393,12 @@ PRODUCTION_CONFIG = {
         'timeout': 30,                              # Request timeout (seconds)
         'max_request_size': 1024 * 1024,           # 1MB max request
         'enable_cors': True,                        # Enable CORS for frontend
+        'cors_origins': os.getenv('CORS_ORIGINS', '*').split(',') if os.getenv('CORS_ORIGINS') else ['*'],  # Allowed origins (use env var in production)
         'log_level': os.getenv('LOG_LEVEL', 'info')
     },
 
-    # Cost Control
+    # Cost Control (Future Feature - Not yet implemented)
+    # WHY: Reserved for cost tracking and budget alerts in production
     'cost': {
         'max_daily_judge_calls': 5000,              # Max judge calls per day
         'alert_daily_cost': 100.0,                  # Alert if daily cost exceeds $100

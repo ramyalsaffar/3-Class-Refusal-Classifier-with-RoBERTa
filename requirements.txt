@@ -31,14 +31,14 @@ pydantic>=2.0.0
 # Database
 psycopg2-binary>=2.9.0
 
-# AWS (optional)
-boto3>=1.28.0
+# AWS (optional - use requirements-aws.txt for AWS deployment)
+# boto3>=1.28.0  # Moved to requirements-aws.txt to avoid duplication
 
 # PDF Reports
 reportlab>=4.0.0
 
-# Interpretability (SHAP)
-shap>=0.42.0
+# Interpretability (SHAP - optional, use requirements-interpretability.txt)
+# shap>=0.42.0  # Moved to requirements-interpretability.txt (~500MB with dependencies)
 
 # Optional: Hyperparameter tuning (for Phase 3)
 # optuna>=3.0.0

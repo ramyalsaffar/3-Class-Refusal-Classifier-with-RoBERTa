@@ -69,7 +69,7 @@ app = FastAPI(
 # Add CORS middleware (production requirement for browser access)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=PRODUCTION_CONFIG.get('cors_origins', ["*"]),
+    allow_origins=PRODUCTION_CONFIG['api'].get('cors_origins', ["*"]),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
