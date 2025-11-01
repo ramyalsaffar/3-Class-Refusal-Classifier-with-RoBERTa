@@ -46,7 +46,7 @@ from transformers import (
 )
 
 # ML Tools
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -57,8 +57,13 @@ from sklearn.metrics import (
     precision_score,
     precision_recall_curve,
     average_precision_score,
-    cohen_kappa_score
+    cohen_kappa_score,
+    ConfusionMatrixDisplay
 )
+
+# Statistical Testing
+from scipy.stats import chisquare, shapiro
+import pickle
 
 # Visualization
 import matplotlib.pyplot as plt
@@ -183,9 +188,9 @@ exec(open(CodeFilePath+"03-Constants.py").read())
 print("✓ Loaded 03-Constants.py")
 
 
-# Load remaining code files (04-31, excluding 26-31)
+# Load remaining code files (04-34, excluding 26-31)
 #--------------------------------------------------------
-# Files are numbered 01-31:
+# Files are numbered 01-34:
 #   01-Imports.py (this file)
 #   02-Config.py (loaded above)
 #   03-Constants.py (loaded above)
@@ -212,6 +217,9 @@ print("✓ Loaded 03-Constants.py")
 #   29-MonitoringSystem.py (production monitoring - don't load)
 #   30-RetrainingPipeline.py (production retraining - don't load)
 #   31-DataManager.py (production data management - don't load)
+#   32-CrossValidator.py (5-fold cross-validation with stratified k-fold)
+#   33-HypothesisTesting.py (statistical hypothesis tests for class balance)
+#   34-ErrorAnalysis.py (comprehensive 7-module error analysis)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])

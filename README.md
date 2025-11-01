@@ -25,6 +25,19 @@ A production-ready, fine-tuned RoBERTa model for detecting refusal patterns in L
 - 🗄️ **PostgreSQL Integration**: Production data management
 - ☁️ **AWS Integration**: Secrets Manager support
 
+### **Research & Evaluation Features (Phase 2):**
+- 🔬 **5-Fold Cross-Validation**: Stratified k-fold CV with held-out test set
+- 📊 **Statistical Hypothesis Testing**: Chi-square tests for class balance analysis
+- 🔍 **Comprehensive Error Analysis**: 7 detailed analysis modules
+  - Confusion matrix deep dive
+  - Per-class performance breakdown
+  - Confidence analysis (correct vs incorrect predictions)
+  - Input length analysis (accuracy by token length)
+  - Failure case extraction (top 50 most confident mistakes)
+  - Token-level attribution (attention-based)
+  - Jailbreak-specific error analysis
+- 📈 **Publication-Ready Results**: Mean ± std metrics across folds with statistical rigor
+
 ---
 
 ## 📁 Project Structure
@@ -62,7 +75,10 @@ A production-ready, fine-tuned RoBERTa model for detecting refusal patterns in L
 │   ├── 28-ProductionAPI.py         # FastAPI server
 │   ├── 29-MonitoringSystem.py      # Production monitoring
 │   ├── 30-RetrainingPipeline.py    # Automated retraining
-│   └── 31-DataManager.py           # Production data management
+│   ├── 31-DataManager.py           # Production data management
+│   ├── 32-CrossValidator.py        # K-fold cross-validation (Phase 2)
+│   ├── 33-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
+│   └── 34-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
 ├── data/                           # Created automatically
 ├── models/                         # Created automatically
 ├── results/                        # Created automatically
@@ -117,6 +133,8 @@ python src/26-Execute.py
 python src/26-Execute.py --full         # Full pipeline
 python src/26-Execute.py --train-only   # Training only
 python src/26-Execute.py --analyze-only # Analysis only
+python src/26-Execute.py --cv           # Cross-validation mode (Phase 2)
+python src/26-Execute.py --cv 10        # Cross-validation with 10 folds
 ```
 
 ---
@@ -128,6 +146,10 @@ python src/26-Execute.py --analyze-only # Analysis only
 ```bash
 # Full experiment with all stages
 python src/26-Execute.py --full
+
+# Cross-validation with hypothesis testing and error analysis (Phase 2)
+python src/26-Execute.py --cv           # 5-fold CV (default)
+python src/26-Execute.py --cv 10        # 10-fold CV
 
 # Analyze existing models with PDF reports
 python src/27-Analyze.py --auto --generate-report

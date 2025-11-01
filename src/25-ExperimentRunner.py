@@ -441,6 +441,232 @@ class ExperimentRunner:
         return serializable_results
 
 
+    def train_with_cross_validation(self, k_folds: int = 5):
+        """
+        Train with cross-validation (Phase 2 feature).
+
+        Runs:
+        1. Hypothesis testing on dataset
+        2. K-fold cross-validation
+        3. Final model training on full train+val
+        4. Error analysis on test set
+
+        Args:
+            k_folds: Number of cross-validation folds (default: 5)
+        """
+        self._print_experiment_header(
+            "Cross-Validation Mode (Phase 2)",
+            f"Training with {k_folds}-fold cross-validation + comprehensive error analysis"
+        )
+
+        # Check if labeled data exists
+        labeled_data_path = os.path.join(data_processed_path, "labeled_responses.pkl")
+        if not os.path.exists(labeled_data_path):
+            print(f"❌ Error: Labeled data not found at {labeled_data_path}")
+            print("Please run data collection first or use --full mode")
+            return
+
+        # Load data
+        print(f"\nLoading data from {labeled_data_path}...")
+        labeled_df = pd.read_pickle(labeled_data_path)
+        print(f"✓ Loaded {len(labeled_df)} labeled samples")
+
+        # Initialize tokenizer
+        tokenizer = RobertaTokenizer.from_pretrained(MODEL_CONFIG['model_name'])
+
+        # ═══════════════════════════════════════════════════════
+        # REFUSAL CLASSIFIER: CV + HYPOTHESIS TESTING
+        # ═══════════════════════════════════════════════════════
+
+        print(f"\n{'#'*60}")
+        print("REFUSAL CLASSIFIER: CROSS-VALIDATION")
+        print(f"{'#'*60}\n")
+
+        # Prepare refusal dataset
+        refusal_texts = labeled_df['response'].tolist()
+        refusal_labels = labeled_df['refusal_class'].tolist()
+        refusal_dataset = ClassificationDataset(refusal_texts, refusal_labels, tokenizer)
+
+        # Step 1: Hypothesis testing on refusal dataset
+        print(f"\n{'='*60}")
+        print("STEP 1: STATISTICAL HYPOTHESIS TESTING (REFUSAL)")
+        print(f"{'='*60}\n")
+
+        hypothesis_tester = HypothesisTester(class_names=CLASS_NAMES, alpha=0.05)
+        refusal_stats = hypothesis_tester.analyze_dataset_statistics(
+            refusal_dataset,
+            task_type='refusal'
+        )
+        hypothesis_tester.save_results()
+        hypothesis_tester.generate_statistical_report()
+
+        # Step 2: Cross-validation on refusal classifier
+        print(f"\n{'='*60}")
+        print(f"STEP 2: {k_folds}-FOLD CROSS-VALIDATION (REFUSAL)")
+        print(f"{'='*60}\n")
+
+        refusal_cv_results = train_with_cross_validation(
+            full_dataset=refusal_dataset,
+            model_class=RefusalClassifier,
+            k_folds=k_folds,
+            test_split=0.2,
+            class_names=CLASS_NAMES,
+            save_final_model=True,
+            final_model_path=os.path.join(
+                models_path,
+                f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt"
+            )
+        )
+
+        # ═══════════════════════════════════════════════════════
+        # JAILBREAK DETECTOR: CV + HYPOTHESIS TESTING
+        # ═══════════════════════════════════════════════════════
+
+        print(f"\n{'#'*60}")
+        print("JAILBREAK DETECTOR: CROSS-VALIDATION")
+        print(f"{'#'*60}\n")
+
+        # Prepare jailbreak dataset
+        jailbreak_texts = labeled_df['response'].tolist()
+        jailbreak_labels = labeled_df['jailbreak_class'].tolist()
+        jailbreak_dataset = ClassificationDataset(jailbreak_texts, jailbreak_labels, tokenizer)
+
+        # Step 1: Hypothesis testing on jailbreak dataset
+        print(f"\n{'='*60}")
+        print("STEP 1: STATISTICAL HYPOTHESIS TESTING (JAILBREAK)")
+        print(f"{'='*60}\n")
+
+        jailbreak_hypothesis_tester = HypothesisTester(class_names=JAILBREAK_CLASS_NAMES, alpha=0.05)
+        jailbreak_stats = jailbreak_hypothesis_tester.analyze_dataset_statistics(
+            jailbreak_dataset,
+            task_type='jailbreak'
+        )
+        jailbreak_hypothesis_tester.save_results()
+        jailbreak_hypothesis_tester.generate_statistical_report()
+
+        # Step 2: Cross-validation on jailbreak detector
+        print(f"\n{'='*60}")
+        print(f"STEP 2: {k_folds}-FOLD CROSS-VALIDATION (JAILBREAK)")
+        print(f"{'='*60}\n")
+
+        jailbreak_cv_results = train_with_cross_validation(
+            full_dataset=jailbreak_dataset,
+            model_class=JailbreakDetector,
+            k_folds=k_folds,
+            test_split=0.2,
+            class_names=JAILBREAK_CLASS_NAMES,
+            save_final_model=True,
+            final_model_path=os.path.join(
+                models_path,
+                f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt"
+            )
+        )
+
+        # ═══════════════════════════════════════════════════════
+        # ERROR ANALYSIS (BOTH CLASSIFIERS)
+        # ═══════════════════════════════════════════════════════
+
+        print(f"\n{'#'*60}")
+        print("COMPREHENSIVE ERROR ANALYSIS")
+        print(f"{'#'*60}\n")
+
+        # Load trained models
+        refusal_model = RefusalClassifier(num_classes=3)
+        refusal_checkpoint = torch.load(
+            os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt"),
+            map_location=DEVICE
+        )
+        refusal_model.load_state_dict(refusal_checkpoint['model_state_dict'])
+        refusal_model = refusal_model.to(DEVICE)
+
+        jailbreak_model = JailbreakDetector(num_classes=2)
+        jailbreak_checkpoint = torch.load(
+            os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt"),
+            map_location=DEVICE
+        )
+        jailbreak_model.load_state_dict(jailbreak_checkpoint['model_state_dict'])
+        jailbreak_model = jailbreak_model.to(DEVICE)
+
+        # Create test datasets from CV results
+        test_indices_refusal = refusal_cv_results['split_info']
+        test_indices_jailbreak = jailbreak_cv_results['split_info']
+
+        # Use the test set from CV split (already saved)
+        # For now, create datasets from test predictions in CV results
+        refusal_test_texts = [refusal_texts[i] for i in range(len(refusal_texts))][-refusal_cv_results['split_info']['test_size']:]
+        refusal_test_labels = refusal_cv_results['test_results']['labels']
+        refusal_test_dataset = ClassificationDataset(refusal_test_texts, refusal_test_labels, tokenizer)
+
+        jailbreak_test_texts = [jailbreak_texts[i] for i in range(len(jailbreak_texts))][-jailbreak_cv_results['split_info']['test_size']:]
+        jailbreak_test_labels = jailbreak_cv_results['test_results']['labels']
+        jailbreak_test_dataset = ClassificationDataset(jailbreak_test_texts, jailbreak_test_labels, tokenizer)
+
+        # Run error analysis on refusal classifier
+        print(f"\n{'='*60}")
+        print("ERROR ANALYSIS: REFUSAL CLASSIFIER")
+        print(f"{'='*60}\n")
+
+        refusal_error_results = run_error_analysis(
+            model=refusal_model,
+            dataset=refusal_test_dataset,
+            tokenizer=tokenizer,
+            device=DEVICE,
+            class_names=CLASS_NAMES,
+            task_type='refusal'
+        )
+
+        # Run error analysis on jailbreak detector
+        print(f"\n{'='*60}")
+        print("ERROR ANALYSIS: JAILBREAK DETECTOR")
+        print(f"{'='*60}\n")
+
+        jailbreak_error_results = run_error_analysis(
+            model=jailbreak_model,
+            dataset=jailbreak_test_dataset,
+            tokenizer=tokenizer,
+            device=DEVICE,
+            class_names=JAILBREAK_CLASS_NAMES,
+            task_type='jailbreak'
+        )
+
+        # Print final summary
+        print(f"\n{'#'*60}")
+        print("PHASE 2 CROSS-VALIDATION COMPLETE")
+        print(f"{'#'*60}\n")
+
+        print("✅ Refusal Classifier:")
+        print(f"   CV Accuracy: {refusal_cv_results['cv_results']['overall']['accuracy']['mean']:.4f} ± {refusal_cv_results['cv_results']['overall']['accuracy']['std']:.4f}")
+        print(f"   Test Accuracy: {refusal_cv_results['test_results']['accuracy']:.4f}")
+        print(f"   Model saved: {refusal_cv_results['final_model_path']}")
+
+        print(f"\n✅ Jailbreak Detector:")
+        print(f"   CV Accuracy: {jailbreak_cv_results['cv_results']['overall']['accuracy']['mean']:.4f} ± {jailbreak_cv_results['cv_results']['overall']['accuracy']['std']:.4f}")
+        print(f"   Test Accuracy: {jailbreak_cv_results['test_results']['accuracy']:.4f}")
+        print(f"   Model saved: {jailbreak_cv_results['final_model_path']}")
+
+        print(f"\n✅ Error Analysis:")
+        print(f"   Refusal failure cases: {len(refusal_error_results.get('failure_cases', []))}")
+        print(f"   Jailbreak failure cases: {len(jailbreak_error_results.get('failure_cases', []))}")
+
+        print(f"\n✅ All results saved to:")
+        print(f"   - {results_path}")
+        print(f"   - {visualizations_path}")
+        print(f"   - {models_path}")
+
+        print(f"\n{'#'*60}\n")
+
+        return {
+            'refusal_cv': refusal_cv_results,
+            'jailbreak_cv': jailbreak_cv_results,
+            'refusal_error': refusal_error_results,
+            'jailbreak_error': jailbreak_error_results,
+            'hypothesis_tests': {
+                'refusal': refusal_stats,
+                'jailbreak': jailbreak_stats
+            }
+        }
+
+
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-

@@ -5,11 +5,12 @@
 # Provides both command-line and interactive interfaces.
 #
 # Usage:
-#   python src/Execute.py                # Interactive mode
-#   python src/Execute.py --test         # Quick test
-#   python src/Execute.py --full         # Full experiment
-#   python src/Execute.py --train-only   # Train only
-#   python src/Execute.py --analyze-only [model_path]  # Analyze only
+#   python src/Execute.py                      # Interactive mode
+#   python src/Execute.py --test               # Quick test
+#   python src/Execute.py --full               # Full experiment
+#   python src/Execute.py --train-only         # Train only
+#   python src/Execute.py --analyze-only       # Analyze only
+#   python src/Execute.py --cv [k_folds]       # Cross-validation mode (Phase 2)
 #
 ###############################################################################
 
@@ -39,17 +40,25 @@ if __name__ == "__main__":
             jailbreak_path = sys.argv[3] if len(sys.argv) > 3 else None
             runner.analyze_only(refusal_path, jailbreak_path)
 
+        elif sys.argv[1] == '--cv':
+            # Cross-validation mode (Phase 2)
+            k_folds = int(sys.argv[2]) if len(sys.argv) > 2 else 5
+            runner.train_with_cross_validation(k_folds=k_folds)
+
         else:
-            print("Usage: python src/Execute.py [--test|--full|--train-only|--analyze-only]")
+            print("Usage: python src/Execute.py [--test|--full|--train-only|--analyze-only|--cv]")
             print("\nOptions:")
             print("  --test           Run quick test with reduced samples")
             print("  --full           Run full experiment as configured")
             print("  --train-only     Train on existing data")
             print("  --analyze-only   Analyze existing models (optionally specify refusal and jailbreak model paths)")
+            print("  --cv [k_folds]   Cross-validation mode with error analysis (Phase 2, default: 5 folds)")
             print("\nExamples:")
             print("  python src/Execute.py --full")
             print("  python src/Execute.py --analyze-only")
             print("  python src/Execute.py --analyze-only models/exp_refusal_best.pt models/exp_jailbreak_best.pt")
+            print("  python src/Execute.py --cv")
+            print("  python src/Execute.py --cv 10")
 
     else:
         # Interactive mode
@@ -67,9 +76,10 @@ if __name__ == "__main__":
         print("2. Full Experiment (complete pipeline)")
         print("3. Train Only (use existing data)")
         print("4. Analyze Only (use existing model)")
-        print("5. Exit")
+        print("5. Cross-Validation Mode (Phase 2: CV + Error Analysis)")
+        print("6. Exit")
 
-        choice = input("\nSelect mode (1-5): ")
+        choice = input("\nSelect mode (1-6): ")
 
         if choice == '1':
             runner.quick_test()
@@ -121,6 +131,21 @@ if __name__ == "__main__":
                         print(f"❌ Report generation failed: {e}")
                         print("   Use: python src/Analyze.py --auto --generate-report")
         elif choice == '5':
+            # Cross-validation mode (Phase 2)
+            print("\n📊 Cross-Validation Settings:")
+            k_folds_input = input("  Number of CV folds (default: 5): ").strip()
+            k_folds = int(k_folds_input) if k_folds_input else 5
+
+            runner.train_with_cross_validation(k_folds=k_folds)
+
+            print("\n" + "="*60)
+            print("💡 TIP: View comprehensive results in:")
+            print("   - Cross-validation: results/*_cv_results.pkl")
+            print("   - Error analysis: results/*_error_analysis.pkl")
+            print("   - Hypothesis tests: results/*_hypothesis_tests.txt")
+            print("   - Visualizations: visualizations/")
+            print("="*60)
+        elif choice == '6':
             print("Exiting...")
         else:
             print("Invalid choice. Exiting...")
