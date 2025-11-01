@@ -24,6 +24,7 @@ A production-ready, fine-tuned RoBERTa model for detecting refusal patterns in L
 - 📄 **PDF Report Generation**: Professional reports using ReportLab
 - 🗄️ **PostgreSQL Integration**: Production data management
 - ☁️ **AWS Integration**: Secrets Manager support
+- 🐳 **Docker & Containerization**: Multi-stage builds with GPU support for easy deployment
 
 ### **Research & Evaluation Features (Phase 2):**
 - 🔬 **5-Fold Cross-Validation**: Stratified k-fold CV with held-out test set
@@ -86,6 +87,9 @@ A production-ready, fine-tuned RoBERTa model for detecting refusal patterns in L
 ├── visualizations/                 # Created automatically
 ├── reports/                        # Created automatically
 ├── requirements.txt                # Python dependencies
+├── Dockerfile                      # Docker multi-stage build
+├── docker-compose.yml              # Docker Compose configuration
+├── .dockerignore                   # Docker ignore patterns
 ├── .gitignore                      # Git ignore patterns
 └── README.md                       # This file
 ```
@@ -136,6 +140,126 @@ python src/26-Execute.py --train-only   # Training only
 python src/26-Execute.py --analyze-only # Analysis only
 python src/26-Execute.py --cv           # Cross-validation mode (Phase 2)
 python src/26-Execute.py --cv 10        # Cross-validation with 10 folds
+```
+
+---
+
+## 🐳 Docker Deployment
+
+### **Why Docker?**
+Docker provides environment consistency, easy deployment, and reproducibility across different machines and environments.
+
+### **Quick Start with Docker:**
+
+```bash
+# 1. Build the image
+docker-compose build dev
+
+# 2. Start development environment
+docker-compose up dev
+
+# Or use specific services:
+docker-compose up train      # Full training pipeline
+docker-compose up train-cv   # Cross-validation (Phase 2)
+docker-compose up analyze    # Analysis only
+docker-compose up api        # Production API server
+docker-compose up jupyter    # Jupyter notebook
+```
+
+### **Docker Services Available:**
+
+| Service | Purpose | Command |
+|---------|---------|---------|
+| `dev` | Interactive development | `docker-compose up dev` |
+| `train` | Full training pipeline | `docker-compose up train` |
+| `train-cv` | Cross-validation training | `docker-compose up train-cv` |
+| `analyze` | Analysis with reports | `docker-compose up analyze` |
+| `api` | Production API server | `docker-compose up api` |
+| `jupyter` | Jupyter notebook | `docker-compose up jupyter` |
+
+### **Environment Setup:**
+
+Create a `.env` file in the project root with your API keys:
+
+```bash
+# .env file
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+GOOGLE_API_KEY=your-google-key
+
+# Optional AWS credentials
+AWS_ACCESS_KEY_ID=your-aws-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret
+```
+
+### **GPU Support:**
+
+Docker Compose is configured for GPU support. To use CPU-only:
+
+```bash
+# Comment out the deploy section in docker-compose.yml
+# Or use CPU-only base image
+docker build --target production -t refusal-classifier:cpu .
+```
+
+### **Common Docker Commands:**
+
+```bash
+# Build all images
+docker-compose build
+
+# Run full training pipeline (with GPU)
+docker-compose up train
+
+# Run cross-validation (Phase 2)
+docker-compose up train-cv
+
+# Start API server
+docker-compose up -d api
+
+# Access development container shell
+docker-compose run --rm dev /bin/bash
+
+# View API logs
+docker-compose logs -f api
+
+# Stop all services
+docker-compose down
+
+# Remove all containers and volumes
+docker-compose down -v
+```
+
+### **Volume Mounts:**
+
+Docker containers mount local directories for persistence:
+
+- `./data` → `/app/data` - Training data
+- `./models` → `/app/models` - Trained models
+- `./results` → `/app/results` - Analysis results
+- `./visualizations` → `/app/visualizations` - Plots
+- `./reports` → `/app/reports` - PDF reports
+
+**WHY:** Changes persist even when containers are stopped/restarted.
+
+### **Production Deployment:**
+
+```bash
+# Build production API image
+docker build --target api -t refusal-classifier:api .
+
+# Run with Docker
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/models:/app/models:ro \
+  --name refusal-api \
+  refusal-classifier:api
+
+# Or use Docker Compose
+docker-compose up -d api
+
+# Health check
+curl http://localhost:8000/health
 ```
 
 ---
