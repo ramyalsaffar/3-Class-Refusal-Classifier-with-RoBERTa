@@ -309,13 +309,12 @@ def interactive_mode():
     # Run analysis
     runner = ExperimentRunner()
 
-    # If custom test data provided, we need to handle it differently
+    # Run analysis with custom test data if provided
+    # WHY: Allows validation on different test sets without retraining
     if test_data_path:
-        print(f"\n⚠️  Note: Custom test data path specified but not yet implemented")
-        print(f"    Will use default test data from data/splits/test.pkl")
-        print(f"    TODO: Add test data override to ExperimentRunner.analyze_only()")
+        print(f"\n✓ Using custom test data: {test_data_path}")
 
-    analysis_results = runner.analyze_only(refusal_path, jailbreak_path)
+    analysis_results = runner.analyze_only(refusal_path, jailbreak_path, test_data_path)
 
     # Generate report if requested
     if generate_report and analysis_results:
@@ -362,15 +361,13 @@ if __name__ == "__main__":
         print(f"  Test data: {args.test_data or 'default'}")
         print(f"  Generate report: {'Yes (' + args.report_type + ')' if args.generate_report else 'No'}")
 
-        # Warn if custom test data provided
+        # Notify if custom test data provided
         if args.test_data:
-            print(f"\n⚠️  Note: Custom test data path specified but not yet implemented")
-            print(f"    Will use default test data from data/splits/test.pkl")
-            print(f"    TODO: Add test data override to ExperimentRunner.analyze_only()")
+            print(f"\n✓ Using custom test data: {args.test_data}")
 
         # Run analysis
         runner = ExperimentRunner()
-        analysis_results = runner.analyze_only(args.refusal_model, args.jailbreak_model)
+        analysis_results = runner.analyze_only(args.refusal_model, args.jailbreak_model, args.test_data)
 
         # Generate report if requested
         if args.generate_report and analysis_results:

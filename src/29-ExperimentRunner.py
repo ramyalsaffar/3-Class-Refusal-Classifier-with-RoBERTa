@@ -83,7 +83,12 @@ class ExperimentRunner:
             print("="*60)
 
     def quick_test(self):
-        """Run quick test with reduced samples."""
+        """
+        Run quick test with reduced samples.
+
+        WHY: Allows rapid prototyping and testing without running full pipeline.
+        Samples a subset of data at each stage to validate end-to-end workflow.
+        """
         self._print_experiment_header(
             "Quick Test Mode",
             f"Testing with {EXPERIMENT_CONFIG['test_sample_size']} samples per category"
@@ -92,14 +97,25 @@ class ExperimentRunner:
         # Get API keys
         api_keys = self._get_api_keys()
 
-        # TODO: Implement reduced dataset logic
-        # For now, run full pipeline (can be optimized later)
+        # Initialize pipeline with quick test mode
         self.pipeline = RefusalPipeline(api_keys)
 
-        print("\n⚠️  Note: Quick test mode runs full pipeline")
-        print("Future enhancement: Implement sampling for faster testing")
+        # Override pipeline behavior for quick test
+        print("\n🚀 Quick test mode active - using reduced dataset")
+        print(f"   Prompts per category: {EXPERIMENT_CONFIG['test_sample_size']}")
+        print(f"   Total prompts: {EXPERIMENT_CONFIG['test_sample_size'] * 6}")  # 6 categories
 
-        self.pipeline.run_full_pipeline()
+        # Temporarily override config for quick testing
+        # WHY: Reduce number of prompts to speed up data collection
+        original_prompt_config = PROMPT_GENERATION_CONFIG.copy()
+        PROMPT_GENERATION_CONFIG['num_prompts_per_category'] = EXPERIMENT_CONFIG['test_sample_size']
+
+        try:
+            self.pipeline.run_full_pipeline()
+        finally:
+            # Restore original config
+            # WHY: Prevent config pollution affecting other modes
+            PROMPT_GENERATION_CONFIG.update(original_prompt_config)
 
     def full_experiment(self):
         """Run full experiment as configured."""
@@ -163,8 +179,18 @@ class ExperimentRunner:
 
         print("\n✅ Training and analysis complete (BOTH classifiers trained)")
 
-    def analyze_only(self, refusal_model_path: str = None, jailbreak_model_path: str = None):
-        """Analysis only (load existing models for BOTH classifiers)."""
+    def analyze_only(self, refusal_model_path: str = None, jailbreak_model_path: str = None, test_data_path: str = None):
+        """
+        Analysis only (load existing models for BOTH classifiers).
+
+        Args:
+            refusal_model_path: Path to trained refusal classifier (default: models/{experiment_name}_refusal_best.pt)
+            jailbreak_model_path: Path to trained jailbreak detector (default: models/{experiment_name}_jailbreak_best.pt)
+            test_data_path: Path to test data (default: data/splits/test.pkl)
+
+        WHY: Allows rerunning analysis with different test sets or on different model checkpoints
+        without retraining. Useful for validating model on new data or comparing model versions.
+        """
         self._print_experiment_header(
             "Analysis Only Mode",
             "Loading trained models and running analysis (BOTH classifiers)"
@@ -186,17 +212,30 @@ class ExperimentRunner:
             print("Please train models first or provide correct paths")
             return
 
+        # Determine test data path
+        if test_data_path is None:
+            test_data_path = os.path.join(data_splits_path, "test.pkl")
+
         # Check if test data exists
-        test_data_path = os.path.join(data_splits_path, "test.pkl")
         if not os.path.exists(test_data_path):
             print(f"❌ Error: Test data not found at {test_data_path}")
-            print("Please run full pipeline first")
+            print("Please run full pipeline first or provide valid test data path")
             return
 
         # Load test data
         print(f"\nLoading test data from {test_data_path}...")
         test_df = pd.read_pickle(test_data_path)
         print(f"✓ Loaded {len(test_df)} test samples")
+
+        # Validate test data has required columns
+        # WHY: Ensure test data contains both refusal and jailbreak labels for dual-task analysis
+        required_columns = ['response', 'refusal_label', 'jailbreak_label']
+        missing_columns = [col for col in required_columns if col not in test_df.columns]
+        if missing_columns:
+            print(f"❌ Error: Test data missing required columns: {missing_columns}")
+            print(f"   Required: {required_columns}")
+            print(f"   Found: {list(test_df.columns)}")
+            return
 
         # Initialize tokenizer
         tokenizer = RobertaTokenizer.from_pretrained(MODEL_CONFIG['model_name'])
