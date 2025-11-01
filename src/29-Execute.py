@@ -123,7 +123,7 @@ if __name__ == "__main__":
                     import sys
                     sys.path.append(os.path.dirname(__file__))
                     from importlib import import_module
-                    analyze_module = import_module('26-Analyze', package=None)
+                    analyze_module = import_module('30-Analyze', package=None)
 
                     try:
                         analyze_module._generate_reports(result, report_type)

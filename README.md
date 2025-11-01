@@ -47,40 +47,39 @@ A production-ready, fine-tuned RoBERTa model for detecting refusal patterns in L
 3-Class-Refusal-Classifier-with-RoBERTa/
 ├── src/
 │   ├── 01-Imports.py              # Central import manager
-│   ├── 02-Config.py                # All configuration settings
+│   ├── 02-Config.py                # All configuration settings (includes AWS config)
 │   ├── 03-Constants.py             # Global constants
-│   ├── 04-AWSConfig.py             # AWS configuration
-│   ├── 05-SecretsHandler.py        # AWS Secrets Manager
-│   ├── 06-PromptGenerator.py       # 3-stage prompt generation
-│   ├── 07-ResponseCollector.py     # Multi-LLM response collection
-│   ├── 08-DataCleaner.py           # Comprehensive data cleaning
-│   ├── 09-DataLabeler.py           # LLM judge labeling
-│   ├── 10-LabelingQualityAnalyzer.py
-│   ├── 11-ClassificationDataset.py # PyTorch Dataset
-│   ├── 12-RefusalClassifier.py     # 3-class RoBERTa model
-│   ├── 13-JailbreakDetector.py     # 2-class RoBERTa model
-│   ├── 14-Trainer.py               # Standard trainer with weighted loss
-│   ├── 15-CrossValidator.py        # K-fold cross-validation (Phase 2)
-│   ├── 16-PerModelAnalyzer.py      # Per-model performance analysis
-│   ├── 17-ConfidenceAnalyzer.py    # Confidence score analysis
-│   ├── 18-AdversarialTester.py     # Paraphrasing robustness tests
-│   ├── 19-JailbreakAnalysis.py     # Security-focused jailbreak analysis
-│   ├── 20-CorrelationAnalysis.py   # Refusal ↔ Jailbreak correlation (Phase 2)
-│   ├── 21-AttentionVisualizer.py   # Attention heatmaps
-│   ├── 22-ShapAnalyzer.py          # SHAP interpretability
-│   ├── 23-PowerLawAnalyzer.py      # Power law analysis
-│   ├── 24-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
-│   ├── 25-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
-│   ├── 26-Visualizer.py            # Basic plotting functions
-│   ├── 27-ReportGenerator.py       # PDF report generation
-│   ├── 28-RefusalPipeline.py       # Main training pipeline
-│   ├── 29-ExperimentRunner.py      # Experiment orchestration
-│   ├── 30-Execute.py               # Main entry point
-│   ├── 31-Analyze.py               # Analysis script
-│   ├── 32-ProductionAPI.py         # FastAPI server
-│   ├── 33-MonitoringSystem.py      # Production monitoring
-│   ├── 34-RetrainingPipeline.py    # Automated retraining
-│   └── 35-DataManager.py           # Production data management
+│   ├── 04-SecretsHandler.py        # AWS Secrets Manager
+│   ├── 05-PromptGenerator.py       # 3-stage prompt generation
+│   ├── 06-ResponseCollector.py     # Multi-LLM response collection
+│   ├── 07-DataCleaner.py           # Comprehensive data cleaning
+│   ├── 08-DataLabeler.py           # LLM judge labeling
+│   ├── 09-LabelingQualityAnalyzer.py
+│   ├── 10-ClassificationDataset.py # PyTorch Dataset
+│   ├── 11-RefusalClassifier.py     # 3-class RoBERTa model
+│   ├── 12-JailbreakDetector.py     # 2-class RoBERTa model
+│   ├── 13-Trainer.py               # Standard trainer with weighted loss
+│   ├── 14-CrossValidator.py        # K-fold cross-validation (Phase 2)
+│   ├── 15-PerModelAnalyzer.py      # Per-model performance analysis
+│   ├── 16-ConfidenceAnalyzer.py    # Confidence score analysis
+│   ├── 17-AdversarialTester.py     # Paraphrasing robustness tests
+│   ├── 18-JailbreakAnalysis.py     # Security-focused jailbreak analysis
+│   ├── 19-CorrelationAnalysis.py   # Refusal ↔ Jailbreak correlation (Phase 2)
+│   ├── 20-AttentionVisualizer.py   # Attention heatmaps
+│   ├── 21-ShapAnalyzer.py          # SHAP interpretability
+│   ├── 22-PowerLawAnalyzer.py      # Power law analysis
+│   ├── 23-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
+│   ├── 24-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
+│   ├── 25-Visualizer.py            # Basic plotting functions
+│   ├── 26-ReportGenerator.py       # PDF report generation
+│   ├── 27-RefusalPipeline.py       # Main training pipeline
+│   ├── 28-ExperimentRunner.py      # Experiment orchestration
+│   ├── 29-Execute.py               # Main entry point
+│   ├── 30-Analyze.py               # Analysis script
+│   ├── 31-ProductionAPI.py         # FastAPI server
+│   ├── 32-MonitoringSystem.py      # Production monitoring
+│   ├── 33-RetrainingPipeline.py    # Automated retraining
+│   └── 34-DataManager.py           # Production data management
 ├── data/                           # Created automatically
 ├── models/                         # Created automatically
 ├── results/                        # Created automatically
@@ -125,21 +124,21 @@ export AWS_SECRET_ACCESS_KEY="your-aws-secret"
 ### **3. Run Quick Test**
 
 ```bash
-python src/30-Execute.py --test
+python src/29-Execute.py --test
 ```
 
 ### **4. Run Full Experiment**
 
 ```bash
 # Interactive mode
-python src/30-Execute.py
+python src/29-Execute.py
 
 # CLI modes
-python src/30-Execute.py --full         # Full pipeline
-python src/30-Execute.py --train-only   # Training only
-python src/30-Execute.py --analyze-only # Analysis only
-python src/30-Execute.py --cv           # Cross-validation mode (Phase 2)
-python src/30-Execute.py --cv 10        # Cross-validation with 10 folds
+python src/29-Execute.py --full         # Full pipeline
+python src/29-Execute.py --train-only   # Training only
+python src/29-Execute.py --analyze-only # Analysis only
+python src/29-Execute.py --cv           # Cross-validation mode (Phase 2)
+python src/29-Execute.py --cv 10        # Cross-validation with 10 folds
 ```
 
 ---
@@ -270,17 +269,17 @@ curl http://localhost:8000/health
 
 ```bash
 # Full experiment with all stages
-python src/30-Execute.py --full
+python src/29-Execute.py --full
 
 # Cross-validation with hypothesis testing and error analysis (Phase 2)
-python src/30-Execute.py --cv           # 5-fold CV (default)
-python src/30-Execute.py --cv 10        # 10-fold CV
+python src/29-Execute.py --cv           # 5-fold CV (default)
+python src/29-Execute.py --cv 10        # 10-fold CV
 
 # Analyze existing models with PDF reports
-python src/31-Analyze.py --auto --generate-report
+python src/30-Analyze.py --auto --generate-report
 
 # Specify custom models
-python src/31-Analyze.py --refusal-model models/my_model.pt \
+python src/30-Analyze.py --refusal-model models/my_model.pt \
                          --jailbreak-model models/jailbreak.pt \
                          --generate-report --report-type performance
 ```
@@ -289,7 +288,7 @@ python src/31-Analyze.py --refusal-model models/my_model.pt \
 
 ```bash
 # Start production server
-python src/32-ProductionAPI.py
+python src/31-ProductionAPI.py
 
 # Test classification endpoint
 curl -X POST http://localhost:8000/classify \
@@ -371,13 +370,13 @@ All settings are centralized in `src/02-Config.py`:
 
 ```bash
 # Quick test (reduced samples)
-python src/30-Execute.py --test
+python src/29-Execute.py --test
 
 # Train only (uses existing data)
-python src/30-Execute.py --train-only
+python src/29-Execute.py --train-only
 
 # Analyze only (uses existing models)
-python src/30-Execute.py --analyze-only
+python src/29-Execute.py --analyze-only
 ```
 
 ---
@@ -388,13 +387,13 @@ Generate professional PDF reports:
 
 ```bash
 # All reports (performance + interpretability + executive summary)
-python src/31-Analyze.py --auto --generate-report --report-type all
+python src/30-Analyze.py --auto --generate-report --report-type all
 
 # Performance report only
-python src/31-Analyze.py --auto --generate-report --report-type performance
+python src/30-Analyze.py --auto --generate-report --report-type performance
 
 # Executive summary only
-python src/31-Analyze.py --auto --generate-report --report-type executive
+python src/30-Analyze.py --auto --generate-report --report-type executive
 ```
 
 Reports are saved to `reports/` directory.

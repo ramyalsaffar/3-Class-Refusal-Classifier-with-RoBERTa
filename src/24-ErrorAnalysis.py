@@ -607,7 +607,7 @@ class ErrorAnalyzer:
         """
         Module 6: Token-level attribution for failure cases using attention.
 
-        Note: Full SHAP analysis is in 20-ShapAnalyzer.py
+        Note: Full SHAP analysis is in 21-ShapAnalyzer.py
         This provides simplified attention-based attribution.
 
         Args:
@@ -621,7 +621,7 @@ class ErrorAnalyzer:
         print(f"{'='*60}\n")
 
         print("⚠️  Note: This module provides simplified attention-based attribution.")
-        print("   For full SHAP analysis, use 20-ShapAnalyzer.py\n")
+        print("   For full SHAP analysis, use 21-ShapAnalyzer.py\n")
 
         # Get failure cases
         incorrect_mask = self.predictions != self.true_labels
@@ -670,7 +670,7 @@ class ErrorAnalyzer:
             print()
 
         print(f"✓ Analyzed {len(attribution_results)} failure cases")
-        print(f"  For detailed SHAP attribution, run 20-ShapAnalyzer.py\n")
+        print(f"  For detailed SHAP attribution, run 21-ShapAnalyzer.py\n")
 
         result = {
             'num_samples': len(attribution_results),

@@ -100,7 +100,7 @@ RUN mkdir -p data/{raw,responses,processed,splits} \
 ENV PYTHONPATH=/app/src
 
 # Default command
-CMD ["python", "src/30-Execute.py", "--mode", "full"]
+CMD ["python", "src/29-Execute.py", "--mode", "full"]
 
 # =============================================================================
 # STAGE 5: API (Production API)
@@ -136,8 +136,8 @@ RUN python -c "from transformers import RobertaTokenizer, RobertaModel; \
     RobertaModel.from_pretrained('roberta-base')"
 
 # Copy only API-related files
-COPY src/02-Config.py src/03-Constants.py src/12-RefusalClassifier.py \
-     src/13-JailbreakDetector.py src/32-ProductionAPI.py ./src/
+COPY src/02-Config.py src/03-Constants.py src/11-RefusalClassifier.py \
+     src/12-JailbreakDetector.py src/31-ProductionAPI.py ./src/
 
 # Copy trained models (these should be mounted as volumes in production)
 RUN mkdir -p models
@@ -151,5 +151,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run API server
-# WHY: Use --app-dir to handle numbered Python files (32-ProductionAPI.py)
-CMD ["uvicorn", "32-ProductionAPI:app", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "8000"]
+# WHY: Use --app-dir to handle numbered Python files (31-ProductionAPI.py)
+CMD ["uvicorn", "31-ProductionAPI:app", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "8000"]

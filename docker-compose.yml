@@ -90,7 +90,7 @@ services:
     env_file:
       - .env
 
-    command: ["python", "src/30-Execute.py", "--mode", "full"]
+    command: ["python", "src/29-Execute.py", "--mode", "full"]
 
   # ===========================================================================
   # TRAINING (CROSS-VALIDATION)
@@ -127,7 +127,7 @@ services:
     env_file:
       - .env
 
-    command: ["python", "src/30-Execute.py", "--mode", "cv", "--k-folds", "5"]
+    command: ["python", "src/29-Execute.py", "--mode", "cv", "--k-folds", "5"]
 
   # ===========================================================================
   # ANALYSIS ONLY
@@ -151,7 +151,7 @@ services:
     env_file:
       - .env
 
-    command: ["python", "src/31-Analyze.py", "--auto", "--generate-report"]
+    command: ["python", "src/30-Analyze.py", "--auto", "--generate-report"]
 
   # ===========================================================================
   # PRODUCTION API

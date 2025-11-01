@@ -372,7 +372,7 @@ PRODUCTION_CONFIG = {
         'early_stopping_patience': 2                # Early stopping patience
     },
 
-    # Data Retention Strategy (Implemented in 35-DataManager.py)
+    # Data Retention Strategy (Implemented in 34-DataManager.py)
     # WHY: Comprehensive strategy to balance storage costs with data quality
     'retention': {
         'recent_days': 7,                           # Recent: keep 100% problematic + 20% correct

@@ -188,33 +188,33 @@ exec(open(CodeFilePath+"03-Constants.py").read())
 print("✓ Loaded 03-Constants.py")
 
 
-# Load remaining code files (05-35, excluding 30-35)
+# Load remaining code files (04-34, excluding 29-34)
 #--------------------------------------------------------
-# Files are numbered 01-35:
+# Files are numbered 01-34:
 #   01-Imports.py (this file)
 #   02-Config.py (loaded above) - includes AWS_CONFIG
 #   03-Constants.py (loaded above)
-#   05-SecretsHandler.py (AWS Secrets Manager)
-#   06-07: Data Collection (PromptGenerator, ResponseCollector)
-#   08: DataCleaner (comprehensive data quality validation and cleaning)
-#   09: DataLabeler (dual-task labeling: refusal + jailbreak detection)
-#   10: LabelingQualityAnalyzer (analyze judge confidence and labeling quality)
-#   11: ClassificationDataset (generic PyTorch Dataset - works for both classifiers)
-#   12: RefusalClassifier (3-class: No/Hard/Soft Refusal)
-#   13: JailbreakDetector (2-class: Jailbreak Failed/Succeeded)
-#   14-15: Training Methods (Trainer, CrossValidator with k-fold CV)
-#   16-18: Analysis - Performance (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
-#   19-20: Analysis - Security (JailbreakAnalysis, CorrelationAnalysis)
-#   21-22: Analysis - Interpretability (AttentionVisualizer, ShapAnalyzer)
-#   23-25: Analysis - Statistical (PowerLawAnalyzer, HypothesisTesting, ErrorAnalysis)
-#   26-27: Visualization & Reporting (Visualizer, ReportGenerator)
-#   28-29: Orchestration (RefusalPipeline, ExperimentRunner)
-#   30-Execute.py (main entry point - don't load)
-#   31-Analyze.py (analysis entry point - don't load)
-#   32-ProductionAPI.py (production API server - don't load)
-#   33-MonitoringSystem.py (production monitoring - don't load)
-#   34-RetrainingPipeline.py (production retraining - don't load)
-#   35-DataManager.py (production data management - don't load)
+#   04-SecretsHandler.py (AWS Secrets Manager)
+#   05-06: Data Collection (PromptGenerator, ResponseCollector)
+#   07: DataCleaner (comprehensive data quality validation and cleaning)
+#   08: DataLabeler (dual-task labeling: refusal + jailbreak detection)
+#   09: LabelingQualityAnalyzer (analyze judge confidence and labeling quality)
+#   10: ClassificationDataset (generic PyTorch Dataset - works for both classifiers)
+#   11: RefusalClassifier (3-class: No/Hard/Soft Refusal)
+#   12: JailbreakDetector (2-class: Jailbreak Failed/Succeeded)
+#   13-14: Training Methods (Trainer, CrossValidator with k-fold CV)
+#   15-17: Analysis - Performance (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
+#   18-19: Analysis - Security (JailbreakAnalysis, CorrelationAnalysis)
+#   20-21: Analysis - Interpretability (AttentionVisualizer, ShapAnalyzer)
+#   22-24: Analysis - Statistical (PowerLawAnalyzer, HypothesisTesting, ErrorAnalysis)
+#   25-26: Visualization & Reporting (Visualizer, ReportGenerator)
+#   27-28: Orchestration (RefusalPipeline, ExperimentRunner)
+#   29-Execute.py (main entry point - don't load)
+#   30-Analyze.py (analysis entry point - don't load)
+#   31-ProductionAPI.py (production API server - don't load)
+#   32-MonitoringSystem.py (production monitoring - don't load)
+#   33-RetrainingPipeline.py (production retraining - don't load)
+#   34-DataManager.py (production data management - don't load)
 
 print("\nLoading modules...")
 code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
@@ -224,12 +224,12 @@ code_files_ls = [x for x in code_files_ls if x not in [
     "01-Imports.py",      # This file
     "02-Config.py",        # Already loaded
     "03-Constants.py",     # Already loaded
-    "30-Execute.py",       # Execution script
-    "31-Analyze.py",       # Execution script
-    "32-ProductionAPI.py",      # Production API server (load manually)
-    "33-MonitoringSystem.py",   # Production monitoring (load manually)
-    "34-RetrainingPipeline.py", # Production retraining (load manually)
-    "35-DataManager.py"         # Production data management (load manually)
+    "29-Execute.py",       # Execution script
+    "30-Analyze.py",       # Execution script
+    "31-ProductionAPI.py",      # Production API server (load manually)
+    "32-MonitoringSystem.py",   # Production monitoring (load manually)
+    "33-RetrainingPipeline.py", # Production retraining (load manually)
+    "34-DataManager.py"         # Production data management (load manually)
 ]]
 
 # Loop over code files and load them
