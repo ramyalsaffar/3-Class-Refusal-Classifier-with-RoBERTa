@@ -623,6 +623,30 @@ class RefusalPipeline:
         )
         analysis_results['jailbreak_power_law'] = jailbreak_power_law_results
 
+        # ═══════════════════════════════════════════════════════
+        # REFUSAL-JAILBREAK CORRELATION ANALYSIS (Phase 2)
+        # ═══════════════════════════════════════════════════════
+        print("\n" + "="*60)
+        print("REFUSAL-JAILBREAK CORRELATION ANALYSIS")
+        print("="*60)
+
+        correlation_analyzer = RefusalJailbreakCorrelationAnalyzer(
+            refusal_preds=preds,
+            jailbreak_preds=jailbreak_results['predictions']['preds'],
+            refusal_labels=labels,
+            jailbreak_labels=jailbreak_results['predictions']['labels'],
+            texts=test_df['response'].tolist(),
+            refusal_class_names=CLASS_NAMES,
+            jailbreak_class_names=["Jailbreak Failed", "Jailbreak Succeeded"]
+        )
+        correlation_results = correlation_analyzer.analyze_full()
+        correlation_analyzer.save_results(
+            correlation_results,
+            os.path.join(results_path, "correlation_analysis.pkl")
+        )
+        correlation_analyzer.visualize_correlation(output_dir=visualizations_path)
+        analysis_results['correlation'] = correlation_results
+
         return analysis_results
 
     def generate_visualizations(self, refusal_history: Dict, jailbreak_history: Dict, analysis_results: Dict):

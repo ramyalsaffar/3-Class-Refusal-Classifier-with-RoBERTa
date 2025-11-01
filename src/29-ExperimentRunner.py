@@ -383,6 +383,25 @@ class ExperimentRunner:
         )
         analysis_results['jailbreak_power_law'] = jailbreak_power_law_results
 
+        # Refusal-Jailbreak Correlation Analysis
+        print("\n--- Refusal-Jailbreak Correlation Analysis ---")
+        correlation_analyzer = RefusalJailbreakCorrelationAnalyzer(
+            refusal_preds=preds,
+            jailbreak_preds=jailbreak_results['predictions']['preds'],
+            refusal_labels=labels,
+            jailbreak_labels=jailbreak_results['predictions']['labels'],
+            texts=test_df['response'].tolist(),
+            refusal_class_names=CLASS_NAMES,
+            jailbreak_class_names=jailbreak_class_names
+        )
+        correlation_results = correlation_analyzer.analyze_full()
+        correlation_analyzer.save_results(
+            correlation_results,
+            os.path.join(results_path, "correlation_analysis.pkl")
+        )
+        correlation_analyzer.visualize_correlation(output_dir=visualizations_path)
+        analysis_results['correlation'] = correlation_results
+
         # Generate visualizations
         print("\n" + "="*60)
         print("GENERATING VISUALIZATIONS")
@@ -626,17 +645,17 @@ class ExperimentRunner:
         jailbreak_model.load_state_dict(jailbreak_checkpoint['model_state_dict'])
         jailbreak_model = jailbreak_model.to(DEVICE)
 
-        # Create test datasets from CV results
-        test_indices_refusal = refusal_cv_results['split_info']
-        test_indices_jailbreak = jailbreak_cv_results['split_info']
+        # Create test datasets from CV results using saved test indices
+        # WHY: Use actual test indices from stratified split, not last N samples
+        refusal_test_idx = refusal_cv_results['split_info']['test_indices']
+        jailbreak_test_idx = jailbreak_cv_results['split_info']['test_indices']
 
-        # Use the test set from CV split (already saved)
-        # For now, create datasets from test predictions in CV results
-        refusal_test_texts = [refusal_texts[i] for i in range(len(refusal_texts))][-refusal_cv_results['split_info']['test_size']:]
+        # Reconstruct test datasets using proper indices
+        refusal_test_texts = [refusal_texts[i] for i in refusal_test_idx]
         refusal_test_labels = refusal_cv_results['test_results']['labels']
         refusal_test_dataset = ClassificationDataset(refusal_test_texts, refusal_test_labels, tokenizer)
 
-        jailbreak_test_texts = [jailbreak_texts[i] for i in range(len(jailbreak_texts))][-jailbreak_cv_results['split_info']['test_size']:]
+        jailbreak_test_texts = [jailbreak_texts[i] for i in jailbreak_test_idx]
         jailbreak_test_labels = jailbreak_cv_results['test_results']['labels']
         jailbreak_test_dataset = ClassificationDataset(jailbreak_test_texts, jailbreak_test_labels, tokenizer)
 

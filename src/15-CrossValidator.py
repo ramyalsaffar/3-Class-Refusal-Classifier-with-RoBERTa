@@ -578,7 +578,8 @@ def train_with_cross_validation(
         'split_info': {
             'train_val_size': len(train_val_idx),
             'test_size': len(test_idx),
-            'k_folds': k_folds
+            'k_folds': k_folds,
+            'test_indices': test_idx  # WHY: Save test indices for proper dataset reconstruction in error analysis
         }
     }
 

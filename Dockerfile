@@ -151,4 +151,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run API server
-CMD ["uvicorn", "src.32-ProductionAPI:app", "--host", "0.0.0.0", "--port", "8000"]
+# WHY: Use --app-dir to handle numbered Python files (32-ProductionAPI.py)
+CMD ["uvicorn", "32-ProductionAPI:app", "--app-dir", "/app/src", "--host", "0.0.0.0", "--port", "8000"]

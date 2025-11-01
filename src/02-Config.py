@@ -85,7 +85,7 @@ TRAINING_CONFIG = {
     'save_best_only': True,                     # Only save best model checkpoint
     'num_workers': 0,                           # DataLoader workers (0 for Mac, 4 for AWS)
     'pin_memory': True,                         # Pin memory for faster GPU transfer
-    'device': DEVICE                            # Auto-detected in 00-Imports.py
+    'device': DEVICE                            # Auto-detected in 01-Imports.py
 }
 
 
