@@ -392,6 +392,7 @@ PRODUCTION_CONFIG = {
         'workers': int(os.getenv('API_WORKERS', '4')),
         'timeout': 30,                              # Request timeout (seconds)
         'max_request_size': 1024 * 1024,           # 1MB max request
+        'max_text_length': 10000,                   # Maximum input text length
         'enable_cors': True,                        # Enable CORS for frontend
         'cors_origins': os.getenv('CORS_ORIGINS', '*').split(',') if os.getenv('CORS_ORIGINS') else ['*'],  # Allowed origins (use env var in production)
         'log_level': os.getenv('LOG_LEVEL', 'info')
@@ -404,6 +405,79 @@ PRODUCTION_CONFIG = {
         'alert_daily_cost': 100.0,                  # Alert if daily cost exceeds $100
         'max_monthly_cost': 2000.0                  # Hard limit: $2000/month
     }
+}
+
+# Prompt Generator Configuration (Stage 1)
+PROMPT_GENERATOR_CONFIG = {
+    'model': 'gpt-4o-mini',                     # Model for prompt generation
+    'temperature': 0.7,                         # Temperature for generation
+    'max_tokens': 150,                          # Max tokens for generation
+}
+
+# Labeling Configuration
+LABELING_CONFIG = {
+    'judge_model': 'gpt-4o-mini',               # LLM judge model
+    'judge_temperature': 0.0,                   # Deterministic judging
+    'low_confidence_threshold': 60,             # Confidence threshold (0-100)
+}
+
+# Adversarial Testing Configuration
+ADVERSARIAL_CONFIG = {
+    'paraphrase_model': 'gpt-4o-mini',          # Model for paraphrasing
+    'paraphrase_temperature': 0.7,              # Temperature for paraphrasing
+    'paraphrase_max_tokens': 200,               # Max tokens for paraphrases
+}
+
+# Error Analysis Configuration
+ERROR_ANALYSIS_CONFIG = {
+    'min_confidence': 0.3,                      # Minimum confidence for analysis
+    'high_confidence_threshold': 0.8,           # High confidence threshold
+    'top_k_misclassifications': 5,              # Top K errors to show
+    'quantiles': [0.25, 0.5, 0.75],            # Quantiles for distribution analysis
+}
+
+# Hypothesis Testing Configuration
+HYPOTHESIS_TESTING_CONFIG = {
+    'alpha': 0.05,                              # Significance level for tests
+}
+
+# Cross-Validation Configuration
+CROSS_VALIDATION_CONFIG = {
+    'default_folds': 5,                         # Default number of folds
+}
+
+# Retraining Configuration
+RETRAINING_CONFIG = {
+    'min_training_samples': 100,                # Minimum samples required for retraining
+    'num_layers_to_freeze': 4,                  # Freeze bottom N RoBERTa layers
+    'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training
+    'test_split': 0.3,                          # Test set ratio
+    'val_split': 0.5,                           # Validation split (from remaining)
+    'high_confidence_threshold': 0.8,           # Confidence threshold for filtering
+}
+
+# Data Retention Configuration
+DATA_RETENTION_CONFIG = {
+    'high_confidence_threshold': 0.8,           # Confidence threshold for retention decisions
+    'recent_correct_sample_fraction': 0.2,      # Keep 20% of recent correct samples (1/5)
+    'medium_term_sample_fraction': 0.5,         # Keep 50% of medium-term samples (1/2)
+    'long_term_sample_fraction': 0.1,           # Keep 10% of long-term samples (1/10)
+}
+
+# Report Styling Configuration
+REPORT_CONFIG = {
+    'title_font_size': 24,
+    'title_color': '#1f77b4',
+    'title_space_after': 30,
+    'section_font_size': 16,
+    'section_color': '#2ca02c',
+    'section_space_after': 12,
+    'section_space_before': 12,
+    'subsection_font_size': 13,
+    'subsection_color': '#d62728',
+    'metric_font_size': 14,
+    'metric_color': '#ff7f0e',
+    'figure_dpi': 150,
 }
 
 # Visualization Configuration
