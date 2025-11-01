@@ -27,10 +27,21 @@ def calculate_class_weights(class_counts: List[int], device: torch.device) -> to
         class_counts = [3000, 2385, 615]  # [no_refusal, hard_refusal, soft_refusal]
         weights = calculate_class_weights(class_counts, device)
         # Result: [0.67, 0.84, 3.25]
+
+    Raises:
+        ValueError: If any class has zero samples
     """
+    # Check for zero counts (would cause division by zero)
+    if any(count == 0 for count in class_counts):
+        raise ValueError(
+            f"Class counts contain zeros: {class_counts}. "
+            f"All classes must have at least one sample for weighted loss calculation."
+        )
+
     total_samples = sum(class_counts)
     num_classes = len(class_counts)
 
+    # Safe division - all counts verified to be > 0
     weights = [total_samples / (num_classes * count) for count in class_counts]
 
     return torch.FloatTensor(weights).to(device)

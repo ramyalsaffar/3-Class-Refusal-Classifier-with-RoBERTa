@@ -382,8 +382,17 @@ EXAMPLES:
         emb1 = np.array(response.data[0].embedding)
         emb2 = np.array(response.data[1].embedding)
 
-        # Calculate cosine similarity
-        cosine_sim = np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
+        # Calculate cosine similarity with zero-check
+        # WHY: Prevent division by zero if embeddings are all zeros (API errors, empty text, etc.)
+        norm1 = np.linalg.norm(emb1)
+        norm2 = np.linalg.norm(emb2)
+
+        if norm1 == 0 or norm2 == 0:
+            # Return 0 similarity for degenerate cases
+            # WHY: Zero embedding indicates empty/invalid text - no similarity
+            return 0.0
+
+        cosine_sim = np.dot(emb1, emb2) / (norm1 * norm2)
 
         return float(cosine_sim)
 

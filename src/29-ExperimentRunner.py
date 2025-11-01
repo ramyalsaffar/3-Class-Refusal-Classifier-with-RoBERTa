@@ -242,18 +242,20 @@ class ExperimentRunner:
 
         # Load refusal classifier
         print(f"\nLoading refusal classifier from {refusal_model_path}...")
-        refusal_model = RefusalClassifier(num_classes=3)
+        refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
         refusal_checkpoint = torch.load(refusal_model_path, map_location=DEVICE)
         refusal_model.load_state_dict(refusal_checkpoint['model_state_dict'])
         refusal_model = refusal_model.to(DEVICE)
+        refusal_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
         print(f"✓ Refusal classifier loaded (Best Val F1: {refusal_checkpoint['best_val_f1']:.4f})")
 
         # Load jailbreak detector
         print(f"\nLoading jailbreak detector from {jailbreak_model_path}...")
-        jailbreak_model = JailbreakDetector(num_classes=2)
+        jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
         jailbreak_checkpoint = torch.load(jailbreak_model_path, map_location=DEVICE)
         jailbreak_model.load_state_dict(jailbreak_checkpoint['model_state_dict'])
         jailbreak_model = jailbreak_model.to(DEVICE)
+        jailbreak_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
         print(f"✓ Jailbreak detector loaded (Best Val F1: {jailbreak_checkpoint['best_val_f1']:.4f})")
 
         # Get API keys for adversarial testing
@@ -629,21 +631,23 @@ class ExperimentRunner:
         print(f"{'#'*60}\n")
 
         # Load trained models
-        refusal_model = RefusalClassifier(num_classes=3)
+        refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
         refusal_checkpoint = torch.load(
             os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt"),
             map_location=DEVICE
         )
         refusal_model.load_state_dict(refusal_checkpoint['model_state_dict'])
         refusal_model = refusal_model.to(DEVICE)
+        refusal_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
 
-        jailbreak_model = JailbreakDetector(num_classes=2)
+        jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
         jailbreak_checkpoint = torch.load(
             os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt"),
             map_location=DEVICE
         )
         jailbreak_model.load_state_dict(jailbreak_checkpoint['model_state_dict'])
         jailbreak_model = jailbreak_model.to(DEVICE)
+        jailbreak_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
 
         # Create test datasets from CV results using saved test indices
         # WHY: Use actual test indices from stratified split, not last N samples

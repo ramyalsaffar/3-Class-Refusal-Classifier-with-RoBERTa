@@ -375,7 +375,8 @@ class RefusalPipeline:
         print("="*60)
 
         # Initialize model
-        self.refusal_model = RefusalClassifier(num_classes=3)
+        # WHY: Use len(CLASS_NAMES) for generic design (works with any N-class classifier)
+        self.refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
         self.refusal_model.freeze_roberta_layers()
         self.refusal_model = self.refusal_model.to(DEVICE)
 
@@ -436,7 +437,8 @@ class RefusalPipeline:
         print("="*60)
 
         # Initialize model
-        self.jailbreak_model = JailbreakDetector(num_classes=2)
+        # WHY: Use len(JAILBREAK_CLASS_NAMES) for generic design (works with any N-class classifier)
+        self.jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
         self.jailbreak_model.freeze_roberta_layers()
         self.jailbreak_model = self.jailbreak_model.to(DEVICE)
 
