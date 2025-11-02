@@ -88,16 +88,17 @@ class ConfidenceAnalyzer:
         print(f"Incorrect Predictions: {results['overall']['mean_confidence_incorrect']:.3f}")
 
         print(f"\n📊 Cohen's Kappa: {results['overall']['cohen_kappa']:.4f}")
-        if kappa > 0.80:
-            print(f"   ✅ Almost perfect agreement (κ > 0.80)")
-        elif kappa > 0.60:
-            print(f"   ✅ Substantial agreement (κ > 0.60)")
-        elif kappa > 0.40:
-            print(f"   ⚠️  Moderate agreement (κ > 0.40)")
-        elif kappa > 0.20:
-            print(f"   ⚠️  Fair agreement (κ > 0.20)")
+        kappa_thresh = INTERPRETABILITY_CONFIG['kappa_thresholds']
+        if kappa > kappa_thresh['almost_perfect']:
+            print(f"   ✅ Almost perfect agreement (κ > {kappa_thresh['almost_perfect']})")
+        elif kappa > kappa_thresh['substantial']:
+            print(f"   ✅ Substantial agreement (κ > {kappa_thresh['substantial']})")
+        elif kappa > kappa_thresh['moderate']:
+            print(f"   ⚠️  Moderate agreement (κ > {kappa_thresh['moderate']})")
+        elif kappa > kappa_thresh['fair']:
+            print(f"   ⚠️  Fair agreement (κ > {kappa_thresh['fair']})")
         else:
-            print(f"   🚨 Poor agreement (κ ≤ 0.20)")
+            print(f"   🚨 Poor agreement (κ ≤ {kappa_thresh['fair']})")
 
         print("\nPer-Class Mean Confidence:")
         for class_name, metrics in results['per_class'].items():

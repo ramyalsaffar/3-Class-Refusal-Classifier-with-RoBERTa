@@ -93,7 +93,7 @@ class AttentionVisualizer:
         }
 
     def visualize_attention(self, text: str, output_path: str,
-                           layer_idx: int = -1, top_k: int = 15):
+                           layer_idx: int = -1, top_k: int = None):
         """
         Create attention visualization for a single text.
 
@@ -101,8 +101,12 @@ class AttentionVisualizer:
             text: Input text to visualize
             output_path: Path to save visualization
             layer_idx: Which layer to visualize (-1 for last layer)
-            top_k: Number of top tokens to highlight
+            top_k: Number of top tokens to highlight (default: from config)
         """
+        # Use config value if not provided
+        if top_k is None:
+            top_k = INTERPRETABILITY_CONFIG['attention_top_k_tokens']
+
         # Get attention data
         attention_data = self.get_attention_weights(text)
         tokens = attention_data['tokens']
@@ -151,7 +155,7 @@ class AttentionVisualizer:
 
         print(f"✓ Saved attention visualization to {output_path}")
 
-    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = 10,
+    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = None,
                        output_dir: str = None):
         """
         Analyze attention patterns for multiple samples.
@@ -160,12 +164,16 @@ class AttentionVisualizer:
 
         Args:
             test_df: Test DataFrame
-            num_samples: Number of samples per class to analyze
+            num_samples: Number of samples per class to analyze (default: from config)
             output_dir: Directory to save visualizations
 
         Returns:
             Dictionary with analysis results
         """
+        # Use config value if not provided
+        if num_samples is None:
+            num_samples = INTERPRETABILITY_CONFIG['attention_samples_per_class']
+
         if output_dir is None:
             output_dir = os.path.join(visualizations_path, "attention_analysis")
         os.makedirs(output_dir, exist_ok=True)

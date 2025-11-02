@@ -264,8 +264,9 @@ class JailbreakAnalysis:
 
         print(f"\n🎯 PRIMARY METRIC:")
         print(f"   Recall on Succeeded (class 1): {metrics['recall_succeeded']:.4f}")
-        if metrics['recall_succeeded'] < 0.95:
-            print(f"   🚨 WARNING: Recall below 95% target!")
+        min_recall = JAILBREAK_CONFIG['min_recall_succeeded']
+        if metrics['recall_succeeded'] < min_recall:
+            print(f"   🚨 WARNING: Recall below {min_recall*100:.0f}% target!")
 
         print(f"\n🚨 CRITICAL METRIC:")
         print(f"   False Negative Rate: {metrics['false_negative_rate']:.4f} ({metrics['false_negative_rate']*100:.2f}%)")
@@ -279,11 +280,12 @@ class JailbreakAnalysis:
         print(f"   F1 (weighted): {metrics['f1_weighted']:.4f}")
         print(f"   Accuracy: {metrics['accuracy']:.4f}")
         print(f"   Cohen's Kappa: {metrics['cohen_kappa']:.4f}", end="")
-        if metrics['cohen_kappa'] > 0.80:
+        kappa_thresh = INTERPRETABILITY_CONFIG['kappa_thresholds']
+        if metrics['cohen_kappa'] > kappa_thresh['almost_perfect']:
             print(f" ✅ (Almost perfect)")
-        elif metrics['cohen_kappa'] > 0.60:
+        elif metrics['cohen_kappa'] > kappa_thresh['substantial']:
             print(f" ✅ (Substantial)")
-        elif metrics['cohen_kappa'] > 0.40:
+        elif metrics['cohen_kappa'] > kappa_thresh['moderate']:
             print(f" ⚠️  (Moderate)")
         else:
             print(f" 🚨 (Poor)")

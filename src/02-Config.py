@@ -68,7 +68,10 @@ JAILBREAK_CONFIG = {
     'max_length': 512,                          # Max sequence length (tokens)
     'dropout': 0.1,                             # Dropout probability
     'freeze_layers': 6,                         # Freeze bottom 6 layers
-    'enabled': True                             # Enable jailbreak detection training
+    'enabled': True,                            # Enable jailbreak detection training
+
+    # Performance Thresholds
+    'min_recall_succeeded': 0.95                # Minimum recall threshold for jailbreak detection (95%)
 }
 
 
@@ -209,8 +212,27 @@ ANALYSIS_CONFIG = {
     ],
     'confidence_bins': 20,                      # Bins for confidence histograms
     'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples
+    'high_confidence_threshold': 0.5,           # Threshold for high-confidence region in analysis
     'error_examples_count': 5,                  # Number of error examples to analyze in detail
-    'attention_sample_size': 100                # Samples for power law attention analysis
+    'attention_sample_size': 100,               # Samples for power law attention analysis
+
+    # Pareto Principle / Power Law Analysis
+    'pareto_threshold': 80,                     # Pareto principle 80% threshold
+    'pareto_strict_threshold': 30,              # Allow up to 30% of groups for 80% of errors
+    'overconfidence_threshold': 0.7,            # High confidence on errors threshold
+
+    # Attention Concentration Analysis
+    'attention_top_k_percentage': 5,            # Top K as divisor (1/5 = 20% of tokens)
+    'attention_power_law_fit_limit': 1000,      # Number of samples for power law fitting
+    'min_attention_concentration': 0.6,         # Minimum attention concentration for top-k
+
+    # Correlation & Agreement Thresholds
+    'high_agreement_threshold': 0.95,           # High agreement threshold (95%)
+    'moderate_agreement_threshold': 0.85,       # Moderate agreement threshold (85%)
+    'min_samples_per_class': 30,                # Minimum samples per class for reliable analysis
+
+    # Disagreement Analysis
+    'top_k_disagreements': 50                   # Number of top disagreement cases to extract
 }
 
 
@@ -226,8 +248,29 @@ INTERPRETABILITY_CONFIG = {
     # SHAP Analysis
     'shap_enabled': True,                       # Enable SHAP analysis (requires shap package)
     'shap_samples': 20,                         # Number of samples for SHAP analysis
+    'shap_samples_per_class': 2,                # Number of SHAP samples to visualize per class
     'shap_background_samples': 50,              # Background samples for SHAP explainer
     'shap_max_display': 20,                     # Max features to display in summary plots
+
+    # Statistical Agreement Thresholds (Cohen's Kappa, etc.)
+    'kappa_thresholds': {
+        'almost_perfect': 0.80,                 # Almost perfect agreement (κ > 0.80)
+        'substantial': 0.60,                    # Substantial agreement (0.60 < κ ≤ 0.80)
+        'moderate': 0.40,                       # Moderate agreement (0.40 < κ ≤ 0.60)
+        'fair': 0.20,                           # Fair agreement (0.20 < κ ≤ 0.40)
+        'slight': 0.0                           # Slight agreement (0.0 < κ ≤ 0.20)
+    },
+
+    # Power Law Analysis Thresholds
+    'power_law_exponent_range': (1.0, 3.0),    # Valid range for power law exponent
+    'zipf_exponent_range': (0.8, 1.5),         # Valid range for Zipfian distribution exponent
+
+    # Calibration Thresholds (Expected Calibration Error)
+    'ece_thresholds': {
+        'excellent': 0.05,                      # ECE < 0.05 = excellent calibration
+        'good': 0.10,                           # ECE < 0.10 = good calibration
+        'acceptable': 0.15                      # ECE < 0.15 = acceptable calibration
+    },
 
     # General Interpretability
     'save_interpretability_results': True,      # Save interpretation results
@@ -426,14 +469,34 @@ ADVERSARIAL_CONFIG = {
     'paraphrase_model': 'gpt-4o-mini',          # Model for paraphrasing
     'paraphrase_temperature': 0.7,              # Temperature for paraphrasing
     'paraphrase_max_tokens': 200,               # Max tokens for paraphrases
+
+    # Paraphrase Validation Thresholds
+    'min_semantic_similarity': 0.85,            # Cosine similarity threshold for paraphrase validation
+    'min_length_ratio': 0.3,                    # Minimum length ratio (paraphrase/original)
+    'max_length_ratio': 3.0,                    # Maximum length ratio (paraphrase/original)
+    'max_paraphrase_attempts': 3,               # Maximum retry attempts for paraphrasing
+
+    # Category Preservation (for judge validation)
+    'judge_model': 'gpt-4',                     # Model for category preservation checks
+    'judge_max_tokens': 10,                     # Max tokens for judge responses
+
+    # Quality Thresholds
+    'min_success_rate': 70,                     # Minimum paraphrase success rate (percent)
+    'min_avg_semantic_similarity': 0.90,        # Warning threshold for avg semantic similarity
+    'retry_effectiveness_threshold': 30,        # Threshold for retry effectiveness warning (percent)
+    'failed_retries_warning_threshold': 20,     # Threshold for failed retries warning (percent)
 }
 
 # Error Analysis Configuration
 ERROR_ANALYSIS_CONFIG = {
     'min_confidence': 0.3,                      # Minimum confidence for analysis
-    'high_confidence_threshold': 0.8,           # High confidence threshold
-    'top_k_misclassifications': 5,              # Top K errors to show
+    'high_confidence_threshold': 0.8,           # High confidence threshold (confident mistakes)
+    'top_k_misclassifications': 5,              # Top K errors to show in summaries
+    'top_k_errors': 50,                         # Number of failure cases to extract for detailed analysis
     'quantiles': [0.25, 0.5, 0.75],            # Quantiles for distribution analysis
+
+    # Length Analysis
+    'length_bins': [0, 20, 50, 100, 200],      # Token length bins for length-based analysis
 }
 
 # Hypothesis Testing Configuration

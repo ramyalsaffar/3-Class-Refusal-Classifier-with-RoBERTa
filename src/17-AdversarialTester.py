@@ -25,11 +25,11 @@ class AdversarialTester:
         self.max_tokens = API_CONFIG['max_tokens_paraphrase']
         self.dimensions = ANALYSIS_CONFIG['paraphrase_dimensions']
 
-        # Quality thresholds
-        self.min_semantic_similarity = 0.85  # Cosine similarity threshold
-        self.min_length_ratio = 0.3
-        self.max_length_ratio = 3.0
-        self.max_paraphrase_attempts = 3  # Retry up to 3 times
+        # Quality thresholds (from config)
+        self.min_semantic_similarity = ADVERSARIAL_CONFIG['min_semantic_similarity']
+        self.min_length_ratio = ADVERSARIAL_CONFIG['min_length_ratio']
+        self.max_length_ratio = ADVERSARIAL_CONFIG['max_length_ratio']
+        self.max_paraphrase_attempts = ADVERSARIAL_CONFIG['max_paraphrase_attempts']
 
         # Quality tracking
         self.quality_stats = {
@@ -431,13 +431,13 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
 
         try:
             response = self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model=ADVERSARIAL_CONFIG['judge_model'],
                 messages=[
                     {"role": "system", "content": "You are a precise classifier. Return only numbers."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.0,
-                max_tokens=10
+                max_tokens=ADVERSARIAL_CONFIG['judge_max_tokens']
             )
 
             result = response.choices[0].message.content.strip()
@@ -562,15 +562,17 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
         print(f"Semantic similarity failures: {failures['semantic_failures']}")
         print(f"Category preservation failures: {failures['category_failures']}")
 
-        # Warnings
+        # Warnings (using config thresholds)
         print(f"\n{'='*60}")
-        if stats['success_rate'] < 70:
+        min_success_rate = ADVERSARIAL_CONFIG['min_success_rate']
+        if stats['success_rate'] < min_success_rate:
             print(f"⚠️  WARNING: Low success rate ({stats['success_rate']:.1f}%)")
             print(f"   Consider adjusting paraphrasing prompts or thresholds")
         else:
             print(f"✅ Success rate is good ({stats['success_rate']:.1f}%)")
 
-        if stats['avg_semantic_similarity'] < 0.90:
+        min_avg_sim = ADVERSARIAL_CONFIG['min_avg_semantic_similarity']
+        if stats['avg_semantic_similarity'] < min_avg_sim:
             print(f"⚠️  WARNING: Low semantic similarity ({stats['avg_semantic_similarity']:.3f})")
             print(f"   Paraphrases may be drifting from original meaning")
         else:
@@ -579,10 +581,12 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
         # Retry effectiveness warning
         if 'retry_stats' in stats and stats['retry_stats']:
             retry = stats['retry_stats']
-            if retry['succeeded_after_retry_pct'] > 30:
+            retry_thresh = ADVERSARIAL_CONFIG['retry_effectiveness_threshold']
+            if retry['succeeded_after_retry_pct'] > retry_thresh:
                 print(f"💡 INFO: {retry['succeeded_after_retry_pct']:.1f}% succeeded after retry")
                 print(f"   Retries are significantly improving quality!")
-            if retry['failed_all_retries_pct'] > 20:
+            failed_thresh = ADVERSARIAL_CONFIG['failed_retries_warning_threshold']
+            if retry['failed_all_retries_pct'] > failed_thresh:
                 print(f"⚠️  WARNING: {retry['failed_all_retries_pct']:.1f}% failed all {retry['max_attempts_allowed']} attempts")
                 print(f"   Consider increasing max_paraphrase_attempts or adjusting prompts")
 

@@ -113,11 +113,13 @@ class RefusalJailbreakCorrelationAnalyzer:
         print(f"{'Succeeded (1)':<20} {cm[1, 0]:<15} {cm[1, 1]:<15}")
         print()
 
-        # Interpretation
-        if agreement_rate >= 0.95:
+        # Interpretation (using config thresholds)
+        high_agree = ANALYSIS_CONFIG['high_agreement_threshold']
+        mod_agree = ANALYSIS_CONFIG['moderate_agreement_threshold']
+        if agreement_rate >= high_agree:
             interpretation = "HIGHLY CORRELATED - Jailbreak detector may be redundant"
             recommendation = "Consider using only refusal classifier and deriving jailbreak success"
-        elif agreement_rate >= 0.85:
+        elif agreement_rate >= mod_agree:
             interpretation = "MODERATELY CORRELATED - Some independent signal"
             recommendation = "Keep both classifiers but investigate disagreement cases"
         else:
@@ -366,8 +368,8 @@ class RefusalJailbreakCorrelationAnalyzer:
         print(f"  >0.5: Strong")
         print()
 
-        # Interpretation
-        alpha = 0.05
+        # Interpretation (using config alpha)
+        alpha = HYPOTHESIS_TESTING_CONFIG['alpha']
         if p_value < alpha:
             print(f"✗ REJECT NULL HYPOTHESIS (p = {p_value:.6f} < α = {alpha})")
             print(f"  → Refusal and jailbreak are DEPENDENT (correlated)")
@@ -539,7 +541,7 @@ class RefusalJailbreakCorrelationAnalyzer:
     # COMPREHENSIVE ANALYSIS RUNNER
     # =========================================================================
 
-    def run_full_analysis(self, save_visualizations: bool = True, top_k_disagreements: int = 50) -> Dict:
+    def run_full_analysis(self, save_visualizations: bool = True, top_k_disagreements: int = None) -> Dict:
         """
         Run all correlation analysis modules.
 
@@ -550,6 +552,10 @@ class RefusalJailbreakCorrelationAnalyzer:
         Returns:
             Complete analysis results
         """
+        # Use config value if not provided
+        if top_k_disagreements is None:
+            top_k_disagreements = ANALYSIS_CONFIG['top_k_disagreements']
+
         print(f"\n{'#'*60}")
         print("COMPREHENSIVE REFUSAL-JAILBREAK CORRELATION ANALYSIS")
         print(f"{'#'*60}\n")
@@ -634,8 +640,8 @@ def analyze_refusal_jailbreak_correlation(
     )
 
     results = analyzer.run_full_analysis(
-        save_visualizations=save_visualizations,
-        top_k_disagreements=50
+        save_visualizations=save_visualizations
+        # top_k_disagreements will use config default
     )
 
     return results
