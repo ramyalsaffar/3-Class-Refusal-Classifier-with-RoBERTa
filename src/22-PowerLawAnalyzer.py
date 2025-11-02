@@ -159,18 +159,20 @@ class PowerLawAnalyzer:
         else:
             error_counts['cumulative_pct'] = 0
 
-        # Find what % of groups cause 80% of errors
-        groups_80pct = (error_counts['cumulative_pct'] <= 80).sum()
+        # Find what % of groups cause 80% of errors (using config threshold)
+        pareto_threshold = ANALYSIS_CONFIG['pareto_threshold']
+        groups_80pct = (error_counts['cumulative_pct'] <= pareto_threshold).sum()
         total_groups = len(error_counts)
         groups_80pct_ratio = groups_80pct / total_groups * 100 if total_groups > 0 else 0
 
+        pareto_strict = ANALYSIS_CONFIG['pareto_strict_threshold']
         return {
             'group_name': group_name,
             'error_counts': error_counts,
             'total_groups': total_groups,
             'groups_causing_80pct_errors': groups_80pct,
             'groups_80pct_ratio': groups_80pct_ratio,
-            'pareto_holds': groups_80pct_ratio <= 30  # Strict Pareto is ~20%, allow up to 30%
+            'pareto_holds': groups_80pct_ratio <= pareto_strict  # Strict Pareto is ~20%, allow up to configured %
         }
 
     def _pareto_analysis_by_class(self, labels: np.ndarray,
@@ -235,16 +237,18 @@ class PowerLawAnalyzer:
         correct_confidences = confidences[~errors]
         error_confidences = confidences[errors]
 
-        # Bin confidences and count
-        bins = np.linspace(0, 1, 21)  # 20 bins
+        # Bin confidences and count (using config)
+        num_bins = ANALYSIS_CONFIG['confidence_bins']
+        bins = np.linspace(0, 1, num_bins + 1)  # +1 because linspace includes both endpoints
         bin_centers = (bins[:-1] + bins[1:]) / 2
 
         hist_all, _ = np.histogram(confidences, bins=bins)
         hist_correct, _ = np.histogram(correct_confidences, bins=bins)
         hist_errors, _ = np.histogram(error_confidences, bins=bins)
 
-        # Fit power law to high-confidence region (0.5-1.0)
-        high_conf_mask = bin_centers >= 0.5
+        # Fit power law to high-confidence region (using config threshold)
+        high_conf_threshold = ANALYSIS_CONFIG['high_confidence_threshold']
+        high_conf_mask = bin_centers >= high_conf_threshold
         x_fit = bin_centers[high_conf_mask]
         y_fit = hist_all[high_conf_mask]
 
@@ -360,8 +364,9 @@ class PowerLawAnalyzer:
 
                     all_token_attentions.extend(valid_attention.tolist())
 
-                    # Top-k concentration: what % of attention goes to top 20% tokens?
-                    k = max(1, len(valid_attention) // 5)  # Top 20%
+                    # Top-k concentration: what % of attention goes to top K% tokens (using config)
+                    k_divisor = ANALYSIS_CONFIG['attention_top_k_percentage']
+                    k = max(1, len(valid_attention) // k_divisor)  # Top (1/k_divisor) percentage
                     top_k_attn = np.partition(valid_attention, -k)[-k:].sum()
                     top_k_concentrations.append(float(top_k_attn))
 
@@ -381,7 +386,9 @@ class PowerLawAnalyzer:
         log_attentions = np.log(sorted_attentions[sorted_attentions > 0])
 
         if len(log_ranks) > 10:
-            slope, intercept = np.polyfit(log_ranks[:1000], log_attentions[:1000], 1)  # Fit first 1000
+            # Fit power law using config limit
+            fit_limit = ANALYSIS_CONFIG['attention_power_law_fit_limit']
+            slope, intercept = np.polyfit(log_ranks[:fit_limit], log_attentions[:fit_limit], 1)
             zipf_exponent = -slope
         else:
             zipf_exponent = None
@@ -444,17 +451,18 @@ class PowerLawAnalyzer:
         """Plot confidence distribution for correct vs incorrect predictions."""
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-        # Histogram
-        axes[0].hist(correct_conf, bins=20, alpha=0.7, label='Correct', color='green', density=True)
-        axes[0].hist(error_conf, bins=20, alpha=0.7, label='Errors', color='red', density=True)
+        # Histogram (using config bins)
+        num_bins = ANALYSIS_CONFIG['confidence_bins']
+        axes[0].hist(correct_conf, bins=num_bins, alpha=0.7, label='Correct', color='green', density=True)
+        axes[0].hist(error_conf, bins=num_bins, alpha=0.7, label='Errors', color='red', density=True)
         axes[0].set_xlabel('Confidence')
         axes[0].set_ylabel('Density')
         axes[0].set_title('Confidence Distribution')
         axes[0].legend()
         axes[0].grid(alpha=0.3)
 
-        # Log-log plot (power law check)
-        bins = np.linspace(0, 1, 21)
+        # Log-log plot (power law check) - using config bins
+        bins = np.linspace(0, 1, num_bins + 1)
         hist_all, _ = np.histogram(all_conf, bins=bins)
         bin_centers = (bins[:-1] + bins[1:]) / 2
 
@@ -506,9 +514,10 @@ class PowerLawAnalyzer:
         axes[0].set_title('Attention Distribution (Top 500 Tokens)')
         axes[0].grid(alpha=0.3)
 
-        # Log-log plot (Zipf's law)
+        # Log-log plot (Zipf's law) - using config limit
         valid_mask = sorted_attentions > 0
-        axes[1].loglog(ranks[valid_mask][:1000], sorted_attentions[valid_mask][:1000], 'o', alpha=0.5)
+        fit_limit = ANALYSIS_CONFIG['attention_power_law_fit_limit']
+        axes[1].loglog(ranks[valid_mask][:fit_limit], sorted_attentions[valid_mask][:fit_limit], 'o', alpha=0.5)
         axes[1].set_xlabel('Token Rank (log scale)')
         axes[1].set_ylabel('Attention Weight (log scale)')
         axes[1].set_title('Zipf\'s Law Check (Log-Log Plot)')
@@ -552,28 +561,33 @@ class PowerLawAnalyzer:
         """Print confidence distribution analysis."""
         print("\n📈 Confidence Distribution Analysis:")
 
+        # Use config thresholds
+        pl_range = INTERPRETABILITY_CONFIG['power_law_exponent_range']
+        ece_thresh = INTERPRETABILITY_CONFIG['ece_thresholds']
+        overconf_thresh = ANALYSIS_CONFIG['overconfidence_threshold']
+
         if results['power_law_exponent'] is not None:
             print(f"   Power law exponent (α): {results['power_law_exponent']:.3f}")
-            if 1.0 <= results['power_law_exponent'] <= 3.0:
+            if pl_range[0] <= results['power_law_exponent'] <= pl_range[1]:
                 print(f"   ✅ Confidence follows power law distribution")
             else:
                 print(f"   ⚠️  Unusual power law exponent")
 
         print(f"\n   Calibration:")
         print(f"   - Expected Calibration Error (ECE): {results['expected_calibration_error']:.4f}")
-        if results['expected_calibration_error'] < 0.05:
-            print(f"   ✅ Well calibrated (ECE < 0.05)")
-        elif results['expected_calibration_error'] < 0.10:
-            print(f"   ⚠️  Moderate calibration (ECE < 0.10)")
+        if results['expected_calibration_error'] < ece_thresh['excellent']:
+            print(f"   ✅ Well calibrated (ECE < {ece_thresh['excellent']})")
+        elif results['expected_calibration_error'] < ece_thresh['good']:
+            print(f"   ⚠️  Moderate calibration (ECE < {ece_thresh['good']})")
         else:
-            print(f"   🚨 Poor calibration (ECE ≥ 0.10)")
+            print(f"   🚨 Poor calibration (ECE ≥ {ece_thresh['good']})")
 
         stats = results['stats']
         print(f"\n   Confidence Statistics:")
         print(f"   - Mean confidence (all): {stats['mean_confidence_all']:.3f}")
         print(f"   - Mean confidence (correct): {stats['mean_confidence_correct']:.3f}")
         print(f"   - Mean confidence (errors): {stats['mean_confidence_errors']:.3f}")
-        if stats['mean_confidence_errors'] > 0.7:
+        if stats['mean_confidence_errors'] > overconf_thresh:
             print(f"   🚨 WARNING: High confidence on errors (overconfidence)!")
 
     def _print_attention_analysis(self, results: Dict):
@@ -584,16 +598,21 @@ class PowerLawAnalyzer:
 
         print("\n🔍 Attention Distribution Analysis:")
 
+        # Use config thresholds
+        zipf_range = INTERPRETABILITY_CONFIG['zipf_exponent_range']
+        min_conc = ANALYSIS_CONFIG['min_attention_concentration']
+        k_pct = 100 / ANALYSIS_CONFIG['attention_top_k_percentage']  # Convert divisor to percentage
+
         if results['zipf_exponent'] is not None:
             print(f"   Zipf exponent (s): {results['zipf_exponent']:.3f}")
-            if 0.8 <= results['zipf_exponent'] <= 1.5:
+            if zipf_range[0] <= results['zipf_exponent'] <= zipf_range[1]:
                 print(f"   ✅ Attention follows Zipfian distribution (typical for language)")
             else:
                 print(f"   ⚠️  Unusual Zipf exponent")
 
         print(f"\n   Attention Concentration:")
-        print(f"   - Top 20% tokens receive: {results['mean_top20_concentration']*100:.1f}% of attention")
-        if results['mean_top20_concentration'] > 0.6:
+        print(f"   - Top {k_pct:.0f}% tokens receive: {results['mean_top20_concentration']*100:.1f}% of attention")
+        if results['mean_top20_concentration'] > min_conc:
             print(f"   ✅ Attention appropriately concentrated on key tokens")
         else:
             print(f"   ⚠️  Attention may be too diffuse")

@@ -41,8 +41,9 @@ class ClassifyRequest(BaseModel):
         """Validate text inputs are not empty and within reasonable length."""
         if not v or not v.strip():
             raise ValueError(f"{field.name} cannot be empty")
-        if len(v) > 10000:  # Reasonable max length
-            raise ValueError(f"{field.name} exceeds maximum length of 10000 characters")
+        max_length = PRODUCTION_CONFIG['api']['max_text_length']
+        if len(v) > max_length:
+            raise ValueError(f"{field.name} exceeds maximum length of {max_length} characters")
         return v.strip()
 
 

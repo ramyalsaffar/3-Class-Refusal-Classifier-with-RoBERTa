@@ -158,17 +158,20 @@ class RefusalPipeline:
         valid_refusal = responses_df[responses_df['refusal_label'] != -1]
         valid_jailbreak = responses_df[responses_df['jailbreak_label'] != -1]
 
+        # Use config threshold for low confidence
+        low_conf_threshold = LABELING_CONFIG['low_confidence_threshold']
+
         if len(valid_refusal) > 0:
             avg_ref_conf = valid_refusal['refusal_confidence'].mean()
-            low_conf_ref = (valid_refusal['refusal_confidence'] < 60).sum()
+            low_conf_ref = (valid_refusal['refusal_confidence'] < low_conf_threshold).sum()
             print(f"  Refusal - Avg Confidence: {avg_ref_conf:.1f}%")
-            print(f"  Refusal - Low confidence (<60%): {low_conf_ref} ({low_conf_ref/len(valid_refusal)*100:.1f}%)")
+            print(f"  Refusal - Low confidence (<{low_conf_threshold}%): {low_conf_ref} ({low_conf_ref/len(valid_refusal)*100:.1f}%)")
 
         if len(valid_jailbreak) > 0:
             avg_jb_conf = valid_jailbreak['jailbreak_confidence'].mean()
-            low_conf_jb = (valid_jailbreak['jailbreak_confidence'] < 60).sum()
+            low_conf_jb = (valid_jailbreak['jailbreak_confidence'] < low_conf_threshold).sum()
             print(f"  Jailbreak - Avg Confidence: {avg_jb_conf:.1f}%")
-            print(f"  Jailbreak - Low confidence (<60%): {low_conf_jb} ({low_conf_jb/len(valid_jailbreak)*100:.1f}%)")
+            print(f"  Jailbreak - Low confidence (<{low_conf_threshold}%): {low_conf_jb} ({low_conf_jb/len(valid_jailbreak)*100:.1f}%)")
 
         # Analyze labeling quality
         print(f"\n{'='*60}")

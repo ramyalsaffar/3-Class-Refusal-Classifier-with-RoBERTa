@@ -85,7 +85,7 @@ class ErrorAnalyzer:
         all_texts = []
         all_token_lengths = []
 
-        data_loader = DataLoader(self.dataset, batch_size=32, shuffle=False)
+        data_loader = DataLoader(self.dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
         with torch.no_grad():
             with tqdm(total=len(data_loader), desc="Predicting") as pbar:
@@ -366,8 +366,8 @@ class ErrorAnalyzer:
         print(f"  Max: {incorrect_confidences.max():.4f}")
         print()
 
-        # Identify "confident mistakes" (high confidence but wrong)
-        high_confidence_threshold = 0.9
+        # Identify "confident mistakes" (high confidence but wrong) - using config
+        high_confidence_threshold = ERROR_ANALYSIS_CONFIG['high_confidence_threshold']
         confident_mistakes = (incorrect_mask) & (self.confidence_scores > high_confidence_threshold)
         num_confident_mistakes = confident_mistakes.sum()
 
@@ -441,9 +441,12 @@ class ErrorAnalyzer:
         print("MODULE 4: INPUT LENGTH ANALYSIS")
         print(f"{'='*60}\n")
 
-        # Define length bins
-        bins = [0, 20, 50, 100, 200, max(self.token_lengths)+1]
-        bin_labels = ['0-20', '21-50', '51-100', '101-200', '200+']
+        # Define length bins (using config)
+        config_bins = ERROR_ANALYSIS_CONFIG['length_bins']
+        bins = config_bins + [max(self.token_lengths)+1]  # Add max+1 for upper bound
+        # Generate labels dynamically
+        bin_labels = [f"{bins[i]}-{bins[i+1]-1}" if i < len(bins)-2 else f"{bins[i]}+"
+                      for i in range(len(bins)-1)]
 
         # Assign each sample to a bin
         length_bins = np.digitize(self.token_lengths, bins) - 1
@@ -538,17 +541,21 @@ class ErrorAnalyzer:
     # MODULE 5: FAILURE CASE EXTRACTION
     # =========================================================================
 
-    def extract_failure_cases(self, top_k: int = 50, save_to_csv: bool = True) -> pd.DataFrame:
+    def extract_failure_cases(self, top_k: int = None, save_to_csv: bool = True) -> pd.DataFrame:
         """
         Module 5: Extract and analyze top failure cases.
 
         Args:
-            top_k: Number of failure cases to extract
+            top_k: Number of failure cases to extract (default: from config)
             save_to_csv: Whether to save to CSV
 
         Returns:
             DataFrame with failure cases
         """
+        # Use config value if not provided
+        if top_k is None:
+            top_k = ERROR_ANALYSIS_CONFIG['top_k_errors']
+
         print(f"\n{'='*60}")
         print(f"MODULE 5: FAILURE CASE EXTRACTION (Top {top_k})")
         print(f"{'='*60}\n")
@@ -685,17 +692,21 @@ class ErrorAnalyzer:
     # COMPREHENSIVE ANALYSIS RUNNER
     # =========================================================================
 
-    def run_full_analysis(self, save_visualizations: bool = True, top_k_failures: int = 50) -> Dict:
+    def run_full_analysis(self, save_visualizations: bool = True, top_k_failures: int = None) -> Dict:
         """
         Run all error analysis modules.
 
         Args:
             save_visualizations: Whether to save visualizations
-            top_k_failures: Number of failure cases to extract
+            top_k_failures: Number of failure cases to extract (default: from config)
 
         Returns:
             Complete analysis results
         """
+        # Use config value if not provided
+        if top_k_failures is None:
+            top_k_failures = ERROR_ANALYSIS_CONFIG['top_k_errors']
+
         print(f"\n{'#'*60}")
         print(f"COMPREHENSIVE ERROR ANALYSIS: {self.task_type.upper()}")
         print(f"{'#'*60}\n")

@@ -303,8 +303,8 @@ class HypothesisTester:
         print("SAMPLE SIZE ADEQUACY")
         print(f"{'='*60}\n")
 
-        # Rule of thumb: At least 30 samples per class for meaningful statistics
-        min_samples_per_class = 30
+        # Rule of thumb: Use config minimum for meaningful statistics
+        min_samples_per_class = ANALYSIS_CONFIG['min_samples_per_class']
         adequate_sample_size = all(count >= min_samples_per_class for count in class_counts)
 
         print(f"Minimum recommended samples per class: {min_samples_per_class}")

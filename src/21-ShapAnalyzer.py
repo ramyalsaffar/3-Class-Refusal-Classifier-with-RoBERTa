@@ -156,19 +156,23 @@ class ShapAnalyzer:
 
         print(f"✓ Saved SHAP visualization to {output_path}")
 
-    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = 20,
+    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = None,
                        output_dir: str = None):
         """
         Analyze SHAP values for multiple samples.
 
         Args:
             test_df: Test DataFrame
-            num_samples: Number of samples to analyze
+            num_samples: Number of samples to analyze (default: from config)
             output_dir: Directory to save results
 
         Returns:
             Dictionary with SHAP analysis results
         """
+        # Use config value if not provided
+        if num_samples is None:
+            num_samples = INTERPRETABILITY_CONFIG['shap_samples']
+
         if output_dir is None:
             output_dir = os.path.join(visualizations_path, "shap_analysis")
         os.makedirs(output_dir, exist_ok=True)
@@ -206,8 +210,9 @@ class ShapAnalyzer:
 
             class_indices = np.where(class_mask)[0]
 
-            # Visualize first 2 samples from this class
-            for i, idx in enumerate(tqdm(class_indices[:2], desc=f"Visualizing {class_name}", leave=False)):
+            # Visualize samples from this class (using config)
+            num_viz = INTERPRETABILITY_CONFIG['shap_samples_per_class']
+            for i, idx in enumerate(tqdm(class_indices[:num_viz], desc=f"Visualizing {class_name}", leave=False)):
                 text = texts[idx]
                 output_path = os.path.join(
                     output_dir,
@@ -263,7 +268,7 @@ class ShapAnalyzer:
 
         return results
 
-    def get_top_features(self, text: str, class_idx: int = None, top_k: int = 10):
+    def get_top_features(self, text: str, class_idx: int = None, top_k: int = None):
         """
         Get top features (tokens) influencing prediction.
 
@@ -272,11 +277,14 @@ class ShapAnalyzer:
         Args:
             text: Input text
             class_idx: Target class (None for predicted)
-            top_k: Number of top features to return
+            top_k: Number of top features to return (default: from config)
 
         Returns:
             Dictionary with top positive and negative features
         """
+        # Use config value if not provided
+        if top_k is None:
+            top_k = INTERPRETABILITY_CONFIG['shap_max_display']
         try:
             import shap
         except ImportError:
