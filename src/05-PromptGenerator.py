@@ -299,7 +299,7 @@ CRITICAL: These generated prompts MUST sound like real humans wrote them, NOT sy
    - 40% medium (40-100 tokens) - most common length, with context, etc.
    - 10% long (100-150 tokens) - detailed requests with backstory, etc.
 
-IMPORTANT: You MUST apply rules 1-7 to EACH prompt individually.
+IMPORTANT: You MUST apply rules 1-7 to EACH generated prompt individually.
 DO NOT take shortcuts. DO NOT batch apply. DO NOT be lazy.
 Each prompt MUST be unique and MUST meet ALL criteria above.
 Use your maximum capability to generate realistic, human-like prompts.
