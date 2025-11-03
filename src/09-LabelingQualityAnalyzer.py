@@ -283,7 +283,7 @@ class LabelingQualityAnalyzer:
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-3-Class Refusal Classifier with RoBERTa
+Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 Created on October 31, 2025
 @author: ramyalsaffar
 """

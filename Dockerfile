@@ -1,4 +1,4 @@
-# 3-Class Refusal Classifier with RoBERTa - Docker Image
+# Dual RoBERTa Classifiers - Docker Image
 # Multi-stage build for optimal size and flexibility
 # Supports both CPU and GPU environments
 

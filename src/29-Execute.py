@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Execute Pipeline
 #-----------------
-# Main entry point for 3-Class Refusal Classifier experiments.
+# Main entry point for Dual RoBERTa Classifiers experiments.
 # Provides both command-line and interactive interfaces.
 #
 # Usage:
