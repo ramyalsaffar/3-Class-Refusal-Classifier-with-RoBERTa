@@ -6,43 +6,42 @@
 
 
 # =============================================================================
-# CONTROL ROOM - All Configuration Settings
+# PART 01: CORE STUDY DESIGN CONFIGURATION
 # =============================================================================
+# This section contains all critical experimental design parameters
 
 
-# API Configuration
-#------------------
+# API Configuration (Centralized LLM Settings)
+#-----------------------------------------------
 API_CONFIG = {
-    # Prompt Generation (GPT-4 generates diverse prompts)
-    'prompt_model': 'gpt-4',
+    # Model Selection
+    'prompt_model': 'gpt-4o',                   # Model for prompt generation
+    'judge_model': 'gpt-4o',                    # Model for response labeling/judging
+    'paraphrase_model': 'gpt-4o',               # Model for adversarial paraphrasing
 
-    # Response Collection (3 models: Claude, GPT-5, Gemini)
+    # Response Collection Models (3 models to test)
     'response_models': {
         'claude': 'claude-sonnet-4-20250514',
         'gpt5': 'gpt-5',
         'gemini': 'gemini-2.5-flash'
     },
 
-    # Adversarial Testing (GPT-4 for paraphrasing)
-    'paraphrase_model': 'gpt-4',
+    # Temperature Settings
+    'temperature_generate': 0.9,                # High = diverse prompts
+    'temperature_judge': 0.0,                   # Deterministic judging
+    'temperature_paraphrase': 0.7,              # Medium = natural paraphrases
+    'temperature_response': 0.7,                # Medium = varied responses
+
+    # Token Limits
+    'max_tokens_generate': 4000,                # For prompt generation
+    'max_tokens_regenerate': 500,               # For regenerating failed prompts
+    'max_tokens_judge': 50,                     # Small JSON response for judging
+    'max_tokens_paraphrase': 200,               # For paraphrasing
+    'max_tokens_response': 1024,                # For LLM responses
 
     # Rate Limiting & Retries
     'rate_limit_delay': 0.5,                    # Seconds between API calls
     'max_retries': 5,                           # Max retries for failed API calls
-
-    # Temperature Settings
-    'temperature_generate': 0.9,                # High = diverse prompts
-    'temperature_response': 0.7,                # Medium = varied responses
-    'temperature_paraphrase': 0.7,              # Medium = natural paraphrases
-
-    # Token Limits
-    'max_tokens_generate': 4000,                # For prompt generation
-    'max_tokens_response': 1024,                # For LLM responses
-    'max_tokens_paraphrase': 500,               # For paraphrasing
-
-    # LLM Judge Settings (for data labeling)
-    'judge_temperature': 0.0,                   # Deterministic for consistency
-    'judge_max_tokens': 50,                     # Small JSON response
 
     # Batch Sizes
     'prompt_generation_batch_size': 50,         # Batch size for generating prompts
@@ -200,6 +199,82 @@ PROMPT_GENERATION_CONFIG = {
 }
 
 
+# Labeling Configuration
+#-----------------------
+LABELING_CONFIG = {
+    'low_confidence_threshold': 60,             # Confidence threshold (0-100 scale)
+}
+
+
+# Adversarial Testing Configuration
+#------------------------------------
+ADVERSARIAL_CONFIG = {
+    # Paraphrase Validation Thresholds
+    'min_semantic_similarity': 0.85,            # Cosine similarity threshold for paraphrase validation
+    'min_length_ratio': 0.3,                    # Minimum length ratio (paraphrase/original)
+    'max_length_ratio': 3.0,                    # Maximum length ratio (paraphrase/original)
+    'max_paraphrase_attempts': 3,               # Maximum retry attempts for paraphrasing
+
+    # Quality Thresholds
+    'min_success_rate': 70,                     # Minimum paraphrase success rate (percent)
+    'min_avg_semantic_similarity': 0.90,        # Warning threshold for avg semantic similarity
+    'retry_effectiveness_threshold': 30,        # Threshold for retry effectiveness warning (percent)
+    'failed_retries_warning_threshold': 20,     # Threshold for failed retries warning (percent)
+}
+
+
+# Data Cleaning Configuration
+#-----------------------------
+DATA_CLEANING_CONFIG = {
+    # Length Thresholds
+    'min_response_length': 5,                   # Minimum response length (characters)
+    'max_response_length': 10000,               # Maximum response length (characters)
+    'min_prompt_length': 5,                     # Minimum prompt length (characters)
+    'max_prompt_length': 2000,                  # Maximum prompt length (characters)
+
+    # Cleaning Strategy
+    'default_strategy': 'auto',                 # auto, conservative, aggressive, none
+
+    # Quality Thresholds
+    'excellent_threshold': 2.0,                 # % removal for "Excellent" rating
+    'good_threshold': 5.0,                      # % removal for "Good" rating
+    'acceptable_threshold': 10.0,               # % removal for "Acceptable" rating
+
+    # Near-Duplicate Detection
+    'similarity_threshold': 0.9,                # Jaccard similarity threshold for near-duplicates
+
+    # Verbose Output
+    'verbose': True                             # Print detailed cleaning reports
+}
+
+
+# Experiment Configuration
+#-------------------------
+EXPERIMENT_CONFIG = {
+    'experiment_name': f'dual_RoBERTa_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
+    'save_intermediate': True,                  # Save intermediate results
+    'verbose': True,                            # Print detailed logs
+    'show_progress': True,                      # Show progress bars
+    'prompt_buffer_percentage': 20,             # Extra prompts as buffer (%)
+    'max_prompt_generation_attempts': 3,        # Retries for prompt generation
+    'test_sample_size': 10                      # Sample size for --test mode
+}
+
+
+# Cross-Validation Configuration
+#--------------------------------
+CROSS_VALIDATION_CONFIG = {
+    'default_folds': 5,                         # Default number of folds
+    'final_val_split': 0.1,                     # Validation split for final model monitoring (10%)
+}
+
+
+# =============================================================================
+# PART 02: ANALYSIS, VISUALIZATION & INFRASTRUCTURE
+# =============================================================================
+# This section contains auxiliary settings for analysis, visualization, AWS, etc.
+
+
 # Analysis Configuration
 #-----------------------
 ANALYSIS_CONFIG = {
@@ -211,7 +286,7 @@ ANALYSIS_CONFIG = {
         'compression'                            # Make more concise
     ],
     'confidence_bins': 20,                      # Bins for confidence histograms
-    'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples
+    'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples (0.0-1.0 scale)
     'high_confidence_threshold': 0.5,           # Threshold for high-confidence region in analysis
     'error_examples_count': 5,                  # Number of error examples to analyze in detail
     'attention_sample_size': 100,               # Samples for power law attention analysis
@@ -278,41 +353,46 @@ INTERPRETABILITY_CONFIG = {
 }
 
 
-# Data Cleaning Configuration
-#-----------------------------
-DATA_CLEANING_CONFIG = {
-    # Length Thresholds
-    'min_response_length': 5,                   # Minimum response length (characters)
-    'max_response_length': 10000,               # Maximum response length (characters)
-    'min_prompt_length': 5,                     # Minimum prompt length (characters)
-    'max_prompt_length': 2000,                  # Maximum prompt length (characters)
+# Error Analysis Configuration
+#------------------------------
+ERROR_ANALYSIS_CONFIG = {
+    'min_confidence': 0.3,                      # Minimum confidence for analysis
+    'high_confidence_threshold': 0.8,           # High confidence threshold (confident mistakes)
+    'top_k_misclassifications': 5,              # Top K errors to show in summaries
+    'top_k_errors': 50,                         # Number of failure cases to extract for detailed analysis
+    'quantiles': [0.25, 0.5, 0.75],            # Quantiles for distribution analysis
 
-    # Cleaning Strategy
-    'default_strategy': 'auto',                 # auto, conservative, aggressive, none
-
-    # Quality Thresholds
-    'excellent_threshold': 2.0,                 # % removal for "Excellent" rating
-    'good_threshold': 5.0,                      # % removal for "Good" rating
-    'acceptable_threshold': 10.0,               # % removal for "Acceptable" rating
-
-    # Near-Duplicate Detection
-    'similarity_threshold': 0.9,                # Jaccard similarity threshold for near-duplicates
-
-    # Verbose Output
-    'verbose': True                             # Print detailed cleaning reports
+    # Length Analysis
+    'length_bins': [0, 20, 50, 100, 200],      # Token length bins for length-based analysis
 }
 
 
-# Experiment Configuration
-#-------------------------
-EXPERIMENT_CONFIG = {
-    'experiment_name': f'dual_RoBERTa_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
-    'save_intermediate': True,                  # Save intermediate results
-    'verbose': True,                            # Print detailed logs
-    'show_progress': True,                      # Show progress bars
-    'prompt_buffer_percentage': 20,             # Extra prompts as buffer (%)
-    'max_prompt_generation_attempts': 3,        # Retries for prompt generation
-    'test_sample_size': 10                      # Sample size for --test mode
+# Hypothesis Testing Configuration
+#-----------------------------------
+HYPOTHESIS_TESTING_CONFIG = {
+    'alpha': 0.05,                              # Significance level for tests
+}
+
+
+# Retraining Configuration
+#--------------------------
+RETRAINING_CONFIG = {
+    'min_training_samples': 100,                # Minimum samples required for retraining
+    'num_layers_to_freeze': 4,                  # Freeze bottom N RoBERTa layers
+    'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training
+    'test_split': 0.3,                          # Test set ratio
+    'val_split': 0.5,                           # Validation split (from remaining)
+    'high_confidence_threshold': 0.8,           # Confidence threshold for filtering
+}
+
+
+# Data Retention Configuration
+#------------------------------
+DATA_RETENTION_CONFIG = {
+    'high_confidence_threshold': 0.8,           # Confidence threshold for retention decisions
+    'recent_correct_sample_fraction': 0.2,      # Keep 20% of recent correct samples (1/5)
+    'medium_term_sample_fraction': 0.5,         # Keep 50% of medium-term samples (1/2)
+    'long_term_sample_fraction': 0.1,           # Keep 10% of long-term samples (1/10)
 }
 
 
@@ -322,6 +402,36 @@ TIMING_CONFIG = {
     'api_delay': 0.5,                           # Delay between API calls (seconds)
     'show_progress': True,                      # Show progress bars
     'estimate_time': True                       # Show time estimates
+}
+
+
+# Report Styling Configuration
+#------------------------------
+REPORT_CONFIG = {
+    'title_font_size': 24,
+    'title_color': '#1f77b4',
+    'title_space_after': 30,
+    'section_font_size': 16,
+    'section_color': '#2ca02c',
+    'section_space_after': 12,
+    'section_space_before': 12,
+    'subsection_font_size': 13,
+    'subsection_color': '#d62728',
+    'metric_font_size': 14,
+    'metric_color': '#ff7f0e',
+    'figure_dpi': 150,
+}
+
+
+# Visualization Configuration
+#-----------------------------
+VISUALIZATION_CONFIG = {
+    'dpi': 150,                      # DPI for all saved plots
+    'figure_format': 'png',          # Output format
+    'style': 'whitegrid',            # Seaborn style
+    'color_palette': 'Set2',
+    'font_scale': 1.0,
+    'f1_target': 0.8                 # Target F1 score threshold for visualization
 }
 
 
@@ -450,116 +560,12 @@ PRODUCTION_CONFIG = {
     }
 }
 
-# Prompt Generator Configuration (Stage 1)
-PROMPT_GENERATOR_CONFIG = {
-    'model': 'gpt-4o',                     # Model for prompt generation
-    'temperature': 0.7,                         # Temperature for generation
-    'max_tokens': 150,                          # Max tokens for generation
-    'max_tokens_regenerate': 500,               # Max tokens for regenerating failed prompts
-}
-
-# Labeling Configuration
-LABELING_CONFIG = {
-    'judge_model': 'gpt-4o',               # LLM judge model
-    'judge_temperature': 0.0,                   # Deterministic judging
-    'low_confidence_threshold': 60,             # Confidence threshold (0-100)
-}
-
-# Adversarial Testing Configuration
-ADVERSARIAL_CONFIG = {
-    'paraphrase_model': 'gpt-4o',          # Model for paraphrasing
-    'paraphrase_temperature': 0.7,              # Temperature for paraphrasing
-    'paraphrase_max_tokens': 200,               # Max tokens for paraphrases
-
-    # Paraphrase Validation Thresholds
-    'min_semantic_similarity': 0.85,            # Cosine similarity threshold for paraphrase validation
-    'min_length_ratio': 0.3,                    # Minimum length ratio (paraphrase/original)
-    'max_length_ratio': 3.0,                    # Maximum length ratio (paraphrase/original)
-    'max_paraphrase_attempts': 3,               # Maximum retry attempts for paraphrasing
-
-    # Category Preservation (for judge validation)
-    'judge_model': 'gpt-4',                     # Model for category preservation checks
-    'judge_max_tokens': 10,                     # Max tokens for judge responses
-
-    # Quality Thresholds
-    'min_success_rate': 70,                     # Minimum paraphrase success rate (percent)
-    'min_avg_semantic_similarity': 0.90,        # Warning threshold for avg semantic similarity
-    'retry_effectiveness_threshold': 30,        # Threshold for retry effectiveness warning (percent)
-    'failed_retries_warning_threshold': 20,     # Threshold for failed retries warning (percent)
-}
-
-# Error Analysis Configuration
-ERROR_ANALYSIS_CONFIG = {
-    'min_confidence': 0.3,                      # Minimum confidence for analysis
-    'high_confidence_threshold': 0.8,           # High confidence threshold (confident mistakes)
-    'top_k_misclassifications': 5,              # Top K errors to show in summaries
-    'top_k_errors': 50,                         # Number of failure cases to extract for detailed analysis
-    'quantiles': [0.25, 0.5, 0.75],            # Quantiles for distribution analysis
-
-    # Length Analysis
-    'length_bins': [0, 20, 50, 100, 200],      # Token length bins for length-based analysis
-}
-
-# Hypothesis Testing Configuration
-HYPOTHESIS_TESTING_CONFIG = {
-    'alpha': 0.05,                              # Significance level for tests
-}
-
-# Cross-Validation Configuration
-CROSS_VALIDATION_CONFIG = {
-    'default_folds': 5,                         # Default number of folds
-    'final_val_split': 0.1,                     # Validation split for final model monitoring (10%)
-}
-
-# Retraining Configuration
-RETRAINING_CONFIG = {
-    'min_training_samples': 100,                # Minimum samples required for retraining
-    'num_layers_to_freeze': 4,                  # Freeze bottom N RoBERTa layers
-    'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training
-    'test_split': 0.3,                          # Test set ratio
-    'val_split': 0.5,                           # Validation split (from remaining)
-    'high_confidence_threshold': 0.8,           # Confidence threshold for filtering
-}
-
-# Data Retention Configuration
-DATA_RETENTION_CONFIG = {
-    'high_confidence_threshold': 0.8,           # Confidence threshold for retention decisions
-    'recent_correct_sample_fraction': 0.2,      # Keep 20% of recent correct samples (1/5)
-    'medium_term_sample_fraction': 0.5,         # Keep 50% of medium-term samples (1/2)
-    'long_term_sample_fraction': 0.1,           # Keep 10% of long-term samples (1/10)
-}
-
-# Report Styling Configuration
-REPORT_CONFIG = {
-    'title_font_size': 24,
-    'title_color': '#1f77b4',
-    'title_space_after': 30,
-    'section_font_size': 16,
-    'section_color': '#2ca02c',
-    'section_space_after': 12,
-    'section_space_before': 12,
-    'subsection_font_size': 13,
-    'subsection_color': '#d62728',
-    'metric_font_size': 14,
-    'metric_color': '#ff7f0e',
-    'figure_dpi': 150,
-}
-
-# Visualization Configuration
-VISUALIZATION_CONFIG = {
-    'dpi': 150,                      # DPI for all saved plots
-    'figure_format': 'png',          # Output format
-    'style': 'whitegrid',            # Seaborn style
-    'color_palette': 'Set2',
-    'font_scale': 1.0,
-    'f1_target': 0.8                 # Target F1 score threshold for visualization
-}
-
 
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 Created on October 28, 2025
 @author: ramyalsaffar
 """

@@ -431,13 +431,13 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
 
         try:
             response = self.openai_client.chat.completions.create(
-                model=ADVERSARIAL_CONFIG['judge_model'],
+                model=API_CONFIG['judge_model'],
                 messages=[
                     {"role": "system", "content": "You are a precise classifier. Return only numbers."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.0,
-                max_tokens=ADVERSARIAL_CONFIG['judge_max_tokens']
+                max_tokens=API_CONFIG['max_tokens_judge']
             )
 
             result = response.choices[0].message.content.strip()
