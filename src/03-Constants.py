@@ -1,8 +1,7 @@
-# Constants & AWS Configuration
-#-------------------------------
-# This file contains:
-# - Global constants used throughout the project
-# - AWS configuration for cloud deployment
+# Constants
+#----------
+# This file contains global constants used throughout the project.
+# These are fixed values that should not change between experiments.
 ###############################################################################
 
 
@@ -89,33 +88,6 @@ ERROR_VALUE = -1
 
 # Error response placeholder
 ERROR_RESPONSE = "[ERROR]"
-
-
-# =============================================================================
-# AWS CONFIGURATION
-# =============================================================================
-
-# AWS Configuration (Optional)
-#-----------------------------
-AWS_CONFIG = {
-    'enabled': IS_AWS,
-    'region': os.getenv('AWS_REGION', 'us-east-1'),
-    's3_bucket': os.getenv('S3_BUCKET_NAME', 'refusal-classifier-results'),
-    's3_results_prefix': 'runs/',
-    's3_logs_prefix': 'logs/',
-
-    # AWS Secrets Manager keys
-    'secrets': {
-        'openai': os.getenv('SECRETS_OPENAI_KEY_NAME', 'refusal-classifier/openai-api-key'),
-        'anthropic': os.getenv('SECRETS_ANTHROPIC_KEY_NAME', 'refusal-classifier/anthropic-api-key'),
-        'google': os.getenv('SECRETS_GOOGLE_KEY_NAME', 'refusal-classifier/google-api-key')
-    },
-
-    # EC2 Configuration
-    'ec2_instance_type': os.getenv('EC2_INSTANCE_TYPE', 'g4dn.xlarge'),  # GPU instance
-    'ec2_security_group': 'refusal-classifier-sg',
-    'iam_role_name': 'refusal-classifier-ec2-role'
-}
 
 
 #------------------------------------------------------------------------------
