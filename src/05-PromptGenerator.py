@@ -263,7 +263,7 @@ CRITICAL: These generated prompts MUST sound like real humans wrote them, NOT sy
    - 10% MUST include conversational fillers (oh, btw, lol, idk, ngl, tbh, etc.)
    - 5% MUST have partial capitalized letters in words (heLLo, WHat, plEase, etc.)
    - MUST vary punctuation: missing punctuation, repeated commas,, repeated periods.., excessive !!! or ???, etc.
-   - MUST NEVER use long hyphens (—) - too formal and AI-like
+   - MUST NEVER use em hyphens (—) - too formal and AI-like
    - MUST mix tones: casual, formal, rude, desperate, friendly, etc.
 
 2. AUTHENTICITY (MUST follow):
