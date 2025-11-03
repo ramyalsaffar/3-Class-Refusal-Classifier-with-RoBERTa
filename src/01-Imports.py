@@ -180,75 +180,23 @@ else:
 # Execute Code Files
 #-------------------
 
-# Import Configuration and Constants FIRST (before other modules)
-#-----------------------------------------------------------------
-print("\n" + "="*60)
-print("LOADING CONFIGURATION")
-print("="*60)
-
-# FIX: Use context manager to properly close file descriptors
-with open(CodeFilePath+"02-Config.py") as f:
-    exec(f.read())
-print("✓ Loaded 02-Config.py")
-
-with open(CodeFilePath+"03-Constants.py") as f:
-    exec(f.read())
-print("✓ Loaded 03-Constants.py")
+CodeFilePath = glob.glob(project_path + "/*Code/*Python/")[0]
+code_files_ls = os.listdir(CodeFilePath)
+code_files_ls.sort()
+code_files_ls = [x for x in code_files_ls if "py" in x]
+code_files_ls = code_files_ls[1:30]
 
 
-# Load remaining code files (04-34, excluding 29-34)
-#--------------------------------------------------------
-# Files are numbered 01-34:
-#   01-Imports.py (this file)
-#   02-Config.py (loaded above) - includes AWS_CONFIG
-#   03-Constants.py (loaded above)
-#   04-SecretsHandler.py (AWS Secrets Manager)
-#   05-06: Data Collection (PromptGenerator, ResponseCollector)
-#   07: DataCleaner (comprehensive data quality validation and cleaning)
-#   08: DataLabeler (dual-task labeling: refusal + jailbreak detection)
-#   09: LabelingQualityAnalyzer (analyze judge confidence and labeling quality)
-#   10: ClassificationDataset (generic PyTorch Dataset - works for both classifiers)
-#   11: RefusalClassifier (3-class: No/Hard/Soft Refusal)
-#   12: JailbreakDetector (2-class: Jailbreak Failed/Succeeded)
-#   13-14: Training Methods (Trainer, CrossValidator with k-fold CV)
-#   15-17: Analysis - Performance (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
-#   18-19: Analysis - Security (JailbreakAnalysis, CorrelationAnalysis)
-#   20-21: Analysis - Interpretability (AttentionVisualizer, ShapAnalyzer)
-#   22-24: Analysis - Statistical (PowerLawAnalyzer, HypothesisTesting, ErrorAnalysis)
-#   25-26: Visualization & Reporting (Visualizer, ReportGenerator)
-#   27-28: Orchestration (RefusalPipeline, ExperimentRunner)
-#   29-Execute.py (main entry point - don't load)
-#   30-Analyze.py (analysis entry point - don't load)
-#   31-ProductionAPI.py (production API server - don't load)
-#   32-MonitoringSystem.py (production monitoring - don't load)
-#   33-RetrainingPipeline.py (production retraining - don't load)
-#   34-DataManager.py (production data management - don't load)
+# Loop over cde files
+#--------------------
+for i in range(0,len(code_files_ls)):
 
-print("\nLoading modules...")
-code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
+    file = code_files_ls[i]
 
-# Remove files we don't want to auto-load
-code_files_ls = [x for x in code_files_ls if x not in [
-    "01-Imports.py",      # This file
-    "02-Config.py",        # Already loaded
-    "03-Constants.py",     # Already loaded
-    "29-Execute.py",       # Execution script
-    "30-Analyze.py",       # Execution script
-    "31-ProductionAPI.py",      # Production API server (load manually)
-    "32-MonitoringSystem.py",   # Production monitoring (load manually)
-    "33-RetrainingPipeline.py", # Production retraining (load manually)
-    "34-DataManager.py"         # Production data management (load manually)
-]]
+    print(file)
 
-# Loop over code files and load them
-# FIX: Use context manager to properly close file descriptors
-for file in code_files_ls:
-    try:
-        with open(CodeFilePath+file) as f:
-            exec(f.read())
-        print(f"✓ Loaded {file}")
-    except Exception as e:
-        print(f"✗ Error loading {file}: {e}")
+    exec(open(CodeFilePath+file).read())
+    print(f"✓ Loaded {file}")
 
 
 print("="*60)
