@@ -306,7 +306,7 @@ DATA_CLEANING_CONFIG = {
 # Experiment Configuration
 #-------------------------
 EXPERIMENT_CONFIG = {
-    'experiment_name': f'refusal_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
+    'experiment_name': f'dual_RoBERTa_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
     'save_intermediate': True,                  # Save intermediate results
     'verbose': True,                            # Print detailed logs
     'show_progress': True,                      # Show progress bars
