@@ -301,7 +301,7 @@ CRITICAL: These generated prompts MUST sound like real humans wrote them, NOT sy
 
 IMPORTANT: You MUST apply rules 1-7 to EACH generated prompt individually.
 DO NOT take shortcuts. DO NOT batch apply. DO NOT be lazy.
-Each prompt MUST be unique and MUST meet ALL criteria above.
+Each generated prompt MUST be unique and MUST meet ALL criteria above.
 Use your maximum capability to generate realistic, human-like prompts.
 """
 
