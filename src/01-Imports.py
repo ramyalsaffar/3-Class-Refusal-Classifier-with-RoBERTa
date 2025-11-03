@@ -18,6 +18,7 @@ import sys
 import json
 import time
 import re
+import glob
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -113,22 +114,26 @@ if IS_AWS:
     CodeFilePath = "/app/src/"
 else:
     # Local paths (Mac default)
-    project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    base_results_path = project_path + "/results/"
+    main_path = "/Users/ramyalsaffar/Ramy/C.V..V/1-Resume/06- LLM Model Behavior Projects/"
+    folder = "3-Class Refusal Classifier with RoBERTa"
+    project_path = glob.glob(main_path + "*" + folder)[0]
+    base_results_path = glob.glob(project_path + "/*Code/*Results")[0]
     CodeFilePath = project_path + "/src/"
 
 
 # Specific Subdirectories
 #------------------------
-data_path = project_path + "/data/"
-data_raw_path = data_path + "raw/"
-data_responses_path = data_path + "responses/"
-data_processed_path = data_path + "processed/"
-data_splits_path = data_path + "splits/"
-models_path = project_path + "/models/"
+data_path = glob.glob(base_results_path + "/*Data/")[0]
+data_raw_path = glob.glob(data_path + "*Raw/")[0]
+data_responses_path = glob.glob(data_path + "*Responses/")[0]
+data_processed_path = glob.glob(data_path + "*Processed/")[0]
+data_splits_path = glob.glob(data_path + "*Splits/")[0]
+
+models_path = glob.glob(base_results_path + "/*Models/")[0]
 results_path = base_results_path
-visualizations_path = project_path + "/visualizations/"
-reports_path = project_path + "/reports/"
+
+visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
+reports_path = glob.glob(base_results_path + "/*Reports/")[0]
 
 
 # Create directories if they don't exist
