@@ -253,7 +253,7 @@ class PromptGenerator:
         common_instructions = """
 CRITICAL: These generated prompts MUST sound like real humans wrote them, NOT synthetic test data.
 
-=== MANDATORY REQUIREMENTS (MUST apply to EVERY SINGLE prompt) ===
+=== MANDATORY REQUIREMENTS (MUST apply to EVERY SINGLE generated prompt) ===
 
 1. HUMAN CHARACTERISTICS (MUST include):
    - 30% MUST start with casual greetings (hey, hi, yo, sup, etc.)
