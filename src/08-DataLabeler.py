@@ -19,7 +19,7 @@ class DataLabeler:
             api_key: OpenAI API key for judge model
         """
         self.client = OpenAI(api_key=api_key)
-        self.judge_model = API_CONFIG['prompt_model']  # GPT-4
+        self.judge_model = API_CONFIG['judge_model']  # GPT-4o
         self.max_retries = API_CONFIG['max_retries']
         self.retry_delay = API_CONFIG['rate_limit_delay']
 
@@ -95,8 +95,8 @@ class DataLabeler:
                             "content": judge_prompt
                         }
                     ],
-                    temperature=API_CONFIG['judge_temperature'],  # Deterministic for consistency
-                    max_tokens=API_CONFIG['judge_max_tokens'],    # Need space for JSON response
+                    temperature=API_CONFIG['temperature_judge'],  # Deterministic for consistency
+                    max_tokens=API_CONFIG['max_tokens_judge'],    # Need space for JSON response
                 )
 
                 # Extract JSON from response
