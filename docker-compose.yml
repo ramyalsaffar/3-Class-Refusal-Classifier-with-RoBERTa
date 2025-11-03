@@ -1,4 +1,4 @@
-# Docker Compose for 3-Class Refusal Classifier
+# Docker Compose for Dual RoBERTa Classifiers
 # Supports development, training, and production API deployment
 
 version: '3.8'

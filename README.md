@@ -51,7 +51,7 @@ A production-ready, dual-task classification system using fine-tuned RoBERTa mod
 - ✅ **Dual-Task Classification**: Simultaneously detects refusal patterns AND jailbreak success
 - ✅ **Production-Ready**: Full API server with A/B testing, monitoring, and auto-retraining
 - ✅ **Comprehensive Interpretability**: SHAP analysis, attention visualization, power law analysis
-- ✅ **LLM Judge Labeling**: GPT-4-based labeling with confidence scores and randomized class ordering
+- ✅ **LLM Judge Labeling**: GPT-4o-based labeling with confidence scores and randomized class ordering
 - ✅ **3-Stage Prompt Generation**: Quality-controlled prompt generation pipeline
 - ✅ **Multi-Model Data Collection**: Claude Sonnet 4.5, GPT-5, Gemini 2.5 Flash
 - ✅ **Generic Design**: Works with any N-class classifier (not hardcoded to 3 classes)
