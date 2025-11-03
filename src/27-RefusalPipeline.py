@@ -107,7 +107,7 @@ class RefusalPipeline:
         print("STEP 4: LABELING DATA WITH LLM JUDGE (DUAL-TASK)")
         print("="*60)
 
-        # Initialize labeler with OpenAI API key (for GPT-4 judge)
+        # Initialize labeler with OpenAI API key (for GPT-4o judge)
         labeler = DataLabeler(api_key=self.api_keys['openai'])
 
         # Label each response using the judge (returns labels + confidence scores)

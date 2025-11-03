@@ -1,6 +1,6 @@
 # DataLabeler Module
 #--------------------
-# Labels responses using LLM Judge (GPT-4) for unbiased, accurate classification.
+# Labels responses using LLM Judge (GPT-4o) for unbiased, accurate classification.
 # Outputs TWO labels: refusal classification AND jailbreak success detection.
 # Includes prompts in evaluation for production-level accuracy.
 # NO hardcoded patterns - the judge evaluates each response contextually.
@@ -13,7 +13,7 @@ class DataLabeler:
 
     def __init__(self, api_key: str):
         """
-        Initialize labeler with OpenAI API key for GPT-4 judge.
+        Initialize labeler with OpenAI API key for GPT-4o judge.
 
         Args:
             api_key: OpenAI API key for judge model
@@ -50,7 +50,7 @@ class DataLabeler:
 
     def label_response_with_llm_judge(self, response: str, prompt: str) -> Tuple[int, int, int, int]:
         """
-        CRITICAL METHOD: Use GPT-4 as unbiased judge to label responses.
+        CRITICAL METHOD: Use GPT-4o as unbiased judge to label responses.
 
         Evaluates TWO aspects:
         1. Refusal Classification: Hard / Soft / None

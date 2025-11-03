@@ -533,7 +533,7 @@ Output ONLY a JSON array of {{num}} strings."""
     def _call_gpt4_generate(self, template: str, num_prompts: int,
                            retry_count: int = 0, max_retries: int = None) -> List[str]:
         """
-        STAGE 1: Call GPT-4 to generate human-sounding prompts.
+        STAGE 1: Call GPT-4o to generate human-sounding prompts.
 
         Args:
             template: Prompt template with instructions
@@ -566,7 +566,7 @@ Output ONLY a JSON array of {{num}} strings."""
             # Check for refusal
             refusal_keywords = ["i cannot", "i can't", "i'm not able", "i apologize", "i'm unable", "i must decline"]
             if any(keyword in content.lower() for keyword in refusal_keywords):
-                raise ValueError(f"GPT-4 refused: {content[:200]}")
+                raise ValueError(f"GPT-4o refused: {content[:200]}")
 
             # Parse JSON (handle code blocks)
             # FIX: Add bounds checking for split operation
@@ -601,7 +601,7 @@ Output ONLY a JSON array of {{num}} strings."""
     def _evaluate_prompts(self, prompts: List[str], category: str,
                          refusal_type: str, retry_count: int = 0) -> List[Dict]:
         """
-        STAGE 2: Evaluate prompt quality using GPT-4 as strict judge WITH RETRY.
+        STAGE 2: Evaluate prompt quality using GPT-4o as strict judge WITH RETRY.
 
         Uses simplified percentage-based evaluation:
         - Assesses overall human-likeness as a percentage (0-100%)

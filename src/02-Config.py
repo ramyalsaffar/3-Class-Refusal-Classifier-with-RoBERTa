@@ -157,7 +157,7 @@ PROMPT_GENERATION_CONFIG = {
     # Three-stage process control
     'stages': {
         'generation': True,                         # Stage 1: Generate prompts
-        'self_evaluation': True,                    # Stage 2: GPT-4 quality check
+        'self_evaluation': True,                    # Stage 2: GPT-4o quality check
         'regeneration': True,                       # Stage 3: Fix failed prompts
         'max_regeneration_attempts': 5              # Max attempts per failed prompt
     },
@@ -491,7 +491,7 @@ PRODUCTION_CONFIG = {
 
     # LLM Judge for Production Monitoring
     'judge': {
-        'model': 'gpt-4',                           # GPT-4 for high accuracy
+        'model': 'gpt-4o',                          # GPT-4o for high accuracy
         'temperature': 0.0,                         # Deterministic
         'max_tokens': 10,                           # Only need score
         'max_retries': 3                            # Retries for failed calls

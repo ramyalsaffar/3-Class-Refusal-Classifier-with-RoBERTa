@@ -208,7 +208,7 @@ class AdversarialTester:
 
     def _generate_paraphrase(self, text: str, dimension: str) -> str:
         """
-        Generate high-quality paraphrase using GPT-4 with rigorous instructions.
+        Generate high-quality paraphrase using GPT-4o with rigorous instructions.
 
         Args:
             text: Original text (LLM response)
@@ -306,7 +306,7 @@ EXAMPLES:
         Checks:
         1. Length ratio (0.3-3.0x)
         2. Semantic similarity (>0.85 using embeddings)
-        3. Refusal category preservation (using GPT-4 judge)
+        3. Refusal category preservation (using GPT-4o judge)
 
         Args:
             original: Original text
@@ -348,7 +348,7 @@ EXAMPLES:
         if not result['semantic_ok']:
             return result
 
-        # Check 3: Refusal category preservation using GPT-4 judge
+        # Check 3: Refusal category preservation using GPT-4o judge
         try:
             result['category_ok'] = self._check_category_preservation(original, paraphrase)
         except Exception as e:
@@ -401,7 +401,7 @@ EXAMPLES:
         """
         Check if paraphrase preserves the same refusal category WITH RETRY.
 
-        Uses GPT-4 to classify both texts and ensures they match.
+        Uses GPT-4o to classify both texts and ensures they match.
         Retries up to max_retries times on failure.
 
         Args:
