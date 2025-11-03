@@ -758,9 +758,7 @@ Generate 1 new prompt for the same category/intent that MUST:
 - Be completely different from the failed version
 - Target 80%+ human-likeness score
 
-OUTPUT: Single prompt as plain text (not JSON).
-
-CRITICAL: This MUST sound like a real human wrote it. Be messy, imperfect, and conversational."""
+OUTPUT: Single prompt as plain text (not JSON)."""
 
         try:
             response = self.client.chat.completions.create(
