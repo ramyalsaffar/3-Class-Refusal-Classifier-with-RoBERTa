@@ -110,14 +110,14 @@ class CrossValidator:
                 train_dataset,
                 batch_size=TRAINING_CONFIG['batch_size'],
                 shuffle=True,
-                num_workers=0  # Avoid multiprocessing issues
+                num_workers=TRAINING_CONFIG['num_workers']
             )
 
             val_loader = DataLoader(
                 val_dataset,
                 batch_size=TRAINING_CONFIG['batch_size'],
                 shuffle=False,
-                num_workers=0
+                num_workers=TRAINING_CONFIG['num_workers']
             )
 
             # Calculate class counts for weighted loss
@@ -445,7 +445,7 @@ def train_with_cross_validation(
         train_val_dataset,
         batch_size=TRAINING_CONFIG['batch_size'],
         shuffle=True,
-        num_workers=0
+        num_workers=TRAINING_CONFIG['num_workers']
     )
 
     # For validation during final training, use a small split from train+val
@@ -453,7 +453,7 @@ def train_with_cross_validation(
     from sklearn.model_selection import train_test_split as tts
     final_train_idx, final_val_idx = tts(
         list(range(len(train_val_dataset))),
-        test_size=0.1,  # Small validation set for monitoring
+        test_size=CROSS_VALIDATION_CONFIG['final_val_split'],
         stratify=[all_labels[train_val_idx[i]] for i in range(len(train_val_dataset))],
         random_state=EXPERIMENT_CONFIG['random_seed']
     )
@@ -461,8 +461,8 @@ def train_with_cross_validation(
     final_train_subset = torch.utils.data.Subset(train_val_dataset, final_train_idx)
     final_val_subset = torch.utils.data.Subset(train_val_dataset, final_val_idx)
 
-    final_train_loader_split = DataLoader(final_train_subset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=True)
-    final_val_loader_split = DataLoader(final_val_subset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False)
+    final_train_loader_split = DataLoader(final_train_subset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=True, num_workers=TRAINING_CONFIG['num_workers'])
+    final_val_loader_split = DataLoader(final_val_subset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False, num_workers=TRAINING_CONFIG['num_workers'])
 
     # Calculate class counts for final model
     final_labels = [all_labels[train_val_idx[i]] for i in final_train_idx]
@@ -507,7 +507,7 @@ def train_with_cross_validation(
     print("STEP 3: EVALUATE ON HELD-OUT TEST SET")
     print(f"{'#'*60}\n")
 
-    test_loader = DataLoader(test_dataset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False, num_workers=TRAINING_CONFIG['num_workers'])
 
     final_model.eval()
     all_preds = []

@@ -455,6 +455,7 @@ PROMPT_GENERATOR_CONFIG = {
     'model': 'gpt-4o-mini',                     # Model for prompt generation
     'temperature': 0.7,                         # Temperature for generation
     'max_tokens': 150,                          # Max tokens for generation
+    'max_tokens_regenerate': 500,               # Max tokens for regenerating failed prompts
 }
 
 # Labeling Configuration
@@ -507,6 +508,7 @@ HYPOTHESIS_TESTING_CONFIG = {
 # Cross-Validation Configuration
 CROSS_VALIDATION_CONFIG = {
     'default_folds': 5,                         # Default number of folds
+    'final_val_split': 0.1,                     # Validation split for final model monitoring (10%)
 }
 
 # Retraining Configuration

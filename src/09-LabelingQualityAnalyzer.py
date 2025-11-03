@@ -68,6 +68,8 @@ class LabelingQualityAnalyzer:
         valid_refusal = df[df['refusal_label'] != -1]
         valid_jailbreak = df[df['jailbreak_label'] != -1]
 
+        threshold = LABELING_CONFIG['low_confidence_threshold']
+
         results = {
             'refusal': {
                 'mean': float(valid_refusal['refusal_confidence'].mean()),
@@ -75,8 +77,8 @@ class LabelingQualityAnalyzer:
                 'median': float(valid_refusal['refusal_confidence'].median()),
                 'min': float(valid_refusal['refusal_confidence'].min()),
                 'max': float(valid_refusal['refusal_confidence'].max()),
-                'count_low': int((valid_refusal['refusal_confidence'] < 60).sum()),
-                'percent_low': float((valid_refusal['refusal_confidence'] < 60).sum() / len(valid_refusal) * 100)
+                'count_low': int((valid_refusal['refusal_confidence'] < threshold).sum()),
+                'percent_low': float((valid_refusal['refusal_confidence'] < threshold).sum() / len(valid_refusal) * 100)
             },
             'jailbreak': {
                 'mean': float(valid_jailbreak['jailbreak_confidence'].mean()),
@@ -84,18 +86,18 @@ class LabelingQualityAnalyzer:
                 'median': float(valid_jailbreak['jailbreak_confidence'].median()),
                 'min': float(valid_jailbreak['jailbreak_confidence'].min()),
                 'max': float(valid_jailbreak['jailbreak_confidence'].max()),
-                'count_low': int((valid_jailbreak['jailbreak_confidence'] < 60).sum()),
-                'percent_low': float((valid_jailbreak['jailbreak_confidence'] < 60).sum() / len(valid_jailbreak) * 100)
+                'count_low': int((valid_jailbreak['jailbreak_confidence'] < threshold).sum()),
+                'percent_low': float((valid_jailbreak['jailbreak_confidence'] < threshold).sum() / len(valid_jailbreak) * 100)
             }
         }
 
         if self.verbose:
             print(f"  Refusal - Mean: {results['refusal']['mean']:.1f}%, "
                   f"Median: {results['refusal']['median']:.1f}%, "
-                  f"Low (<60%): {results['refusal']['count_low']} ({results['refusal']['percent_low']:.1f}%)")
+                  f"Low (<{threshold}%): {results['refusal']['count_low']} ({results['refusal']['percent_low']:.1f}%)")
             print(f"  Jailbreak - Mean: {results['jailbreak']['mean']:.1f}%, "
                   f"Median: {results['jailbreak']['median']:.1f}%, "
-                  f"Low (<60%): {results['jailbreak']['count_low']} ({results['jailbreak']['percent_low']:.1f}%)")
+                  f"Low (<{threshold}%): {results['jailbreak']['count_low']} ({results['jailbreak']['percent_low']:.1f}%)")
 
         return results
 
@@ -104,6 +106,7 @@ class LabelingQualityAnalyzer:
         if self.verbose:
             print("\n--- Per-Model Confidence ---")
 
+        threshold = LABELING_CONFIG['low_confidence_threshold']
         results = {}
         valid_df = df[df['refusal_label'] != -1]
 
@@ -113,13 +116,13 @@ class LabelingQualityAnalyzer:
             results[model] = {
                 'refusal': {
                     'mean': float(model_df['refusal_confidence'].mean()),
-                    'count_low': int((model_df['refusal_confidence'] < 60).sum()),
-                    'percent_low': float((model_df['refusal_confidence'] < 60).sum() / len(model_df) * 100)
+                    'count_low': int((model_df['refusal_confidence'] < threshold).sum()),
+                    'percent_low': float((model_df['refusal_confidence'] < threshold).sum() / len(model_df) * 100)
                 },
                 'jailbreak': {
                     'mean': float(model_df['jailbreak_confidence'].mean()),
-                    'count_low': int((model_df['jailbreak_confidence'] < 60).sum()),
-                    'percent_low': float((model_df['jailbreak_confidence'] < 60).sum() / len(model_df) * 100)
+                    'count_low': int((model_df['jailbreak_confidence'] < threshold).sum()),
+                    'percent_low': float((model_df['jailbreak_confidence'] < threshold).sum() / len(model_df) * 100)
                 }
             }
 
@@ -137,6 +140,7 @@ class LabelingQualityAnalyzer:
         if self.verbose:
             print("\n--- Per-Category Confidence ---")
 
+        threshold = LABELING_CONFIG['low_confidence_threshold']
         results = {}
         valid_df = df[df['refusal_label'] != -1]
 
@@ -146,13 +150,13 @@ class LabelingQualityAnalyzer:
             results[category] = {
                 'refusal': {
                     'mean': float(cat_df['refusal_confidence'].mean()),
-                    'count_low': int((cat_df['refusal_confidence'] < 60).sum()),
-                    'percent_low': float((cat_df['refusal_confidence'] < 60).sum() / len(cat_df) * 100)
+                    'count_low': int((cat_df['refusal_confidence'] < threshold).sum()),
+                    'percent_low': float((cat_df['refusal_confidence'] < threshold).sum() / len(cat_df) * 100)
                 },
                 'jailbreak': {
                     'mean': float(cat_df['jailbreak_confidence'].mean()),
-                    'count_low': int((cat_df['jailbreak_confidence'] < 60).sum()),
-                    'percent_low': float((cat_df['jailbreak_confidence'] < 60).sum() / len(cat_df) * 100)
+                    'count_low': int((cat_df['jailbreak_confidence'] < threshold).sum()),
+                    'percent_low': float((cat_df['jailbreak_confidence'] < threshold).sum() / len(cat_df) * 100)
                 }
             }
 
@@ -166,8 +170,9 @@ class LabelingQualityAnalyzer:
 
         return results
 
-    def _flag_low_confidence(self, df: pd.DataFrame, threshold: int = 60) -> Dict:
+    def _flag_low_confidence(self, df: pd.DataFrame, threshold: int = None) -> Dict:
         """Flag samples with low confidence for review."""
+        threshold = threshold or LABELING_CONFIG['low_confidence_threshold']
         if self.verbose:
             print(f"\n--- Low Confidence Flags (threshold: {threshold}%) ---")
 
@@ -239,15 +244,16 @@ class LabelingQualityAnalyzer:
         return results
 
     def export_flagged_samples(self, labeled_df: pd.DataFrame, output_path: str,
-                              threshold: int = 60):
+                              threshold: int = None):
         """
         Export low-confidence samples for manual review.
 
         Args:
             labeled_df: Labeled DataFrame
             output_path: Path to save CSV
-            threshold: Confidence threshold
+            threshold: Confidence threshold (uses config if None)
         """
+        threshold = threshold or LABELING_CONFIG['low_confidence_threshold']
         valid_df = labeled_df[labeled_df['refusal_label'] != -1]
         low_both = valid_df[(valid_df['refusal_confidence'] < threshold) &
                            (valid_df['jailbreak_confidence'] < threshold)]

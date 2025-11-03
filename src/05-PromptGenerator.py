@@ -770,7 +770,7 @@ CRITICAL: This MUST sound like a real human wrote it. Be messy, imperfect, and c
                     {"role": "user", "content": regeneration_prompt}
                 ],
                 temperature=self.temperature,
-                max_tokens=500  # Single prompt
+                max_tokens=PROMPT_GENERATOR_CONFIG['max_tokens_regenerate']
             )
 
             regenerated = response.choices[0].message.content.strip()
