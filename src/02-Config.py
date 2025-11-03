@@ -452,7 +452,7 @@ PRODUCTION_CONFIG = {
 
 # Prompt Generator Configuration (Stage 1)
 PROMPT_GENERATOR_CONFIG = {
-    'model': 'gpt-4o-mini',                     # Model for prompt generation
+    'model': 'gpt-4o',                     # Model for prompt generation
     'temperature': 0.7,                         # Temperature for generation
     'max_tokens': 150,                          # Max tokens for generation
     'max_tokens_regenerate': 500,               # Max tokens for regenerating failed prompts
@@ -460,14 +460,14 @@ PROMPT_GENERATOR_CONFIG = {
 
 # Labeling Configuration
 LABELING_CONFIG = {
-    'judge_model': 'gpt-4o-mini',               # LLM judge model
+    'judge_model': 'gpt-4o',               # LLM judge model
     'judge_temperature': 0.0,                   # Deterministic judging
     'low_confidence_threshold': 60,             # Confidence threshold (0-100)
 }
 
 # Adversarial Testing Configuration
 ADVERSARIAL_CONFIG = {
-    'paraphrase_model': 'gpt-4o-mini',          # Model for paraphrasing
+    'paraphrase_model': 'gpt-4o',          # Model for paraphrasing
     'paraphrase_temperature': 0.7,              # Temperature for paraphrasing
     'paraphrase_max_tokens': 200,               # Max tokens for paraphrases
 
