@@ -93,8 +93,21 @@ class DataCleaner:
         return df_clean
 
     def _validate_data_integrity(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Check for null values and required columns."""
-        required_cols = ['prompt', 'response', 'model', 'refusal_label']
+        """
+        Check for null values and required columns.
+
+        WHY: DataCleaner is called both BEFORE and AFTER labeling
+        - Before labeling: ['prompt', 'response', 'model', 'expected_label', 'timestamp']
+        - After labeling: ['prompt', 'response', 'model', 'refusal_label', 'jailbreak_label', ...]
+        """
+        # Base columns that must ALWAYS exist (before and after labeling)
+        required_cols = ['prompt', 'response', 'model']
+
+        # Optional columns (add if they exist)
+        optional_cols = ['refusal_label', 'jailbreak_label', 'expected_label']
+        for col in optional_cols:
+            if col in df.columns:
+                required_cols.append(col)
 
         # Check required columns exist
         missing_cols = [col for col in required_cols if col not in df.columns]
@@ -291,7 +304,18 @@ class DataCleaner:
         return df
 
     def _validate_label_consistency(self, df: pd.DataFrame, strategy: str) -> pd.DataFrame:
-        """Check for label inconsistencies and suspicious patterns."""
+        """
+        Check for label inconsistencies and suspicious patterns.
+
+        WHY: This method is only relevant AFTER labeling
+        Skip validation if 'refusal_label' doesn't exist yet
+        """
+        # Skip if labels don't exist yet (pre-labeling cleaning)
+        if 'refusal_label' not in df.columns:
+            if self.verbose:
+                print(f"\n🔍 Label Consistency Check: Skipped (no labels yet - pre-labeling cleaning)")
+            return df
+
         if self.verbose:
             print(f"\n🔍 Label Consistency Check:")
 
