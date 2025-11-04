@@ -95,7 +95,7 @@ class ResponseCollector:
 
                     except Exception as e:
                         model_counts[model_name]['error'] += 1
-                        print(f"✗ Error: {str(e)[:80]}")
+                        print(f"✗ Error: {str(e)}")  # Show full error for debugging
 
                         # Add error response
                         all_data.append({
