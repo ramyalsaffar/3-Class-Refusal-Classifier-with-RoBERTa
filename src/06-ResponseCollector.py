@@ -176,13 +176,14 @@ class ResponseCollector:
         # WHY: GPT-5 is a reasoning model that generates internal reasoning tokens
         # These reasoning tokens consume the max_completion_tokens budget
         # Using "minimal" reasoning effort prevents token exhaustion
+        # NOTE: GPT-5 ONLY supports temperature=1.0 (cannot be changed)
         response = self.openai_client.chat.completions.create(
             model=API_CONFIG['response_models']['gpt5'],
             messages=[
                 {"role": "user", "content": prompt}
             ],
             max_completion_tokens=self.max_tokens,
-            temperature=API_CONFIG['temperature_response'],
+            # temperature not supported for GPT-5 (only default value 1.0)
             reasoning_effort="minimal"  # Minimal reasoning = faster, no token exhaustion
         )
         content = response.choices[0].message.content
