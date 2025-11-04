@@ -18,12 +18,14 @@ import sys
 import json
 import time
 import re
+import glob
 import warnings
 warnings.filterwarnings('ignore')
 
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
+from io import BytesIO
 import getpass
 import atexit
 
@@ -46,7 +48,7 @@ from transformers import (
 )
 
 # ML Tools
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
@@ -56,12 +58,36 @@ from sklearn.metrics import (
     recall_score,
     precision_score,
     precision_recall_curve,
-    average_precision_score
+    average_precision_score,
+    cohen_kappa_score,
+    ConfusionMatrixDisplay
 )
+
+# Statistical Testing
+from scipy.stats import chisquare, shapiro
+import pickle
 
 # Visualization
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# PDF Report Generation (optional - only needed for report generation)
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        PageBreak, Image, KeepTogether
+    )
+    from reportlab.platypus.flowables import HRFlowable
+    from reportlab.lib.utils import ImageReader
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    print("ℹ️  reportlab not available - PDF report generation disabled")
 
 # API Clients
 from openai import OpenAI
@@ -107,30 +133,29 @@ if IS_AWS:
     CodeFilePath = "/app/src/"
 else:
     # Local paths (Mac default)
-    project_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    base_results_path = project_path + "/results/"
+    main_path = "/Users/ramyalsaffar/Ramy/C.V..V/1-Resume/06- LLM Model Behavior Projects/"
+    folder = "3-Class Refusal Classifier with RoBERTa"
+    project_path = glob.glob(main_path + "*" + folder)[0]
+    base_results_path = glob.glob(project_path + "/*Code/*Results")[0]
     CodeFilePath = project_path + "/src/"
 
 
 # Specific Subdirectories
 #------------------------
-data_path = project_path + "/data/"
-data_raw_path = data_path + "raw/"
-data_responses_path = data_path + "responses/"
-data_processed_path = data_path + "processed/"
-data_splits_path = data_path + "splits/"
-models_path = project_path + "/models/"
+data_path = glob.glob(base_results_path + "/*Data/")[0]
+data_raw_path = glob.glob(data_path + "*Raw/")[0]
+data_responses_path = glob.glob(data_path + "*Responses/")[0]
+data_processed_path = glob.glob(data_path + "*Processed/")[0]
+data_splits_path = glob.glob(data_path + "*Splits/")[0]
+
+models_path = glob.glob(base_results_path + "/*Models/")[0]
 results_path = base_results_path
-visualizations_path = project_path + "/visualizations/"
-reports_path = project_path + "/reports/"
 
+visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
+reports_path = glob.glob(base_results_path + "/*Reports/")[0]
 
-# Create directories if they don't exist
-#----------------------------------------
-for path in [base_results_path, data_path, data_raw_path, data_responses_path,
-             data_processed_path, data_splits_path, models_path, results_path,
-             visualizations_path, reports_path]:
-    os.makedirs(path, exist_ok=True)
+# API Keys (local file storage)
+api_keys_file_path = glob.glob(project_path + "/*API Keys/API Keys.txt")[0]
 
 
 #------------------------------------------------------------------------------
@@ -169,69 +194,23 @@ else:
 # Execute Code Files
 #-------------------
 
-# Import Configuration and Constants FIRST (before other modules)
-#-----------------------------------------------------------------
-print("\n" + "="*60)
-print("LOADING CONFIGURATION")
-print("="*60)
-
-exec(open(CodeFilePath+"01-Config.py").read())
-print("✓ Loaded 01-Config.py")
-
-exec(open(CodeFilePath+"02-Constants.py").read())
-print("✓ Loaded 02-Constants.py")
+CodeFilePath = glob.glob(project_path + "/*Code/*Python/")[0]
+code_files_ls = os.listdir(CodeFilePath)
+code_files_ls.sort()
+code_files_ls = [x for x in code_files_ls if "py" in x]
+code_files_ls = code_files_ls[1:30]
 
 
-# Load remaining code files (03-28, excluding 23-28)
-#--------------------------------------------------------
-# Files are numbered 00-28:
-#   00-Imports.py (this file)
-#   01-Config.py (loaded above)
-#   02-Constants.py (loaded above)
-#   03-AWSConfig.py (AWS configuration)
-#   04-SecretsHandler.py (AWS Secrets Manager)
-#   05-07: Data Collection (PromptGenerator, ResponseCollector, DataLabeler - with dual-task labeling)
-#   08: DataCleaner (comprehensive data quality validation and cleaning)
-#   09: Dataset (generic PyTorch Dataset - works for both classifiers)
-#   10: RefusalClassifier (3-class: No/Hard/Soft Refusal)
-#   11: JailbreakClassifier (2-class: Jailbreak Failed/Succeeded)
-#   12: WeightedLoss (handles class imbalance)
-#   13: Trainer (generic trainer - works for both classifiers)
-#   14-16: Analysis (PerModelAnalyzer, ConfidenceAnalyzer, AdversarialTester)
-#   17: JailbreakAnalysis (security-critical jailbreak analysis with cross-analysis)
-#   18-19: Interpretability (AttentionVisualizer, ShapAnalyzer)
-#   20: Visualization (Visualizer)
-#   21-22: Orchestration (RefusalPipeline - trains both classifiers, ExperimentRunner)
-#   23-Execute.py (main entry point - don't load)
-#   24-Analyze.py (analysis entry point - don't load)
-#   25-ProductionAPI.py (production API server - don't load)
-#   26-MonitoringSystem.py (production monitoring - don't load)
-#   27-RetrainingPipeline.py (production retraining - don't load)
-#   28-DataManager.py (production data management - don't load)
+# Loop over cde files
+#--------------------
+for i in range(0,len(code_files_ls)):
 
-print("\nLoading modules...")
-code_files_ls = sorted([x for x in os.listdir(CodeFilePath) if x.endswith('.py')])
+    file = code_files_ls[i]
 
-# Remove files we don't want to auto-load
-code_files_ls = [x for x in code_files_ls if x not in [
-    "00-Imports.py",      # This file
-    "01-Config.py",        # Already loaded
-    "02-Constants.py",     # Already loaded
-    "23-Execute.py",       # Execution script
-    "24-Analyze.py",       # Execution script
-    "25-ProductionAPI.py",      # Production API server (load manually)
-    "26-MonitoringSystem.py",   # Production monitoring (load manually)
-    "27-RetrainingPipeline.py", # Production retraining (load manually)
-    "28-DataManager.py"         # Production data management (load manually)
-]]
+    print(file)
 
-# Loop over code files and load them
-for file in code_files_ls:
-    try:
-        exec(open(CodeFilePath+file).read())
-        print(f"✓ Loaded {file}")
-    except Exception as e:
-        print(f"✗ Error loading {file}: {e}")
+    exec(open(CodeFilePath+file).read())
+    print(f"✓ Loaded {file}")
 
 
 print("="*60)
@@ -243,7 +222,7 @@ print("="*60 + "\n")
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-3-Class Refusal Classifier with RoBERTa
+Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 Created on October 28, 2025
 @author: ramyalsaffar
 """

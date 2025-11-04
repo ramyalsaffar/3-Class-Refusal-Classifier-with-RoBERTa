@@ -1,0 +1,165 @@
+# Docker Ignore File for 3-Class Refusal Classifier
+# Excludes unnecessary files from Docker build context
+# WHY: Faster builds and smaller images by excluding large/unnecessary files
+
+# =============================================================================
+# Git & Version Control
+# =============================================================================
+.git/
+.gitignore
+.gitattributes
+**/.git/
+**/.gitignore
+
+# =============================================================================
+# Python
+# =============================================================================
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Testing
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+
+# =============================================================================
+# Data Files (exclude from image, mount as volumes)
+# =============================================================================
+# WHY: Data changes frequently, should be mounted as volumes
+data/raw/**
+data/responses/**
+data/processed/**
+data/splits/**
+!data/.gitkeep
+
+# Models (exclude from image, mount as volumes)
+# WHY: Models are large and should be mounted
+models/*.pt
+models/*.pth
+models/*.bin
+!models/.gitkeep
+
+# Results (exclude from image)
+results/**
+!results/.gitkeep
+
+# Visualizations (exclude from image)
+visualizations/**
+!visualizations/.gitkeep
+
+# Reports (exclude from image)
+reports/**
+!reports/.gitkeep
+
+# Logs (exclude from image)
+logs/**
+!logs/.gitkeep
+
+# =============================================================================
+# Development Files
+# =============================================================================
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+notebooks/
+
+# Documentation drafts
+docs/_build/
+*.draft.*
+
+# =============================================================================
+# CI/CD
+# =============================================================================
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# =============================================================================
+# Docker
+# =============================================================================
+# WHY: Don't include Docker files in Docker context (inception!)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# =============================================================================
+# Environment & Secrets
+# =============================================================================
+# WHY: Never include secrets in Docker images
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+secrets/
+
+# =============================================================================
+# Large Files (should be downloaded at runtime or mounted)
+# =============================================================================
+# WHY: Keep image size small
+*.tar
+*.tar.gz
+*.zip
+*.rar
+*.7z
+
+# =============================================================================
+# Temporary Files
+# =============================================================================
+*.tmp
+*.temp
+tmp/
+temp/
+cache/
+
+# =============================================================================
+# OS Files
+# =============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# README and Documentation (keep these for reference)
+# =============================================================================
+# Include README and LICENSE
+!README.md
+!LICENSE

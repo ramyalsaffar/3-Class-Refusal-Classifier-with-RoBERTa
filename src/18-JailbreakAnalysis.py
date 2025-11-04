@@ -2,7 +2,7 @@
 #--------------------------
 # Specialized analysis for jailbreak detector with security-critical metrics.
 # Wraps existing analyzers with jailbreak-specific interpretation and cross-analysis.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
@@ -32,8 +32,10 @@ class JailbreakAnalysis:
         self.tokenizer = tokenizer
         self.device = device
 
-        # Reuse existing analyzers
-        self.confidence_analyzer = ConfidenceAnalyzer(jailbreak_model, tokenizer, device)
+        # Reuse existing analyzers (with jailbreak-specific class names)
+        jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
+        self.confidence_analyzer = ConfidenceAnalyzer(jailbreak_model, tokenizer, device, jailbreak_class_names)
+        self.per_model_analyzer = PerModelAnalyzer(jailbreak_model, tokenizer, device, jailbreak_class_names)
         self.attention_viz = AttentionVisualizer(jailbreak_model, tokenizer, device)
 
     def analyze_full(self, test_df: pd.DataFrame) -> Dict:
@@ -57,14 +59,19 @@ class JailbreakAnalysis:
 
         results = {}
 
+        # OPTIMIZATION: Run inference ONCE and cache results (4x speedup)
+        print("\n--- Running Inference (cached for all analyses) ---")
+        cached_predictions = self._run_inference_once(test_df)
+        print(f"✓ Inference complete: {len(cached_predictions['jailbreak_preds'])} predictions cached")
+
         # 1. Security-Critical Metrics
         print("\n--- Security-Critical Metrics ---")
-        results['security_metrics'] = self._calculate_security_metrics(test_df)
+        results['security_metrics'] = self._calculate_security_metrics(cached_predictions)
         self._print_security_metrics(results['security_metrics'])
 
         # 2. Identify False Negatives (CRITICAL!)
         print("\n--- False Negative Analysis ---")
-        results['false_negatives'] = self._identify_false_negatives(test_df)
+        results['false_negatives'] = self._identify_false_negatives(test_df, cached_predictions)
         print(f"Total False Negatives (missed jailbreaks): {len(results['false_negatives'])}")
         if len(results['false_negatives']) > 0:
             print("🚨 CRITICAL: These jailbreak successes were NOT detected!")
@@ -76,26 +83,30 @@ class JailbreakAnalysis:
         results['confidence'] = conf_results
         results['predictions'] = {'preds': preds, 'labels': labels, 'confidences': confidences}
 
-        # 4. Per-Model Vulnerability
+        # 4. Per-Model Analysis (NEW!)
+        print("\n--- Per-Model Analysis ---")
+        results['per_model'] = self.per_model_analyzer.analyze(test_df)
+
+        # 5. Per-Model Vulnerability
         print("\n--- Per-Model Vulnerability Analysis ---")
         results['vulnerability'] = self._analyze_vulnerability_per_model(test_df)
         self._print_vulnerability_analysis(results['vulnerability'])
 
-        # 5. Attack Type Analysis
+        # 6. Attack Type Analysis
         print("\n--- Attack Type Success Rate ---")
         results['attack_types'] = self._analyze_attack_types(test_df)
         self._print_attack_analysis(results['attack_types'])
 
-        # 6. Cross-Analysis with Refusal Classifier
+        # 7. Cross-Analysis with Refusal Classifier
         print("\n--- Cross-Analysis with Refusal Classifier ---")
-        results['cross_analysis'] = self._cross_analyze_with_refusal(test_df)
+        results['cross_analysis'] = self._cross_analyze_with_refusal(test_df, cached_predictions)
         self._print_cross_analysis(results['cross_analysis'])
 
-        # 7. Precision-Recall Curve (better than ROC for imbalanced data)
+        # 8. Precision-Recall Curve (better than ROC for imbalanced data)
         print("\n--- Precision-Recall Analysis ---")
         results['pr_curve'] = self._calculate_pr_curve(preds, labels, confidences)
 
-        # 8. Attention Analysis on Failures
+        # 9. Attention Analysis on Failures
         print("\n--- Attention Analysis on False Negatives ---")
         if len(results['false_negatives']) > 0:
             results['attention_fn'] = self._analyze_attention_on_failures(results['false_negatives'])
@@ -106,26 +117,31 @@ class JailbreakAnalysis:
 
         return results
 
-    def _calculate_security_metrics(self, test_df: pd.DataFrame) -> Dict:
+    def _run_inference_once(self, test_df: pd.DataFrame) -> Dict:
         """
-        Calculate security-critical metrics.
+        Run inference ONCE and cache all predictions for efficiency.
 
-        Primary Metrics:
-        - Recall on "Succeeded" (class 1) - MOST IMPORTANT
-        - False Negative Rate (FNR) - Must be minimized
-        - True Negative Rate (TNR) - Correctly identifying safe responses
-        - F1 Score (weighted for imbalance)
+        PERFORMANCE OPTIMIZATION: Previously ran inference 4 times (security metrics,
+        false negatives, jailbreak preds, refusal preds). Now runs 2 times total.
+
+        Returns:
+            Dictionary with cached predictions:
+                - jailbreak_preds: Jailbreak predictions (0/1)
+                - jailbreak_confidences: Confidence scores
+                - jailbreak_labels: Ground truth labels
+                - refusal_preds: Refusal predictions (0/1/2)
         """
-        # Get predictions
-        dataset = RefusalDataset(
+        # 1. Jailbreak model inference
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
         loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
 
-        all_preds = []
-        all_labels = []
+        jailbreak_preds = []
+        jailbreak_confidences = []
+        jailbreak_labels = []
 
         self.jailbreak_model.eval()
         with torch.no_grad():
@@ -135,13 +151,57 @@ class JailbreakAnalysis:
                 labels = batch['label']
 
                 logits = self.jailbreak_model(input_ids, attention_mask)
+                probs = torch.softmax(logits, dim=1)
                 preds = torch.argmax(logits, dim=1).cpu().numpy()
+                confidences = torch.max(probs, dim=1)[0].cpu().numpy()
 
-                all_preds.extend(preds)
-                all_labels.extend(labels.numpy())
+                jailbreak_preds.extend(preds)
+                jailbreak_confidences.extend(confidences)
+                jailbreak_labels.extend(labels.cpu().numpy())  # FIX: Added .cpu() before .numpy()
 
-        all_preds = np.array(all_preds)
-        all_labels = np.array(all_labels)
+        # 2. Refusal model inference (for cross-analysis)
+        dataset = ClassificationDataset(
+            test_df['response'].tolist(),
+            test_df['refusal_label'].tolist(),
+            self.tokenizer
+        )
+        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
+
+        refusal_preds = []
+
+        self.refusal_model.eval()
+        with torch.no_grad():
+            for batch in loader:
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+
+                logits = self.refusal_model(input_ids, attention_mask)
+                preds = torch.argmax(logits, dim=1).cpu().numpy()
+                refusal_preds.extend(preds)
+
+        return {
+            'jailbreak_preds': np.array(jailbreak_preds),
+            'jailbreak_confidences': np.array(jailbreak_confidences),
+            'jailbreak_labels': np.array(jailbreak_labels),
+            'refusal_preds': np.array(refusal_preds)
+        }
+
+    def _calculate_security_metrics(self, cached_predictions: Dict) -> Dict:
+        """
+        Calculate security-critical metrics using cached predictions.
+
+        Primary Metrics:
+        - Recall on "Succeeded" (class 1) - MOST IMPORTANT
+        - False Negative Rate (FNR) - Must be minimized
+        - True Negative Rate (TNR) - Correctly identifying safe responses
+        - F1 Score (weighted for imbalance)
+
+        Args:
+            cached_predictions: Cached predictions from _run_inference_once()
+        """
+        # Use cached predictions (no inference needed!)
+        all_preds = cached_predictions['jailbreak_preds']
+        all_labels = cached_predictions['jailbreak_labels']
 
         # Calculate metrics
         cm = confusion_matrix(all_labels, all_preds)
@@ -173,6 +233,9 @@ class JailbreakAnalysis:
         # Overall accuracy (less important for imbalanced data)
         accuracy = accuracy_score(all_labels, all_preds)
 
+        # Cohen's Kappa (agreement beyond chance - important for imbalanced data)
+        kappa = cohen_kappa_score(all_labels, all_preds)
+
         return {
             'confusion_matrix': cm,
             'recall_succeeded': recall_succeeded,  # PRIMARY METRIC
@@ -183,6 +246,7 @@ class JailbreakAnalysis:
             'f1_macro': f1_macro,
             'f1_weighted': f1_weighted,
             'accuracy': accuracy,
+            'cohen_kappa': float(kappa),
             'counts': {
                 'true_negatives': int(tn),
                 'false_positives': int(fp),
@@ -200,8 +264,9 @@ class JailbreakAnalysis:
 
         print(f"\n🎯 PRIMARY METRIC:")
         print(f"   Recall on Succeeded (class 1): {metrics['recall_succeeded']:.4f}")
-        if metrics['recall_succeeded'] < 0.95:
-            print(f"   🚨 WARNING: Recall below 95% target!")
+        min_recall = JAILBREAK_CONFIG['min_recall_succeeded']
+        if metrics['recall_succeeded'] < min_recall:
+            print(f"   🚨 WARNING: Recall below {min_recall*100:.0f}% target!")
 
         print(f"\n🚨 CRITICAL METRIC:")
         print(f"   False Negative Rate: {metrics['false_negative_rate']:.4f} ({metrics['false_negative_rate']*100:.2f}%)")
@@ -214,40 +279,30 @@ class JailbreakAnalysis:
         print(f"   True Negative Rate (TNR): {metrics['true_negative_rate']:.4f}")
         print(f"   F1 (weighted): {metrics['f1_weighted']:.4f}")
         print(f"   Accuracy: {metrics['accuracy']:.4f}")
+        print(f"   Cohen's Kappa: {metrics['cohen_kappa']:.4f}", end="")
+        kappa_thresh = INTERPRETABILITY_CONFIG['kappa_thresholds']
+        if metrics['cohen_kappa'] > kappa_thresh['almost_perfect']:
+            print(f" ✅ (Almost perfect)")
+        elif metrics['cohen_kappa'] > kappa_thresh['substantial']:
+            print(f" ✅ (Substantial)")
+        elif metrics['cohen_kappa'] > kappa_thresh['moderate']:
+            print(f" ⚠️  (Moderate)")
+        else:
+            print(f" 🚨 (Poor)")
 
-    def _identify_false_negatives(self, test_df: pd.DataFrame) -> pd.DataFrame:
+    def _identify_false_negatives(self, test_df: pd.DataFrame, cached_predictions: Dict) -> pd.DataFrame:
         """
-        Identify all false negatives (missed jailbreak successes).
+        Identify all false negatives (missed jailbreak successes) using cached predictions.
         These are CRITICAL failures that must be manually reviewed.
+
+        Args:
+            test_df: Test dataframe
+            cached_predictions: Cached predictions from _run_inference_once()
         """
-        # Get predictions
-        dataset = RefusalDataset(
-            test_df['response'].tolist(),
-            test_df['jailbreak_label'].tolist(),
-            self.tokenizer
-        )
-        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
-
-        all_preds = []
-        all_confidences = []
-
-        self.jailbreak_model.eval()
-        with torch.no_grad():
-            for batch in loader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
-
-                logits = self.jailbreak_model(input_ids, attention_mask)
-                probs = torch.softmax(logits, dim=1)
-                preds = torch.argmax(logits, dim=1).cpu().numpy()
-                confidences = torch.max(probs, dim=1)[0].cpu().numpy()
-
-                all_preds.extend(preds)
-                all_confidences.extend(confidences)
-
+        # Use cached predictions (no inference needed!)
         test_df = test_df.copy()
-        test_df['jailbreak_pred'] = all_preds
-        test_df['jailbreak_confidence'] = all_confidences
+        test_df['jailbreak_pred'] = cached_predictions['jailbreak_preds']
+        test_df['jailbreak_confidence'] = cached_predictions['jailbreak_confidences']
 
         # False Negatives: Actually Succeeded (1) but predicted Failed (0)
         false_negatives = test_df[
@@ -322,15 +377,19 @@ class JailbreakAnalysis:
                 print(f"  {category}:")
                 print(f"    Successes: {stats['jailbreak_successes']}/{stats['total_samples']} ({stats['success_rate']*100:.2f}%)")
 
-    def _cross_analyze_with_refusal(self, test_df: pd.DataFrame) -> Dict:
+    def _cross_analyze_with_refusal(self, test_df: pd.DataFrame, cached_predictions: Dict) -> Dict:
         """
-        Cross-analyze jailbreak detection with refusal classification.
+        Cross-analyze jailbreak detection with refusal classification using cached predictions.
 
         Critical Question: Do jailbreak successes bypass refusal detection?
+
+        Args:
+            test_df: Test dataframe
+            cached_predictions: Cached predictions from _run_inference_once()
         """
-        # Get predictions from both models
-        jailbreak_preds = self._get_jailbreak_predictions(test_df)
-        refusal_preds = self._get_refusal_predictions(test_df)
+        # Use cached predictions (no inference needed!)
+        jailbreak_preds = cached_predictions['jailbreak_preds']
+        refusal_preds = cached_predictions['refusal_preds']
 
         # Cross-tabulation
         cross_tab = pd.crosstab(
@@ -371,50 +430,6 @@ class JailbreakAnalysis:
             print(f"   - Jailbreak SUCCEEDED")
             print(f"   - Refusal classifier says SOFT REFUSAL")
             print(f"   → Partial bypass detected!")
-
-    def _get_jailbreak_predictions(self, test_df: pd.DataFrame) -> np.ndarray:
-        """Get jailbreak detector predictions."""
-        dataset = RefusalDataset(
-            test_df['response'].tolist(),
-            test_df['jailbreak_label'].tolist(),
-            self.tokenizer
-        )
-        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
-
-        all_preds = []
-        self.jailbreak_model.eval()
-        with torch.no_grad():
-            for batch in loader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
-
-                logits = self.jailbreak_model(input_ids, attention_mask)
-                preds = torch.argmax(logits, dim=1).cpu().numpy()
-                all_preds.extend(preds)
-
-        return np.array(all_preds)
-
-    def _get_refusal_predictions(self, test_df: pd.DataFrame) -> np.ndarray:
-        """Get refusal classifier predictions."""
-        dataset = RefusalDataset(
-            test_df['response'].tolist(),
-            test_df['refusal_label'].tolist(),
-            self.tokenizer
-        )
-        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
-
-        all_preds = []
-        self.refusal_model.eval()
-        with torch.no_grad():
-            for batch in loader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
-
-                logits = self.refusal_model(input_ids, attention_mask)
-                preds = torch.argmax(logits, dim=1).cpu().numpy()
-                all_preds.extend(preds)
-
-        return np.array(all_preds)
 
     def _calculate_pr_curve(self, preds, labels, confidences) -> Dict:
         """

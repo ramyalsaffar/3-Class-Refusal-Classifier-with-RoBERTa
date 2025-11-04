@@ -1,30 +1,36 @@
 # SHAP Analyzer Module
 #----------------------
 # Computes SHAP values for model interpretability.
-# All imports are in 00-Imports.py
+# Generic implementation that works with any classifier (RefusalClassifier or JailbreakDetector).
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
 class ShapAnalyzer:
     """Compute and visualize SHAP values for model interpretability."""
 
-    def __init__(self, model, tokenizer, device):
+    def __init__(self, model, tokenizer, device, class_names: List[str] = None):
         """
         Initialize SHAP analyzer.
 
         Args:
-            model: Trained RefusalClassifier
+            model: Trained classification model (RefusalClassifier or JailbreakDetector)
             tokenizer: RoBERTa tokenizer
             device: torch device
+            class_names: List of class names (default: uses CLASS_NAMES from config)
         """
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
+        self.class_names = class_names or CLASS_NAMES
+        self.num_classes = len(self.class_names)
         self.model.eval()
 
     def _predict_proba(self, texts: List[str]) -> np.ndarray:
         """
         Predict probabilities for texts (needed for SHAP).
+
+        OPTIMIZATION: Uses batched inference for efficiency.
 
         Args:
             texts: List of text strings
@@ -35,11 +41,16 @@ class ShapAnalyzer:
         self.model.eval()
         all_probs = []
 
+        # Batch processing for efficiency
+        batch_size = API_CONFIG['inference_batch_size']
+
         with torch.no_grad():
-            for text in tqdm(texts, desc="Computing predictions for SHAP", leave=False):
-                # Tokenize
+            for i in tqdm(range(0, len(texts), batch_size), desc="Computing predictions for SHAP", leave=False):
+                batch_texts = texts[i:i+batch_size]
+
+                # Tokenize batch
                 encoding = self.tokenizer(
-                    text,
+                    batch_texts,
                     max_length=MODEL_CONFIG['max_length'],
                     padding='max_length',
                     truncation=True,
@@ -49,26 +60,28 @@ class ShapAnalyzer:
                 input_ids = encoding['input_ids'].to(self.device)
                 attention_mask = encoding['attention_mask'].to(self.device)
 
-                # Get prediction
+                # Get predictions
                 logits = self.model(input_ids, attention_mask)
                 probs = torch.softmax(logits, dim=1)
-                all_probs.append(probs[0].cpu().numpy())
+                all_probs.extend(probs.cpu().numpy())
 
         return np.array(all_probs)
 
     def compute_shap_values(self, texts: List[str], background_texts: List[str] = None,
-                           max_background: int = 50):
+                           max_background: int = None):
         """
         Compute SHAP values for text samples.
 
         Args:
             texts: List of texts to explain
             background_texts: Background dataset for SHAP (uses subset if None)
-            max_background: Maximum background samples to use
+            max_background: Maximum background samples to use (default: from config)
 
         Returns:
             Dictionary with SHAP values and metadata
         """
+        if max_background is None:
+            max_background = INTERPRETABILITY_CONFIG['shap_background_samples']
         try:
             import shap
         except ImportError:
@@ -134,7 +147,7 @@ class ShapAnalyzer:
         plt.figure(figsize=(12, 8))
         shap.plots.waterfall(shap_values[text_idx, :, class_idx], show=False)
         plt.title(
-            f'SHAP Values for {CLASS_NAMES[class_idx]}\n{text[:80]}...',
+            f'SHAP Values for {self.class_names[class_idx]}\n{text[:80]}...',
             fontsize=12, fontweight='bold'
         )
         plt.tight_layout()
@@ -143,19 +156,23 @@ class ShapAnalyzer:
 
         print(f"✓ Saved SHAP visualization to {output_path}")
 
-    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = 20,
+    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = None,
                        output_dir: str = None):
         """
         Analyze SHAP values for multiple samples.
 
         Args:
             test_df: Test DataFrame
-            num_samples: Number of samples to analyze
+            num_samples: Number of samples to analyze (default: from config)
             output_dir: Directory to save results
 
         Returns:
             Dictionary with SHAP analysis results
         """
+        # Use config value if not provided
+        if num_samples is None:
+            num_samples = INTERPRETABILITY_CONFIG['shap_samples']
+
         if output_dir is None:
             output_dir = os.path.join(visualizations_path, "shap_analysis")
         os.makedirs(output_dir, exist_ok=True)
@@ -184,8 +201,8 @@ class ShapAnalyzer:
         # Visualize samples from each class
         results = {'by_class': {}, 'examples': []}
 
-        for class_idx in range(3):
-            class_name = CLASS_NAMES[class_idx]
+        for class_idx in range(self.num_classes):
+            class_name = self.class_names[class_idx]
             class_mask = np.array(labels) == class_idx
 
             if not class_mask.any():
@@ -193,8 +210,9 @@ class ShapAnalyzer:
 
             class_indices = np.where(class_mask)[0]
 
-            # Visualize first 2 samples from this class
-            for i, idx in enumerate(tqdm(class_indices[:2], desc=f"Visualizing {class_name}", leave=False)):
+            # Visualize samples from this class (using config)
+            num_viz = INTERPRETABILITY_CONFIG['shap_samples_per_class']
+            for i, idx in enumerate(tqdm(class_indices[:num_viz], desc=f"Visualizing {class_name}", leave=False)):
                 text = texts[idx]
                 output_path = os.path.join(
                     output_dir,
@@ -214,15 +232,16 @@ class ShapAnalyzer:
             print("\nCreating SHAP summary plot...")
 
             # For each class, create a summary
-            for class_idx in range(3):
-                class_name = CLASS_NAMES[class_idx]
+            max_display = INTERPRETABILITY_CONFIG['shap_max_display']
+            for class_idx in range(self.num_classes):
+                class_name = self.class_names[class_idx]
 
                 plt.figure(figsize=(12, 8))
                 shap.summary_plot(
                     shap_data['shap_values'].values[:, :, class_idx],
                     texts,
                     show=False,
-                    max_display=20
+                    max_display=max_display
                 )
                 plt.title(
                     f'SHAP Summary - {class_name}',
@@ -242,25 +261,30 @@ class ShapAnalyzer:
             print(f"⚠️  Could not create summary plot: {e}")
 
         # Save results
-        results_path = os.path.join(output_dir, "shap_analysis_results.json")
-        with open(results_path, 'w') as f:
+        results_json_path = os.path.join(output_dir, "shap_analysis_results.json")
+        with open(results_json_path, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"\n✓ Saved SHAP analysis to {results_path}")
+        print(f"\n✓ Saved SHAP analysis to {results_json_path}")
 
         return results
 
-    def get_top_features(self, text: str, class_idx: int = None, top_k: int = 10):
+    def get_top_features(self, text: str, class_idx: int = None, top_k: int = None):
         """
         Get top features (tokens) influencing prediction.
+
+        IMPROVED: Uses actual RoBERTa BPE tokenization for proper alignment.
 
         Args:
             text: Input text
             class_idx: Target class (None for predicted)
-            top_k: Number of top features to return
+            top_k: Number of top features to return (default: from config)
 
         Returns:
             Dictionary with top positive and negative features
         """
+        # Use config value if not provided
+        if top_k is None:
+            top_k = INTERPRETABILITY_CONFIG['shap_max_display']
         try:
             import shap
         except ImportError:
@@ -281,33 +305,62 @@ class ShapAnalyzer:
         # Get SHAP values for this class
         shap_vals = shap_data['shap_values'].values[0, :, class_idx]
 
-        # Tokenize to get words
-        tokens = text.split()  # Simple tokenization
+        # PROPER TOKENIZATION: Use actual RoBERTa tokenizer
+        encoding = self.tokenizer(
+            text,
+            max_length=MODEL_CONFIG['max_length'],
+            padding='max_length',
+            truncation=True,
+            return_tensors='pt'
+        )
 
-        # Match SHAP values to tokens (approximate)
-        if len(shap_vals) != len(tokens):
-            # Pad or truncate
-            if len(shap_vals) > len(tokens):
-                shap_vals = shap_vals[:len(tokens)]
-            else:
-                tokens = tokens[:len(shap_vals)]
+        input_ids = encoding['input_ids'][0]  # Shape: (seq_len,)
+        attention_mask = encoding['attention_mask'][0]
+
+        # Decode tokens to get readable strings
+        tokens = []
+        valid_indices = []
+        for i, (token_id, mask) in enumerate(zip(input_ids, attention_mask)):
+            if mask == 0:  # Padding
+                break
+
+            # Decode token
+            token_str = self.tokenizer.decode([token_id])
+
+            # Skip special tokens
+            if token_str in ['<s>', '</s>', '<pad>']:
+                continue
+
+            tokens.append(token_str)
+            valid_indices.append(i)
+
+        # Match SHAP values to valid tokens
+        if len(valid_indices) > len(shap_vals):
+            valid_indices = valid_indices[:len(shap_vals)]
+        elif len(valid_indices) < len(shap_vals):
+            shap_vals = shap_vals[:len(valid_indices)]
+
+        # Get SHAP values for valid tokens
+        valid_shap_vals = shap_vals[valid_indices] if len(valid_indices) <= len(shap_vals) else shap_vals[:len(valid_indices)]
 
         # Get top positive and negative
-        sorted_indices = np.argsort(np.abs(shap_vals))[::-1]
-        top_indices = sorted_indices[:top_k]
+        sorted_indices = np.argsort(np.abs(valid_shap_vals))[::-1]
+        top_indices = sorted_indices[:min(top_k, len(sorted_indices))]
 
         top_features = []
         for idx in top_indices:
-            top_features.append({
-                'token': tokens[idx] if idx < len(tokens) else 'UNK',
-                'shap_value': float(shap_vals[idx]),
-                'impact': 'positive' if shap_vals[idx] > 0 else 'negative'
-            })
+            if idx < len(tokens):
+                top_features.append({
+                    'token': tokens[idx].strip(),  # Clean up whitespace
+                    'shap_value': float(valid_shap_vals[idx]),
+                    'impact': 'positive' if valid_shap_vals[idx] > 0 else 'negative'
+                })
 
         return {
             'text': text,
-            'class': CLASS_NAMES[class_idx],
-            'top_features': top_features
+            'class': self.class_names[class_idx],
+            'top_features': top_features,
+            'note': 'Tokens are from RoBERTa BPE tokenization (may be subwords)'
         }
 
 

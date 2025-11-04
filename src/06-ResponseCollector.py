@@ -1,7 +1,7 @@
 # ResponseCollector Module
 #-------------------------
 # Collects responses from multiple LLM APIs (Claude, GPT-5, Gemini).
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
@@ -141,11 +141,12 @@ class ResponseCollector:
         """
         for attempt in range(self.max_retries):
             try:
-                if model_name == "claude-sonnet-4.5":
+                # WHY: Use config values instead of hardcoded model names
+                if model_name == API_CONFIG['response_models']['claude']:
                     return self._query_claude(prompt)
-                elif model_name == "gpt-5":
+                elif model_name == API_CONFIG['response_models']['gpt5']:
                     return self._query_gpt5(prompt)
-                elif model_name == "gemini-2.5-flash":
+                elif model_name == API_CONFIG['response_models']['gemini']:
                     return self._query_gemini(prompt)
                 else:
                     raise ValueError(f"Unknown model: {model_name}")

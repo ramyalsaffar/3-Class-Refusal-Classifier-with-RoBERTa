@@ -1,7 +1,7 @@
 # Visualization Module
 #---------------------
 # Generate visualizations for results.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
@@ -10,9 +10,11 @@ class Visualizer:
 
     def __init__(self, class_names: List[str] = None):
         self.class_names = class_names or CLASS_NAMES
+        self.num_classes = len(self.class_names)
         self.class_colors = PLOT_COLORS_LIST
         self.model_colors = MODEL_COLORS
-        sns.set_style('whitegrid')
+        self.dpi = VISUALIZATION_CONFIG['dpi']
+        sns.set_style(VISUALIZATION_CONFIG['style'])
 
     def plot_confusion_matrix(self, cm: np.ndarray, output_path: str):
         """Plot confusion matrix."""
@@ -30,7 +32,7 @@ class Visualizer:
         plt.ylabel('True Label', fontsize=12)
         plt.xlabel('Predicted Label', fontsize=12)
         plt.tight_layout()
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved confusion matrix to {output_path}")
 
@@ -40,11 +42,14 @@ class Visualizer:
         classes = list(f1_scores.keys())
         scores = list(f1_scores.values())
 
-        bars = plt.bar(classes, scores, color=self.class_colors, alpha=0.8, edgecolor='black')
+        # Use modulo for color cycling if we have more classes than colors
+        colors = [self.class_colors[i % len(self.class_colors)] for i in range(len(classes))]
+        bars = plt.bar(classes, scores, color=colors, alpha=0.8, edgecolor='black')
         plt.ylabel('F1 Score', fontsize=12)
         plt.title('Per-Class F1 Scores', fontsize=16, fontweight='bold')
         plt.ylim([0, 1])
-        plt.axhline(y=0.8, color='red', linestyle='--', alpha=0.5, label='Target (0.80)')
+        f1_target = VISUALIZATION_CONFIG['f1_target']
+        plt.axhline(y=f1_target, color='red', linestyle='--', alpha=0.5, label=f'Target ({f1_target:.2f})')
 
         # Add value labels on bars
         for bar in bars:
@@ -55,7 +60,7 @@ class Visualizer:
 
         plt.legend()
         plt.tight_layout()
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved per-class F1 to {output_path}")
 
@@ -83,7 +88,7 @@ class Visualizer:
 
         plt.legend()
         plt.tight_layout()
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved per-model F1 to {output_path}")
 
@@ -115,36 +120,50 @@ class Visualizer:
 
         # Add drop percentage
         for i, (orig, para) in enumerate(zip([original_f1] * len(dimensions), paraphrased_f1)):
-            drop = (orig - para) / orig * 100
+            drop = (orig - para) / orig * 100 if orig > 0 else 0
             ax.text(i, max(orig, para) + 0.02, f'-{drop:.1f}%',
                    ha='center', fontsize=9, color='red')
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved adversarial robustness to {output_path}")
 
     def plot_confidence_distributions(self, labels: List, confidences: List, output_path: str):
-        """Plot confidence distributions per class."""
-        fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+        """
+        Plot confidence distributions per class.
 
-        for class_idx in range(3):
+        GENERIC: Works with any number of classes (2, 3, or more).
+        """
+        # Dynamic subplot configuration based on number of classes
+        fig, axes = plt.subplots(1, self.num_classes, figsize=(5 * self.num_classes, 4))
+
+        # Handle single class case (axes won't be a list)
+        if self.num_classes == 1:
+            axes = [axes]
+
+        for class_idx in range(self.num_classes):
             class_confidences = [c for l, c in zip(labels, confidences) if l == class_idx]
 
+            # Use modulo for color cycling if we have more classes than colors
+            color_idx = class_idx % len(self.class_colors)
+
             axes[class_idx].hist(class_confidences, bins=ANALYSIS_CONFIG['confidence_bins'],
-                               alpha=0.7, color=self.class_colors[class_idx], edgecolor='black')
+                               alpha=0.7, color=self.class_colors[color_idx], edgecolor='black')
             axes[class_idx].set_title(f'{self.class_names[class_idx]}',
                                      fontsize=12, fontweight='bold')
             axes[class_idx].set_xlabel('Confidence', fontsize=10)
             axes[class_idx].set_ylabel('Count', fontsize=10)
             axes[class_idx].set_xlim([0, 1])
-            axes[class_idx].axvline(x=np.mean(class_confidences), color='red',
-                                   linestyle='--', label=f'Mean: {np.mean(class_confidences):.3f}')
-            axes[class_idx].legend()
+
+            if len(class_confidences) > 0:
+                axes[class_idx].axvline(x=np.mean(class_confidences), color='red',
+                                       linestyle='--', label=f'Mean: {np.mean(class_confidences):.3f}')
+                axes[class_idx].legend()
 
         plt.suptitle('Confidence Distributions by Class', fontsize=16, fontweight='bold', y=1.02)
         plt.tight_layout()
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved confidence distributions to {output_path}")
 
@@ -173,7 +192,7 @@ class Visualizer:
         ax2.set_ylim([0, 1])
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved training curves to {output_path}")
 

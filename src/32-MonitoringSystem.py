@@ -2,8 +2,17 @@
 #------------------------
 # Daily performance monitoring with escalating validation.
 # Detects model drift and triggers retraining when needed.
-# NOTE: This is a standalone production script - core imports from 00-Imports.py
+# NOTE: This is a standalone production script - core imports from 01-Imports.py
 ###############################################################################
+
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class MonitoringSystem:
@@ -55,22 +64,32 @@ class MonitoringSystem:
 
         # Get judge labels with progress bar
         print(f"\n2. Running LLM Judge on sample...")
+        logger.info(f"Running LLM Judge on {len(sample_df)} samples")
         judge_labels = []
 
-        for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
-                          desc="LLM Judge evaluation"):
-            refusal_label, jailbreak_label = self.judge.label_response(
-                response=row['response'],
-                prompt=row['prompt']
-            )
-            judge_labels.append(refusal_label)  # Only use refusal label for monitoring
-            time.sleep(PRODUCTION_CONFIG['judge_rate_limit'])
+        try:
+            for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
+                              desc="LLM Judge evaluation"):
+                try:
+                    refusal_label, jailbreak_label = self.judge.label_response(
+                        response=row['response'],
+                        prompt=row['prompt']
+                    )
+                    judge_labels.append(refusal_label)  # Only use refusal label for monitoring
+                    time.sleep(PRODUCTION_CONFIG.get('judge_rate_limit', 1.0))
+                except Exception as e:
+                    logger.error(f"LLM Judge failed for sample {row['id']}: {e}")
+                    # Use model prediction as fallback
+                    judge_labels.append(row['prediction'])
 
-        # Update database with judge labels
-        self.data_manager.update_with_judge_labels(
-            sample_ids=sample_df['id'].tolist(),
-            judge_labels=judge_labels
-        )
+            # Update database with judge labels
+            self.data_manager.update_with_judge_labels(
+                sample_ids=sample_df['id'].tolist(),
+                judge_labels=judge_labels
+            )
+        except Exception as e:
+            logger.error(f"Failed to get judge labels: {e}")
+            raise
 
         # Calculate disagreement rate
         disagreements = sum(
@@ -137,22 +156,32 @@ class MonitoringSystem:
 
         # Get judge labels with progress bar
         print(f"\n2. Running LLM Judge on sample (this will take longer)...")
+        logger.info(f"Running LLM Judge on {len(sample_df)} samples (escalated)")
         judge_labels = []
 
-        for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
-                          desc="LLM Judge evaluation (escalated)"):
-            refusal_label, jailbreak_label = self.judge.label_response(
-                response=row['response'],
-                prompt=row['prompt']
-            )
-            judge_labels.append(refusal_label)  # Only use refusal label for monitoring
-            time.sleep(PRODUCTION_CONFIG['judge_rate_limit'])
+        try:
+            for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
+                              desc="LLM Judge evaluation (escalated)"):
+                try:
+                    refusal_label, jailbreak_label = self.judge.label_response(
+                        response=row['response'],
+                        prompt=row['prompt']
+                    )
+                    judge_labels.append(refusal_label)  # Only use refusal label for monitoring
+                    time.sleep(PRODUCTION_CONFIG.get('judge_rate_limit', 1.0))
+                except Exception as e:
+                    logger.error(f"LLM Judge failed for sample {row['id']}: {e}")
+                    # Use model prediction as fallback
+                    judge_labels.append(row['prediction'])
 
-        # Update database
-        self.data_manager.update_with_judge_labels(
-            sample_ids=sample_df['id'].tolist(),
-            judge_labels=judge_labels
-        )
+            # Update database
+            self.data_manager.update_with_judge_labels(
+                sample_ids=sample_df['id'].tolist(),
+                judge_labels=judge_labels
+            )
+        except Exception as e:
+            logger.error(f"Failed to get judge labels: {e}")
+            raise
 
         # Calculate disagreement rate
         disagreements = sum(
@@ -170,6 +199,8 @@ class MonitoringSystem:
         action = self._determine_action(disagreement_rate, sample_size='large')
 
         # Log monitoring run
+        # GENERIC: Dynamic class count
+        num_classes = len(CLASS_NAMES)
         metrics = {
             'total_samples': len(sample_df),
             'disagreements': disagreements,
@@ -181,7 +212,7 @@ class MonitoringSystem:
                     zip(sample_df['prediction'], judge_labels, sample_df['prediction'])
                     if true_pred == i and pred != judge
                 )
-                for i in range(3)
+                for i in range(num_classes)
             }
         }
 
@@ -247,7 +278,10 @@ class MonitoringSystem:
         # Step 2: Escalate if needed
         if daily_result['action'] == 'escalate':
             print("\n⚠️  Small sample showed issues - escalating to larger sample")
-            time.sleep(PRODUCTION_CONFIG['monitoring']['escalation_ui_delay'])  # Brief pause for UX
+            logger.warning("Escalating to larger sample due to high disagreement rate")
+            # Brief pause for UX (use get with default)
+            ui_delay = PRODUCTION_CONFIG.get('escalation_ui_delay', 2.0)
+            time.sleep(ui_delay)
 
             escalated_result = self.run_escalated_check()
 

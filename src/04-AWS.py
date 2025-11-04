@@ -1,9 +1,41 @@
-# AWS Secrets Manager Handler
-#----------------------------
-# Retrieves sensitive information (API keys) from AWS Secrets Manager.
-# Separated from main code following Alignment Tax structure.
+# AWS Configuration & Secrets Handler
+#--------------------------------------
+# This file contains:
+# - AWS configuration for cloud deployment
+# - AWS Secrets Manager handler for API keys
 ###############################################################################
 
+
+# =============================================================================
+# AWS CONFIGURATION
+# =============================================================================
+
+# AWS Configuration (Optional)
+#-----------------------------
+AWS_CONFIG = {
+    'enabled': IS_AWS,
+    'region': os.getenv('AWS_REGION', 'us-east-1'),
+    's3_bucket': os.getenv('S3_BUCKET_NAME', 'refusal-classifier-results'),
+    's3_results_prefix': 'runs/',
+    's3_logs_prefix': 'logs/',
+
+    # AWS Secrets Manager keys
+    'secrets': {
+        'openai': os.getenv('SECRETS_OPENAI_KEY_NAME', 'refusal-classifier/openai-api-key'),
+        'anthropic': os.getenv('SECRETS_ANTHROPIC_KEY_NAME', 'refusal-classifier/anthropic-api-key'),
+        'google': os.getenv('SECRETS_GOOGLE_KEY_NAME', 'refusal-classifier/google-api-key')
+    },
+
+    # EC2 Configuration
+    'ec2_instance_type': os.getenv('EC2_INSTANCE_TYPE', 'g4dn.xlarge'),  # GPU instance
+    'ec2_security_group': 'refusal-classifier-sg',
+    'iam_role_name': 'refusal-classifier-ec2-role'
+}
+
+
+# =============================================================================
+# AWS SECRETS MANAGER HANDLER
+# =============================================================================
 
 class SecretsHandler:
     """Handle AWS Secrets Manager operations"""
@@ -17,6 +49,21 @@ class SecretsHandler:
         """
         self.region = region
         self.client = boto3.client('secretsmanager', region_name=region)
+
+    def __enter__(self):
+        """Context manager entry - FIX: Support 'with' statement for proper cleanup"""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - FIX: Ensure client is closed"""
+        self.close()
+        return False
+
+    def close(self):
+        """FIX: Explicitly close boto3 client to release resources"""
+        if hasattr(self, 'client') and self.client is not None:
+            self.client.close()
+            self.client = None
 
 
     def get_secret(self, secret_name):
@@ -163,6 +210,7 @@ class SecretsHandler:
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 Created on October 28, 2025
 @author: ramyalsaffar
 """
