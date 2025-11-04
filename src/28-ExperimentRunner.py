@@ -169,7 +169,7 @@ class ExperimentRunner:
         """
         self._print_experiment_header(
             "Quick Test Mode",
-            f"Testing with {EXPERIMENT_CONFIG['test_sample_size']} samples per category"
+            f"Testing with {EXPERIMENT_CONFIG['test_sample_size']} total prompts (distributed across categories)"
         )
 
         # Get API keys
