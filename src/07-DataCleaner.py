@@ -403,7 +403,12 @@ class DataCleaner:
         }
 
         # Check for nulls
-        null_counts = df[['prompt', 'response', 'refusal_label']].isnull().sum()
+        # WHY: refusal_label may not exist yet if called before labeling
+        null_check_cols = ['prompt', 'response']
+        if 'refusal_label' in df.columns:
+            null_check_cols.append('refusal_label')
+
+        null_counts = df[null_check_cols].isnull().sum()
         if null_counts.sum() > 0:
             report['issues_found'].append({
                 'type': 'null_values',

@@ -179,7 +179,9 @@ class ResponseCollector:
             ],
             max_completion_tokens=self.max_tokens
         )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        # WHY: GPT-5 reasoning models may return None if response is empty
+        return content if content is not None else ""
 
     def _query_gemini(self, prompt: str) -> str:
         """Query Gemini 2.5 Flash."""
