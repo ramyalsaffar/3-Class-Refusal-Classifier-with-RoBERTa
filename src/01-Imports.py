@@ -93,6 +93,7 @@ except ImportError:
 from openai import OpenAI
 from anthropic import Anthropic
 import google.generativeai as genai
+import tiktoken  # Token counting for API usage tracking
 
 # AWS (optional - only needed for cloud deployment)
 try:

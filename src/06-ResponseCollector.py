@@ -28,6 +28,10 @@ class ResponseCollector:
         self.rate_delay = API_CONFIG['rate_limit_delay']
         self.max_retries = API_CONFIG['max_retries']
 
+        # Token counter for API usage tracking
+        # WHY: cl100k_base is used by GPT-4/GPT-5 and provides good approximation for Claude/Gemini
+        self.tokenizer = tiktoken.get_encoding("cl100k_base")
+
     def collect_all_responses(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
         """
         Collect responses from all models for all prompts.
@@ -88,7 +92,8 @@ class ResponseCollector:
                         })
 
                         model_counts[model_name]['success'] += 1
-                        print(f"✓ Success ({len(response)} chars)")
+                        token_count = self._count_tokens(response)
+                        print(f"✓ Success ({token_count} tokens)")
 
                         # Rate limiting
                         time.sleep(self.rate_delay)
@@ -158,6 +163,23 @@ class ResponseCollector:
                     time.sleep(wait_time)
                 else:
                     raise e
+
+    def _count_tokens(self, text: str) -> int:
+        """
+        Count tokens in text using tiktoken.
+
+        WHY: Token counting is critical for:
+        - API cost tracking (APIs charge per token, not per character)
+        - Understanding actual API usage vs limits
+        - Professional best practice for LLM development
+
+        Args:
+            text: Text to count tokens in
+
+        Returns:
+            Number of tokens
+        """
+        return len(self.tokenizer.encode(text))
 
     def _query_claude(self, prompt: str) -> str:
         """
