@@ -37,9 +37,9 @@ class DataCleaner:
         self.max_prompt_length = DATA_CLEANING_CONFIG['max_prompt_length']
         self.similarity_threshold = DATA_CLEANING_CONFIG['similarity_threshold']
 
-        # Error indicators
+        # Error indicators (escape regex special characters)
         self.error_patterns = [
-            '[ERROR',
+            r'\[ERROR',  # Escaped [ for regex
             'Failed to generate',
             '<!DOCTYPE html>',
             '<html>',
@@ -279,7 +279,7 @@ class DataCleaner:
         """Detect and remove error responses from API failures."""
         before = len(df)
 
-        # Check for error patterns
+        # Check for error patterns (regex enabled, special chars escaped in patterns)
         error_mask = df['response'].str.contains('|'.join(self.error_patterns), case=False, na=False)
         error_count = error_mask.sum()
 
