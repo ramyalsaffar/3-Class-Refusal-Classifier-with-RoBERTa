@@ -13,9 +13,61 @@ class ExperimentRunner:
         self.pipeline = None
         self.api_keys = None
 
+    def _read_api_keys_from_file(self) -> Dict[str, str]:
+        """
+        Read API keys from local file.
+
+        File format (each line):
+            OpenAI API Key: sk-...
+            Anthropic API Key: sk-ant-...
+            Google API Key: AI...
+
+        Returns:
+            Dictionary with keys: 'openai', 'anthropic', 'google'
+            Returns None if file not found or parsing fails
+        """
+        try:
+            if not os.path.exists(api_keys_file_path):
+                return None
+
+            api_keys = {}
+            with open(api_keys_file_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    # Parse line: "OpenAI API Key: sk-..."
+                    if ':' in line:
+                        key_name, key_value = line.split(':', 1)
+                        key_value = key_value.strip()
+
+                        if 'OpenAI' in key_name:
+                            api_keys['openai'] = key_value
+                        elif 'Anthropic' in key_name:
+                            api_keys['anthropic'] = key_value
+                        elif 'Google' in key_name:
+                            api_keys['google'] = key_value
+
+            # Validate all keys are present
+            if all(k in api_keys for k in ['openai', 'anthropic', 'google']):
+                return api_keys
+            else:
+                return None
+
+        except Exception as e:
+            print(f"⚠️  Error reading API keys file: {e}")
+            return None
+
     def _get_api_keys(self) -> Dict[str, str]:
         """
         Get API keys based on environment.
+
+        Priority order:
+        1. AWS Secrets Manager (if in AWS)
+        2. Local API Keys file (if exists)
+        3. Environment variables (.env)
+        4. Manual input (last resort)
 
         Returns:
             Dictionary with keys: 'openai', 'anthropic', 'google'
@@ -33,37 +85,45 @@ class ExperimentRunner:
                 }
             except Exception as e:
                 print(f"❌ Error retrieving secrets from AWS: {e}")
-                print("Falling back to manual input...")
+                print("Falling back to local methods...")
 
-        # Local mode: Try .env first, then manual input
+        # Local mode: Try API keys file first
         print("🔑 API Key Configuration")
         print("-" * 40)
 
+        # Try reading from local API keys file
+        file_keys = self._read_api_keys_from_file()
+        if file_keys:
+            print("✓ Loaded API keys from local file")
+            print(f"  - OpenAI: {'*' * 20}{file_keys['openai'][-4:]}")
+            print(f"  - Anthropic: {'*' * 20}{file_keys['anthropic'][-4:]}")
+            print(f"  - Google: {'*' * 20}{file_keys['google'][-4:]}")
+            return file_keys
+
         # Try loading from .env file
-        # FIX: Specify exception type instead of bare except
         try:
             from dotenv import load_dotenv
             load_dotenv()
-            print("✓ Loaded .env file")
+            print("✓ Checking .env file...")
         except (ImportError, FileNotFoundError):
             pass  # dotenv is optional
 
         # Get or prompt for OpenAI key
         openai_key = os.getenv('OPENAI_API_KEY')
         if not openai_key:
-            print("\nOpenAI API Key not found in .env")
+            print("\nOpenAI API Key not found in file or .env")
             openai_key = getpass.getpass("Enter OpenAI API Key: ")
 
         # Get or prompt for Anthropic key
         anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         if not anthropic_key:
-            print("\nAnthropic API Key not found in .env")
+            print("\nAnthropic API Key not found in file or .env")
             anthropic_key = getpass.getpass("Enter Anthropic API Key: ")
 
         # Get or prompt for Google key
         google_key = os.getenv('GOOGLE_API_KEY')
         if not google_key:
-            print("\nGoogle API Key not found in .env")
+            print("\nGoogle API Key not found in file or .env")
             google_key = getpass.getpass("Enter Google API Key: ")
 
         print("\n✓ API keys configured")
