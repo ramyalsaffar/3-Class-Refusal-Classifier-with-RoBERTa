@@ -155,7 +155,7 @@ visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
 reports_path = glob.glob(base_results_path + "/*Reports/")[0]
 
 # API Keys (local file storage)
-api_keys_file_path = glob.glob(project_path + "/*API Keys/API Keys")[0]
+api_keys_file_path = glob.glob(project_path + "/*API Keys/API Keys.rtf")[0]
 
 
 #------------------------------------------------------------------------------
