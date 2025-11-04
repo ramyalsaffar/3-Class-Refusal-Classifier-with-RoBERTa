@@ -51,19 +51,31 @@ class ResponseCollector:
         total_prompts = len(prompt_data)
         total_calls = total_prompts * len(self.models)
 
-        print(f"\nCollecting responses:")
+        print(f"\n{'='*60}")
+        print(f"🤖 COLLECTING RESPONSES FROM {len(self.models)} MODELS")
+        print(f"{'='*60}")
         print(f"  Total prompts: {total_prompts}")
-        print(f"  Models: {len(self.models)}")
+        print(f"  Models: {', '.join(self.models)}")
         print(f"  Total API calls: {total_calls}")
+        print(f"{'='*60}\n")
 
-        # Collect responses
-        with tqdm(total=total_calls, desc="Collecting responses") as pbar:
-            for prompt_info in prompt_data:
+        # Track per-model counts
+        model_counts = {model: {'success': 0, 'error': 0} for model in self.models}
+
+        # Collect responses with nested progress
+        with tqdm(total=total_prompts, desc="Prompts", position=0) as prompt_pbar:
+            for idx, prompt_info in enumerate(prompt_data, 1):
                 prompt = prompt_info['prompt']
                 expected_label = prompt_info['expected_label']
 
+                print(f"\n{'─'*60}")
+                print(f"📄 Prompt {idx}/{total_prompts} ({expected_label})")
+                print(f"   \"{prompt[:60]}{'...' if len(prompt) > 60 else ''}\"")
+                print(f"{'─'*60}")
+
                 for model_name in self.models:
                     try:
+                        print(f"  ⏳ Querying {model_name}...", end=" ", flush=True)
                         response = self._query_model(model_name, prompt)
 
                         all_data.append({
@@ -74,12 +86,16 @@ class ResponseCollector:
                             'timestamp': datetime.now().isoformat()
                         })
 
+                        model_counts[model_name]['success'] += 1
+                        print(f"✓ Success ({len(response)} chars)")
+
                         # Rate limiting
                         time.sleep(self.rate_delay)
 
                     except Exception as e:
-                        print(f"\nError with {model_name} on prompt: {prompt[:50]}...")
-                        print(f"Error: {e}")
+                        model_counts[model_name]['error'] += 1
+                        print(f"✗ Error: {str(e)[:80]}")
+
                         # Add error response
                         all_data.append({
                             'prompt': prompt,
@@ -89,13 +105,26 @@ class ResponseCollector:
                             'timestamp': datetime.now().isoformat()
                         })
 
-                    pbar.update(1)
+                # Show running totals after each prompt
+                print(f"  Running totals: ", end="")
+                for model_name in self.models:
+                    counts = model_counts[model_name]
+                    print(f"{model_name}: {counts['success']}✓/{counts['error']}✗ | ", end="")
+                print()
+
+                prompt_pbar.update(1)
 
         df = pd.DataFrame(all_data)
-        print(f"\nCollected {len(df)} total responses")
-        print(f"  Claude: {len(df[df['model'] == 'claude-sonnet-4.5'])}")
-        print(f"  GPT-5: {len(df[df['model'] == 'gpt-5'])}")
-        print(f"  Gemini: {len(df[df['model'] == 'gemini-2.5-flash'])}")
+
+        print(f"\n{'='*60}")
+        print(f"✅ RESPONSE COLLECTION COMPLETE")
+        print(f"{'='*60}")
+        print(f"  Total responses: {len(df)}")
+        for model_name in self.models:
+            counts = model_counts[model_name]
+            success_rate = (counts['success'] / total_prompts * 100) if total_prompts > 0 else 0
+            print(f"  {model_name}: {counts['success']} success, {counts['error']} errors ({success_rate:.1f}% success rate)")
+        print(f"{'='*60}\n")
 
         return df
 
