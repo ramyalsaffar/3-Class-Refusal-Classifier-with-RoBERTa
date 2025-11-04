@@ -15,7 +15,7 @@
 #-----------------------------------------------
 API_CONFIG = {
     # Model Selection
-    'prompt_model': 'gpt-4o',                   # Model for prompt generation
+    'prompt_model': 'claude-sonnet-4-20250514',  # Model for prompt generation (Claude more permissive for AI safety research)
     'judge_model': 'gpt-4o',                    # Model for response labeling/judging
     'paraphrase_model': 'gpt-4o',               # Model for adversarial paraphrasing
 
