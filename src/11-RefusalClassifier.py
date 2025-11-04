@@ -126,12 +126,6 @@ class RefusalClassifier(nn.Module):
 
         print(f"Froze {num_layers_to_freeze} RoBERTa layers")
 
-    def unfreeze_all(self):
-        """Unfreeze all parameters."""
-        for param in self.parameters():
-            param.requires_grad = True
-        print("Unfroze all parameters")
-
 
 def count_parameters(model: nn.Module) -> int:
     """Count trainable parameters."""

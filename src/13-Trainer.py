@@ -212,26 +212,47 @@ class Trainer:
 
         return avg_loss, f1, accuracy
 
-    def train(self, model_save_path: str = None):
+    def train(self, model_save_path: str = None, resume_from_checkpoint: str = None):
         """
-        Full training with early stopping.
+        Full training with early stopping and optional checkpoint resumption.
 
         Args:
             model_save_path: Path to save best model (uses default if None)
+            resume_from_checkpoint: Path to checkpoint to resume training from (optional)
+
+        Example:
+            # Start new training
+            trainer.train()
+
+            # Resume from checkpoint if training was interrupted
+            trainer.train(resume_from_checkpoint='models/experiment_best.pt')
         """
         if model_save_path is None:
             model_save_path = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_best.pt")
 
+        # Resume from checkpoint if specified
+        start_epoch = 1
+        if resume_from_checkpoint:
+            if os.path.exists(resume_from_checkpoint):
+                print(f"\n🔄 Resuming training from checkpoint: {resume_from_checkpoint}")
+                self.load_checkpoint(resume_from_checkpoint)
+                start_epoch = self.best_epoch + 1
+                print(f"   Resuming from epoch {start_epoch}/{self.epochs}")
+                print(f"   Previous best F1: {self.best_val_f1:.4f}\n")
+            else:
+                print(f"\n⚠️  Checkpoint not found: {resume_from_checkpoint}")
+                print("   Starting training from scratch\n")
+
         print("\n" + "="*60)
         print("TRAINING")
         print("="*60)
-        print(f"Epochs: {self.epochs}")
+        print(f"Epochs: {self.epochs} (starting from epoch {start_epoch})")
         print(f"Early stopping patience: {self.early_stopping_patience}")
         print(f"Device: {self.device}")
         print(f"Trainable parameters: {count_parameters(self.model):,}")
         print("="*60 + "\n")
 
-        for epoch in range(1, self.epochs + 1):
+        for epoch in range(start_epoch, self.epochs + 1):
             print(f"\nEpoch {epoch}/{self.epochs}")
             print("-" * 40)
 
@@ -261,7 +282,7 @@ class Trainer:
 
                 # Save best model
                 if self.save_best_only or epoch == self.epochs:
-                    self.save_checkpoint(model_save_path)
+                    self.save_checkpoint(model_save_path, epoch=epoch)
                     print(f"✓ Saved best model (F1: {val_f1:.4f})")
             else:
                 self.patience_counter += 1
@@ -283,8 +304,14 @@ class Trainer:
 
         return self.history
 
-    def save_checkpoint(self, path: str):
-        """Save model checkpoint."""
+    def save_checkpoint(self, path: str, epoch: int = None):
+        """
+        Save model checkpoint.
+
+        Args:
+            path: Path to save checkpoint
+            epoch: Current epoch (optional, uses best_epoch if not provided)
+        """
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save({
             'model_state_dict': self.model.state_dict(),
@@ -292,6 +319,7 @@ class Trainer:
             'scheduler_state_dict': self.scheduler.state_dict(),
             'best_val_f1': self.best_val_f1,
             'best_epoch': self.best_epoch,
+            'epoch': epoch if epoch is not None else self.best_epoch,
             'history': self.history
         }, path)
 

@@ -128,12 +128,6 @@ class JailbreakDetector(nn.Module):
 
         print(f"Froze {num_layers_to_freeze} RoBERTa layers")
 
-    def unfreeze_all(self):
-        """Unfreeze all parameters."""
-        for param in self.parameters():
-            param.requires_grad = True
-        print("Unfroze all parameters")
-
 
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
