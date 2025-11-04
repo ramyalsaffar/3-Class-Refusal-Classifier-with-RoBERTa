@@ -229,11 +229,14 @@ class ResponseCollector:
 
         Temperature: Uses default 1.0 for fair comparison across models.
         Gemini default: 1.0 (range: 0.0-2.0)
+
+        WHY: Using genai.GenerationConfig object ensures proper configuration enforcement.
+        Dictionary format may not always be applied correctly by the Gemini SDK.
         """
-        generation_config = {
-            'max_output_tokens': self.max_tokens,
-            'temperature': API_CONFIG['temperature_response']  # Default 1.0
-        }
+        generation_config = genai.GenerationConfig(
+            max_output_tokens=self.max_tokens,
+            temperature=API_CONFIG['temperature_response']  # Default 1.0
+        )
         response = self.gemini_model.generate_content(
             prompt,
             generation_config=generation_config

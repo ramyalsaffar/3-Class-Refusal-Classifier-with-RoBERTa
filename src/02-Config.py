@@ -258,7 +258,7 @@ EXPERIMENT_CONFIG = {
     'show_progress': True,                      # Show progress bars
     'prompt_buffer_percentage': 20,             # Extra prompts as buffer (%)
     'max_prompt_generation_attempts': 3,        # Retries for prompt generation
-    'test_sample_size': 10                      # Sample size for --test mode
+    'test_sample_size': 50                      # Sample size for --test mode (min 50 for 3-class stratified splits)
 }
 
 
