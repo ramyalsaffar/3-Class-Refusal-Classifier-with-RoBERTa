@@ -141,12 +141,13 @@ class ResponseCollector:
 
     def _query_gpt5(self, prompt: str) -> str:
         """Query GPT-5."""
+        # WHY: GPT-5/o1/o3 models use max_completion_tokens instead of max_tokens
         response = self.openai_client.chat.completions.create(
             model=API_CONFIG['response_models']['gpt5'],
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=self.max_tokens
+            max_completion_tokens=self.max_tokens
         )
         return response.choices[0].message.content
 

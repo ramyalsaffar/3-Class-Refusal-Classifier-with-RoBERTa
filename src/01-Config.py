@@ -27,7 +27,7 @@ API_CONFIG = {
     'paraphrase_model': 'gpt-4',
 
     # Rate Limiting & Retries
-    'rate_limit_delay': 0.5,                    # Seconds between API calls
+    'rate_limit_delay': 0.2,                    # Seconds between API calls
     'max_retries': 5,                           # Max retries for failed API calls
 
     # Temperature Settings
@@ -36,7 +36,7 @@ API_CONFIG = {
     'temperature_paraphrase': 0.7,              # Medium = natural paraphrases
 
     # Token Limits
-    'max_tokens_generate': 4000,                # For prompt generation
+    'max_tokens_generate': 2000,                # For prompt generation
     'max_tokens_response': 1024,                # For LLM responses
     'max_tokens_paraphrase': 500,               # For paraphrasing
 
@@ -103,45 +103,46 @@ DATASET_CONFIG = {
     'test_split': 0.15,                         # 15% test
     'random_seed': 42,                          # For reproducibility
 
-    # Category distribution (must sum to total_prompts = 2000)
-    # Hard Refusal: 795 prompts across 5 categories
-    # Soft Refusal: 205 prompts across 4 categories
-    # No Refusal: 1000 prompts across 4 categories
+    # Category distribution (percentages - will scale with total_prompts)
+    # WHY: Using percentages allows automatic scaling for any total_prompts value
+    # Hard Refusal: 39.75% across 5 categories
+    # Soft Refusal: 10.25% across 4 categories
+    # No Refusal: 50% across 4 categories
     'categories': {
-        # HARD REFUSAL CATEGORIES (795 total)
+        # HARD REFUSAL CATEGORIES (39.75% total)
         'violence_illegal': {
-            'hard': 285,        # Weapons, violence, illegal activities
-            'soft': 15          # Edge cases (self-defense, security)
+            'hard': 14.25,      # Weapons, violence, illegal activities
+            'soft': 0.75        # Edge cases (self-defense, security)
         },
         'hate_speech': {
-            'hard': 150,        # Explicit hate speech
+            'hard': 7.5,        # Explicit hate speech
             'soft': 0
         },
         'jailbreaks': {
-            'hard': 225,        # Role-play, DAN-style, adversarial
-            'soft': 25          # Borderline hypotheticals
+            'hard': 11.25,      # Role-play, DAN-style, adversarial
+            'soft': 1.25        # Borderline hypotheticals
         },
         'privacy_misinfo': {
-            'hard': 90,         # PII requests, doxxing, fake news
-            'soft': 60          # Privacy tips, misinfo education
+            'hard': 4.5,        # PII requests, doxxing, fake news
+            'soft': 3.0         # Privacy tips, misinfo education
         },
         'regulated_content': {
-            'hard': 45,         # Medical diagnosis, legal strategy
-            'soft': 105         # General health/legal info with disclaimers
+            'hard': 2.25,       # Medical diagnosis, legal strategy
+            'soft': 5.25        # General health/legal info with disclaimers
         },
 
-        # NO REFUSAL CATEGORIES (1000 total)
+        # NO REFUSAL CATEGORIES (50% total)
         'technical_educational': {
-            'no_refusal': 350   # Programming, math, science
+            'no_refusal': 17.5  # Programming, math, science
         },
         'creative_professional': {
-            'no_refusal': 300   # Writing, business, career
+            'no_refusal': 15.0  # Writing, business, career
         },
         'general_assistance': {
-            'no_refusal': 200   # Recipes, travel, summaries
+            'no_refusal': 10.0  # Recipes, travel, summaries
         },
         'edge_cases': {
-            'no_refusal': 150   # Legitimate but suspicious-sounding
+            'no_refusal': 7.5   # Legitimate but suspicious-sounding
         }
     }
 }
@@ -156,7 +157,7 @@ PROMPT_GENERATION_CONFIG = {
         'generation': True,                         # Stage 1: Generate prompts
         'self_evaluation': True,                    # Stage 2: GPT-4 quality check
         'regeneration': True,                       # Stage 3: Fix failed prompts
-        'max_regeneration_attempts': 3              # Max attempts per failed prompt
+        'max_regeneration_attempts': 2              # Max attempts per failed prompt
     },
 
     # Human-like characteristics (Stage 1 requirements)

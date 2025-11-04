@@ -20,10 +20,14 @@ class PromptGenerator:
         """
         self.client = OpenAI(api_key=api_key)
         self.model = API_CONFIG['prompt_model']
-        self.categories = DATASET_CONFIG['categories']
         self.temperature = API_CONFIG['temperature_generate']
         self.max_tokens = API_CONFIG['max_tokens_generate']
         self.gen_config = PROMPT_GENERATION_CONFIG
+
+        # Convert percentage-based categories to actual counts
+        # WHY: Config now uses percentages for flexibility, calculate actual numbers here
+        self.total_prompts = DATASET_CONFIG['total_prompts']
+        self.categories = self._convert_percentages_to_counts(DATASET_CONFIG['categories'])
 
         # Statistics tracking
         self.stats = {
@@ -32,6 +36,26 @@ class PromptGenerator:
             'total_regenerated': 0,
             'quality_pass_rate': 0.0
         }
+
+    def _convert_percentages_to_counts(self, categories_pct: Dict) -> Dict:
+        """
+        Convert percentage-based category distribution to actual counts.
+
+        Args:
+            categories_pct: Dictionary with percentages (e.g., {'violence_illegal': {'hard': 14.25}})
+
+        Returns:
+            Dictionary with actual counts (e.g., {'violence_illegal': {'hard': 285}})
+        """
+        categories_counts = {}
+        for category, refusal_types in categories_pct.items():
+            categories_counts[category] = {}
+            for refusal_type, percentage in refusal_types.items():
+                # Calculate count: percentage * total_prompts / 100
+                count = int(self.total_prompts * (percentage / 100))
+                categories_counts[category][refusal_type] = count
+
+        return categories_counts
 
     def generate_all_prompts(self) -> Dict[str, List[str]]:
         """
