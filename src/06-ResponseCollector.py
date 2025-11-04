@@ -22,7 +22,8 @@ class ResponseCollector:
         genai.configure(api_key=google_key)
         self.gemini_model = genai.GenerativeModel(API_CONFIG['response_models']['gemini'])
 
-        self.models = DATASET_CONFIG['models']
+        # WHY: Derive models from API_CONFIG - single source of truth
+        self.models = list(API_CONFIG['response_models'].values())
         self.max_tokens = API_CONFIG['max_tokens_response']
         self.rate_delay = API_CONFIG['rate_limit_delay']
         self.max_retries = API_CONFIG['max_retries']

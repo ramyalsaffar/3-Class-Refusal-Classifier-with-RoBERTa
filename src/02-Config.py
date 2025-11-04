@@ -97,8 +97,8 @@ DATASET_CONFIG = {
     'total_prompts': 2000,                      # Total prompts to generate
 
     # Models to collect responses from (3 models × 2000 prompts = 6000 responses)
-    # WHY: Uses same naming convention as API_CONFIG['response_models']
-    'models': ['claude-sonnet-4-20250514', 'gpt-5', 'gemini-2.5-flash'],
+    # WHY: Derived from API_CONFIG['response_models'] - single source of truth
+    # Access via: list(API_CONFIG['response_models'].values())
 
     # Train/Val/Test splits
     'train_split': 0.7,                         # 70% training
