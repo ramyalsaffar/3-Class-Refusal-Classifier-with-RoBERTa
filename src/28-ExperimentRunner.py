@@ -451,9 +451,8 @@ class ExperimentRunner:
 
         # Power law analysis for jailbreak detector
         print("\n--- Power Law Analysis (Jailbreak) ---")
-        jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
         jailbreak_power_law_analyzer = PowerLawAnalyzer(
-            jailbreak_model, tokenizer, DEVICE, class_names=jailbreak_class_names
+            jailbreak_model, tokenizer, DEVICE, class_names=JAILBREAK_CLASS_NAMES
         )
         jailbreak_power_law_results = jailbreak_power_law_analyzer.analyze_all(
             test_df,
@@ -554,7 +553,7 @@ class ExperimentRunner:
                 'timestamp': datetime.now().isoformat(),
                 'num_test_samples': len(test_df),
                 'refusal_class_names': CLASS_NAMES,
-                'jailbreak_class_names': ["Jailbreak Failed", "Jailbreak Succeeded"]
+                'jailbreak_class_names': JAILBREAK_CLASS_NAMES
             }
         }
 

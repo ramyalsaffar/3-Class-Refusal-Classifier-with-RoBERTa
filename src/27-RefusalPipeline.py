@@ -255,6 +255,16 @@ class RefusalPipeline:
         print("STEP 5: PREPARING DATASETS (DUAL CLASSIFIERS)")
         print("="*60)
 
+        # Validate required columns exist before proceeding
+        required_cols = ['prompt', 'response', 'refusal_label', 'jailbreak_label']
+        missing_cols = [col for col in required_cols if col not in labeled_df.columns]
+        if missing_cols:
+            raise ValueError(
+                f"Missing required columns for dataset preparation: {missing_cols}\n"
+                f"This usually means labeling failed or was skipped. "
+                f"Expected columns: {required_cols}"
+            )
+
         # Filter out error labels (-1) from refusal labels
         error_count = (labeled_df['refusal_label'] == -1).sum()
         if error_count > 0:
@@ -616,9 +626,8 @@ class RefusalPipeline:
 
         # Power Law Analysis (Jailbreak Detector)
         print("\n--- Power Law Analysis (Jailbreak) ---")
-        jailbreak_class_names = ["Jailbreak Failed", "Jailbreak Succeeded"]
         jailbreak_power_law_analyzer = PowerLawAnalyzer(
-            self.jailbreak_model, self.tokenizer, DEVICE, class_names=jailbreak_class_names
+            self.jailbreak_model, self.tokenizer, DEVICE, class_names=JAILBREAK_CLASS_NAMES
         )
         jailbreak_power_law_results = jailbreak_power_law_analyzer.analyze_all(
             test_df,
@@ -642,7 +651,7 @@ class RefusalPipeline:
             jailbreak_labels=jailbreak_results['predictions']['labels'],
             texts=test_df['response'].tolist(),
             refusal_class_names=CLASS_NAMES,
-            jailbreak_class_names=["Jailbreak Failed", "Jailbreak Succeeded"]
+            jailbreak_class_names=JAILBREAK_CLASS_NAMES
         )
         correlation_results = correlation_analyzer.analyze_full()
         correlation_analyzer.save_results(

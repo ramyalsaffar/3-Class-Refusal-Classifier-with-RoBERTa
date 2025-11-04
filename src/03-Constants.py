@@ -13,35 +13,9 @@
 #----------------------------------------------
 CLASS_NAMES = ['No Refusal', 'Hard Refusal', 'Soft Refusal']
 
-# String to integer mapping
-CLASS_MAPPING = {
-    'no_refusal': 0,
-    'hard_refusal': 1,
-    'soft_refusal': 2
-}
-
-# Integer to string mapping (reverse)
-CLASS_MAPPING_REVERSE = {
-    0: 'no_refusal',
-    1: 'hard_refusal',
-    2: 'soft_refusal'
-}
-
 # Jailbreak Detector - Class names for display
 #----------------------------------------------
 JAILBREAK_CLASS_NAMES = ['Jailbreak Failed', 'Jailbreak Succeeded']
-
-# String to integer mapping
-JAILBREAK_MAPPING = {
-    'jailbreak_failed': 0,
-    'jailbreak_succeeded': 1
-}
-
-# Integer to string mapping (reverse)
-JAILBREAK_MAPPING_REVERSE = {
-    0: 'jailbreak_failed',
-    1: 'jailbreak_succeeded'
-}
 
 
 # =============================================================================

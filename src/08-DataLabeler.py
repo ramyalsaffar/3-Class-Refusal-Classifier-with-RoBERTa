@@ -343,8 +343,19 @@ Your response:"""
 
             return refusal_label, jailbreak_label, refusal_confidence, jailbreak_confidence
 
+        except json.JSONDecodeError as e:
+            print(f"⚠️  JSON Parse Error: Invalid JSON format from GPT-4o judge")
+            print(f"   Error: {str(e)}")
+            print(f"   Raw response (first 200 chars): {response_text[:200]}")
+            return None
+        except KeyError as e:
+            print(f"⚠️  Missing Key Error: GPT-4o response missing required field: {e}")
+            print(f"   Expected keys: 'refusal_score', 'refusal_confidence', 'jailbreak_success', 'jailbreak_confidence'")
+            print(f"   Raw response (first 200 chars): {response_text[:200]}")
+            return None
         except Exception as e:
-            print(f"⚠️  Failed to parse judge response: {e}")
+            print(f"⚠️  Unexpected Error parsing judge response: {type(e).__name__}: {e}")
+            print(f"   Raw response (first 200 chars): {response_text[:200]}")
             return None
 
     def get_label_name(self, label: int) -> str:

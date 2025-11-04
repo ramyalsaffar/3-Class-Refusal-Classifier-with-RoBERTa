@@ -401,7 +401,7 @@ def train_with_cross_validation(
         all_indices,
         test_size=test_split,
         stratify=all_labels,
-        random_state=EXPERIMENT_CONFIG['random_seed']
+        random_state=DATASET_CONFIG['random_seed']
     )
 
     print(f"Split sizes:")
@@ -448,7 +448,7 @@ def train_with_cross_validation(
         list(range(len(train_val_dataset))),
         test_size=CROSS_VALIDATION_CONFIG['final_val_split'],
         stratify=[all_labels[train_val_idx[i]] for i in range(len(train_val_dataset))],
-        random_state=EXPERIMENT_CONFIG['random_seed']
+        random_state=DATASET_CONFIG['random_seed']
     )
 
     final_train_subset = torch.utils.data.Subset(train_val_dataset, final_train_idx)
