@@ -171,17 +171,22 @@ class ResponseCollector:
 
     def _query_gpt5(self, prompt: str) -> str:
         """Query GPT-5."""
-        # WHY: GPT-5/o1/o3 models use max_completion_tokens instead of max_tokens
+        # WHY: GPT-5 is a reasoning model that generates internal reasoning tokens
+        # These reasoning tokens consume the max_completion_tokens budget
+        # Using "minimal" reasoning effort prevents token exhaustion
         response = self.openai_client.chat.completions.create(
             model=API_CONFIG['response_models']['gpt5'],
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            max_completion_tokens=self.max_tokens
+            max_completion_tokens=self.max_tokens,
+            reasoning_effort="minimal"  # Minimal reasoning = faster, no token exhaustion
         )
         content = response.choices[0].message.content
-        # WHY: GPT-5 reasoning models may return None if response is empty
-        return content if content is not None else ""
+        # WHY: GPT-5 may return None if all tokens used for reasoning
+        if content is None or content == "":
+            raise ValueError(f"GPT-5 returned empty response. Reasoning tokens may have exhausted budget. Consider increasing max_completion_tokens or using 'minimal' reasoning_effort.")
+        return content
 
     def _query_gemini(self, prompt: str) -> str:
         """Query Gemini 2.5 Flash."""

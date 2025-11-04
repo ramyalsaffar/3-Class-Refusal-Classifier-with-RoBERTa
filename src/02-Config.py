@@ -37,7 +37,7 @@ API_CONFIG = {
     'max_tokens_regenerate': 500,               # For regenerating failed prompts
     'max_tokens_judge': 50,                     # Small JSON response for judging
     'max_tokens_paraphrase': 200,               # For paraphrasing
-    'max_tokens_response': 1024,                # For LLM responses
+    'max_tokens_response': 4096,                # For LLM responses (increased for GPT-5 reasoning tokens)
 
     # Rate Limiting & Retries
     'rate_limit_delay': 0.2,                    # Seconds between API calls (reduced for speed)
