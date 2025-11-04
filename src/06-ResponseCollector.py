@@ -164,6 +164,7 @@ class ResponseCollector:
         response = self.anthropic_client.messages.create(
             model=API_CONFIG['response_models']['claude'],
             max_tokens=self.max_tokens,
+            temperature=API_CONFIG['temperature_response'],
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -181,6 +182,7 @@ class ResponseCollector:
                 {"role": "user", "content": prompt}
             ],
             max_completion_tokens=self.max_tokens,
+            temperature=API_CONFIG['temperature_response'],
             reasoning_effort="minimal"  # Minimal reasoning = faster, no token exhaustion
         )
         content = response.choices[0].message.content
@@ -191,7 +193,14 @@ class ResponseCollector:
 
     def _query_gemini(self, prompt: str) -> str:
         """Query Gemini 2.5 Flash."""
-        response = self.gemini_model.generate_content(prompt)
+        generation_config = {
+            'max_output_tokens': self.max_tokens,
+            'temperature': API_CONFIG['temperature_response']
+        }
+        response = self.gemini_model.generate_content(
+            prompt,
+            generation_config=generation_config
+        )
         return response.text
 
     def save_responses(self, df: pd.DataFrame, output_dir: str):
