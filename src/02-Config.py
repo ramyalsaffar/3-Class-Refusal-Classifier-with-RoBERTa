@@ -157,8 +157,8 @@ PROMPT_GENERATION_CONFIG = {
     # Three-stage process control
     'stages': {
         'generation': True,                         # Stage 1: Generate prompts
-        'self_evaluation': True,                    # Stage 2: GPT-4o quality check
-        'regeneration': True,                       # Stage 3: Fix failed prompts
+        'self_evaluation': False,                   # Stage 2: GPT-4o quality check (DISABLED - triggers refusals)
+        'regeneration': False,                      # Stage 3: Fix failed prompts (DISABLED - depends on Stage 2)
         'max_regeneration_attempts': 5              # Max attempts per failed prompt
     },
 
