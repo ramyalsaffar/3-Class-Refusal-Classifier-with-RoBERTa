@@ -28,18 +28,24 @@ class ExperimentRunner:
         """
         try:
             if not os.path.exists(api_keys_file_path):
+                print(f"⚠️  API keys file not found: {api_keys_file_path}")
                 return None
 
             api_keys = {}
-            with open(api_keys_file_path, 'r') as f:
-                for line in f:
+            with open(api_keys_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                for line_num, line in enumerate(f, 1):
+                    # Strip ALL whitespace and remove non-printable characters
                     line = line.strip()
+                    # Remove any BOM or hidden characters
+                    line = ''.join(char for char in line if char.isprintable())
+
                     if not line:
                         continue
 
                     # Parse line: "OpenAI API Key: sk-..."
                     if ':' in line:
                         key_name, key_value = line.split(':', 1)
+                        # Aggressively strip all whitespace
                         key_value = key_value.strip()
 
                         if 'OpenAI' in key_name:
@@ -53,6 +59,8 @@ class ExperimentRunner:
             if all(k in api_keys for k in ['openai', 'anthropic', 'google']):
                 return api_keys
             else:
+                missing = [k for k in ['openai', 'anthropic', 'google'] if k not in api_keys]
+                print(f"⚠️  Missing API keys in file: {', '.join(missing)}")
                 return None
 
         except Exception as e:
@@ -95,9 +103,18 @@ class ExperimentRunner:
         file_keys = self._read_api_keys_from_file()
         if file_keys:
             print("✓ Loaded API keys from local file")
-            print(f"  - OpenAI: {'*' * 20}{file_keys['openai'][-4:]}")
-            print(f"  - Anthropic: {'*' * 20}{file_keys['anthropic'][-4:]}")
-            print(f"  - Google: {'*' * 20}{file_keys['google'][-4:]}")
+            print(f"  - OpenAI: {'*' * 20}{file_keys['openai'][-4:]} (length: {len(file_keys['openai'])})")
+            print(f"  - Anthropic: {'*' * 20}{file_keys['anthropic'][-4:]} (length: {len(file_keys['anthropic'])})")
+            print(f"  - Google: {'*' * 20}{file_keys['google'][-4:]} (length: {len(file_keys['google'])})")
+
+            # Debug: Check for whitespace issues
+            if file_keys['openai'].strip() != file_keys['openai']:
+                print("  ⚠️  WARNING: OpenAI key has leading/trailing whitespace!")
+            if file_keys['anthropic'].strip() != file_keys['anthropic']:
+                print("  ⚠️  WARNING: Anthropic key has leading/trailing whitespace!")
+            if file_keys['google'].strip() != file_keys['google']:
+                print("  ⚠️  WARNING: Google key has leading/trailing whitespace!")
+
             return file_keys
 
         # Try loading from .env file
