@@ -189,7 +189,9 @@ class ExperimentRunner:
         DATASET_CONFIG['total_prompts'] = EXPERIMENT_CONFIG['test_sample_size']
 
         try:
-            self.pipeline.run_full_pipeline()
+            # Prevent Mac from sleeping during execution
+            with KeepAwake():
+                self.pipeline.run_full_pipeline()
         finally:
             # Restore original config
             # WHY: Prevent config pollution affecting other modes
@@ -205,9 +207,10 @@ class ExperimentRunner:
         # Get API keys
         api_keys = self._get_api_keys()
 
-        # Run pipeline
+        # Run pipeline with sleep prevention
         self.pipeline = RefusalPipeline(api_keys)
-        self.pipeline.run_full_pipeline()
+        with KeepAwake():
+            self.pipeline.run_full_pipeline()
 
     def train_only(self):
         """Train only (assumes data already collected)."""
