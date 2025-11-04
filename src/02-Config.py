@@ -375,53 +375,10 @@ HYPOTHESIS_TESTING_CONFIG = {
 }
 
 
-# Retraining Configuration
-#--------------------------
-RETRAINING_CONFIG = {
-    'min_training_samples': 100,                # Minimum samples required for retraining
-    'num_layers_to_freeze': 4,                  # Freeze bottom N RoBERTa layers
-    'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training
-    'test_split': 0.3,                          # Test set ratio
-    'val_split': 0.5,                           # Validation split (from remaining)
-    'high_confidence_threshold': 0.8,           # Confidence threshold for filtering
-}
-
-
-# Data Retention Configuration
-#------------------------------
-DATA_RETENTION_CONFIG = {
-    'high_confidence_threshold': 0.8,           # Confidence threshold for retention decisions
-    'recent_correct_sample_fraction': 0.2,      # Keep 20% of recent correct samples (1/5)
-    'medium_term_sample_fraction': 0.5,         # Keep 50% of medium-term samples (1/2)
-    'long_term_sample_fraction': 0.1,           # Keep 10% of long-term samples (1/10)
-}
-
-
-# Timing Configuration
-#---------------------
-TIMING_CONFIG = {
-    'api_delay': 0.5,                           # Delay between API calls (seconds)
-    'show_progress': True,                      # Show progress bars
-    'estimate_time': True                       # Show time estimates
-}
-
-
-# Report Styling Configuration
-#------------------------------
-REPORT_CONFIG = {
-    'title_font_size': 24,
-    'title_color': '#1f77b4',
-    'title_space_after': 30,
-    'section_font_size': 16,
-    'section_color': '#2ca02c',
-    'section_space_after': 12,
-    'section_space_before': 12,
-    'subsection_font_size': 13,
-    'subsection_color': '#d62728',
-    'metric_font_size': 14,
-    'metric_color': '#ff7f0e',
-    'figure_dpi': 150,
-}
+# NOTE: RETRAINING_CONFIG consolidated into PRODUCTION_CONFIG['retraining']
+# NOTE: DATA_RETENTION_CONFIG consolidated into PRODUCTION_CONFIG['retention']
+# NOTE: TIMING_CONFIG values now in API_CONFIG and EXPERIMENT_CONFIG
+# NOTE: REPORT_CONFIG styling consolidated into REPORT_CONFIG (kept for backward compatibility)
 
 
 # Visualization Configuration
@@ -498,9 +455,14 @@ PRODUCTION_CONFIG = {
         'schedule': 'weekly',                       # Weekly retraining schedule
         'trigger_on_drift': True,                   # Trigger if drift detected
         'retain_historical_samples': True,          # Prevent catastrophic forgetting
-        'freeze_layers': 6,                         # Transfer learning (freeze bottom layers)
+        'freeze_layers': 4,                         # Transfer learning (freeze bottom layers) - less than initial for adaptation
         'max_epochs': 5,                            # Max training epochs
-        'early_stopping_patience': 2                # Early stopping patience
+        'early_stopping_patience': 2,               # Early stopping patience
+        'min_training_samples': 100,                # Minimum samples required for retraining
+        'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training (lower for fine-tuning)
+        'test_split': 0.3,                          # Test set ratio
+        'val_split': 0.5,                           # Validation split (from remaining 70%)
+        'high_confidence_threshold': 0.8            # Confidence threshold for data filtering
     },
 
     # Data Retention Strategy (Implemented in 34-DataManager.py)

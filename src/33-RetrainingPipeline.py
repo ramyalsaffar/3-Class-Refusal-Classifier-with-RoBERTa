@@ -51,9 +51,10 @@ class RetrainingPipeline:
 
         training_df = self.data_manager.get_retraining_data()
 
-        if len(training_df) < 100:
+        min_samples = PRODUCTION_CONFIG['retraining']['min_training_samples']
+        if len(training_df) < min_samples:
             print(f"❌ Insufficient data for retraining: {len(training_df)} samples")
-            print("   Need at least 100 samples")
+            print(f"   Need at least {min_samples} samples")
             return {'status': 'failed', 'reason': 'insufficient_data'}
 
         # Step 2: Prepare datasets
@@ -113,7 +114,8 @@ class RetrainingPipeline:
                 model.load_state_dict(checkpoint['model_state_dict'])
 
         # Freeze fewer layers for fine-tuning (allow more adaptation)
-        model.freeze_roberta_layers(num_layers_to_freeze=4)  # Less freezing than initial training
+        freeze_layers = PRODUCTION_CONFIG['retraining']['freeze_layers']
+        model.freeze_roberta_layers(num_layers_to_freeze=freeze_layers)
 
         # Training setup
         train_labels = [label for _, label in train_dataset]
@@ -121,9 +123,10 @@ class RetrainingPipeline:
         class_counts = [train_labels.count(i) for i in range(num_classes)]
         criterion = get_weighted_criterion(class_counts, DEVICE)
 
+        lr_multiplier = PRODUCTION_CONFIG['retraining']['lr_multiplier']
         optimizer = AdamW(
             model.parameters(),
-            lr=TRAINING_CONFIG['learning_rate'] * 0.5,  # Lower LR for fine-tuning
+            lr=TRAINING_CONFIG['learning_rate'] * lr_multiplier,  # Lower LR for fine-tuning
             weight_decay=TRAINING_CONFIG['weight_decay']
         )
 
@@ -214,7 +217,7 @@ class RetrainingPipeline:
 
     def _split_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Split data into train/val/test.
+        Split data into train/val/test using configured ratios.
 
         Args:
             df: Full dataset
@@ -222,16 +225,19 @@ class RetrainingPipeline:
         Returns:
             Tuple of (train_df, val_df, test_df)
         """
+        test_split = PRODUCTION_CONFIG['retraining']['test_split']
+        val_split = PRODUCTION_CONFIG['retraining']['val_split']
+
         train_df, temp_df = train_test_split(
             df,
-            test_size=0.3,
+            test_size=test_split,
             random_state=DATASET_CONFIG['random_seed'],
             stratify=df['label']
         )
 
         val_df, test_df = train_test_split(
             temp_df,
-            test_size=0.5,
+            test_size=val_split,
             random_state=DATASET_CONFIG['random_seed'],
             stratify=temp_df['label']
         )

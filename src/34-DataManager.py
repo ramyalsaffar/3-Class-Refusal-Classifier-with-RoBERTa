@@ -287,13 +287,14 @@ class DataManager:
             print(f"   - Collected {len(problematic)} problematic samples")
 
             print("   - 20% of correct high-confidence samples")
-            cursor.execute("""
+            high_conf_threshold = PRODUCTION_CONFIG['retraining']['high_confidence_threshold']
+            cursor.execute(f"""
                 SELECT prompt, response, judge_label as label
                 FROM predictions_log
                 WHERE timestamp > NOW() - INTERVAL '7 days'
                 AND judge_label IS NOT NULL
                 AND judge_label = prediction
-                AND confidence > 0.8
+                AND confidence > {high_conf_threshold}
                 ORDER BY RANDOM()
                 LIMIT (SELECT COUNT(*) FROM predictions_log
                        WHERE timestamp > NOW() - INTERVAL '7 days'
