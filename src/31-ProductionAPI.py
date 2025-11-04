@@ -6,12 +6,9 @@
 # Requires: pip install fastapi uvicorn pydantic
 ###############################################################################
 
-# Import core dependencies from 01-Imports.py
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-# FIX: Use context manager to properly close file descriptor
-with open(os.path.join(os.path.dirname(__file__), "01-Imports.py")) as f:
+# Import core dependencies from 01-Imports.py (sys and os imported there)
+_import_file_path = __file__.replace("31-ProductionAPI.py", "01-Imports.py")
+with open(_import_file_path) as f:
     exec(f.read())
 
 # FastAPI specific imports

@@ -81,8 +81,6 @@ class CrossValidator:
         Returns:
             Dictionary with CV results and statistics
         """
-        from sklearn.model_selection import StratifiedKFold
-
         # Create stratified k-fold splitter
         skf = StratifiedKFold(n_splits=self.k_folds, shuffle=True, random_state=self.random_state)
 
@@ -185,8 +183,6 @@ class CrossValidator:
                     all_labels_val.extend(labels.cpu().numpy())
 
             # Calculate metrics
-            from sklearn.metrics import classification_report, accuracy_score, f1_score, precision_score, recall_score
-
             accuracy = accuracy_score(all_labels_val, all_preds)
             f1_macro = f1_score(all_labels_val, all_preds, average='macro')
             precision_macro = precision_score(all_labels_val, all_preds, average='macro')
@@ -387,8 +383,6 @@ def train_with_cross_validation(
     Returns:
         Dictionary with CV results and final test performance
     """
-    from sklearn.model_selection import train_test_split
-
     print(f"\n{'='*60}")
     print("TRAIN/VAL/TEST SPLIT WITH CROSS-VALIDATION")
     print(f"{'='*60}")
@@ -450,8 +444,7 @@ def train_with_cross_validation(
 
     # For validation during final training, use a small split from train+val
     # This is just for monitoring, not for hyperparameter selection
-    from sklearn.model_selection import train_test_split as tts
-    final_train_idx, final_val_idx = tts(
+    final_train_idx, final_val_idx = train_test_split(
         list(range(len(train_val_dataset))),
         test_size=CROSS_VALIDATION_CONFIG['final_val_split'],
         stratify=[all_labels[train_val_idx[i]] for i in range(len(train_val_dataset))],
@@ -526,8 +519,6 @@ def train_with_cross_validation(
             all_labels_test.extend(labels.cpu().numpy())
 
     # Calculate test metrics
-    from sklearn.metrics import classification_report, accuracy_score, f1_score
-
     test_accuracy = accuracy_score(all_labels_test, all_preds)
     test_f1 = f1_score(all_labels_test, all_preds, average='macro')
     test_report = classification_report(

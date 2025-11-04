@@ -25,6 +25,7 @@ warnings.filterwarnings('ignore')
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
+from io import BytesIO
 import getpass
 import atexit
 
@@ -69,6 +70,24 @@ import pickle
 # Visualization
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# PDF Report Generation (optional - only needed for report generation)
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        PageBreak, Image, KeepTogether
+    )
+    from reportlab.platypus.flowables import HRFlowable
+    from reportlab.lib.utils import ImageReader
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    print("ℹ️  reportlab not available - PDF report generation disabled")
 
 # API Clients
 from openai import OpenAI
@@ -134,14 +153,6 @@ results_path = base_results_path
 
 visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
 reports_path = glob.glob(base_results_path + "/*Reports/")[0]
-
-
-# Create directories if they don't exist
-#----------------------------------------
-for path in [base_results_path, data_path, data_raw_path, data_responses_path,
-             data_processed_path, data_splits_path, models_path, results_path,
-             visualizations_path, reports_path]:
-    os.makedirs(path, exist_ok=True)
 
 
 #------------------------------------------------------------------------------

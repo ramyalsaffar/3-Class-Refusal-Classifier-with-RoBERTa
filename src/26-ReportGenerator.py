@@ -4,22 +4,8 @@
 # Creates professional reports for model performance, interpretability,
 # production monitoring, and executive summaries.
 # Requirements: pip install reportlab
+# All imports are in 01-Imports.py
 ###############################################################################
-
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, Image, KeepTogether
-)
-from reportlab.platypus.flowables import HRFlowable
-from reportlab.lib.utils import ImageReader
-from io import BytesIO
-import matplotlib.pyplot as plt
-from datetime import datetime
 
 
 class ReportGenerator:
