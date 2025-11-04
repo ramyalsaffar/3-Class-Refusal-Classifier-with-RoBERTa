@@ -27,10 +27,10 @@ API_CONFIG = {
     },
 
     # Temperature Settings
-    'temperature_generate': 0.9,                # High = diverse prompts
+    'temperature_generate': 1.0,                # Default = diverse prompts (max randomness)
     'temperature_judge': 0.0,                   # Deterministic judging
     'temperature_paraphrase': 0.7,              # Medium = natural paraphrases
-    'temperature_response': 0.7,                # Medium = varied responses
+    'temperature_response': 1.0,                # Default = 1.0 for all models (Claude, GPT-5, Gemini)
 
     # Token Limits
     'max_tokens_generate': 2000,                # For prompt generation (reduced for speed)

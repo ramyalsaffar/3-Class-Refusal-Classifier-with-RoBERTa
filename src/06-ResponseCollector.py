@@ -160,11 +160,16 @@ class ResponseCollector:
                     raise e
 
     def _query_claude(self, prompt: str) -> str:
-        """Query Claude Sonnet 4.5."""
+        """
+        Query Claude Sonnet 4.5.
+
+        Temperature: Uses default 1.0 for fair comparison across models.
+        Claude default: 1.0 (range: 0.0-1.0)
+        """
         response = self.anthropic_client.messages.create(
             model=API_CONFIG['response_models']['claude'],
             max_tokens=self.max_tokens,
-            temperature=API_CONFIG['temperature_response'],
+            temperature=API_CONFIG['temperature_response'],  # Default 1.0
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -172,18 +177,22 @@ class ResponseCollector:
         return response.content[0].text
 
     def _query_gpt5(self, prompt: str) -> str:
-        """Query GPT-5."""
-        # WHY: GPT-5 is a reasoning model that generates internal reasoning tokens
-        # These reasoning tokens consume the max_completion_tokens budget
-        # Using "minimal" reasoning effort prevents token exhaustion
-        # NOTE: GPT-5 ONLY supports temperature=1.0 (cannot be changed)
+        """
+        Query GPT-5.
+
+        Temperature: LOCKED at 1.0 (cannot be changed).
+        GPT-5 is a reasoning model with architectural constraints:
+        - Only supports temperature=1.0 (default)
+        - Generates internal reasoning tokens that consume max_completion_tokens budget
+        - Using "minimal" reasoning effort prevents token exhaustion
+        """
         response = self.openai_client.chat.completions.create(
             model=API_CONFIG['response_models']['gpt5'],
             messages=[
                 {"role": "user", "content": prompt}
             ],
             max_completion_tokens=self.max_tokens,
-            # temperature not supported for GPT-5 (only default value 1.0)
+            # temperature not included - GPT-5 only supports default 1.0
             reasoning_effort="minimal"  # Minimal reasoning = faster, no token exhaustion
         )
         content = response.choices[0].message.content
@@ -193,10 +202,15 @@ class ResponseCollector:
         return content
 
     def _query_gemini(self, prompt: str) -> str:
-        """Query Gemini 2.5 Flash."""
+        """
+        Query Gemini 2.5 Flash.
+
+        Temperature: Uses default 1.0 for fair comparison across models.
+        Gemini default: 1.0 (range: 0.0-2.0)
+        """
         generation_config = {
             'max_output_tokens': self.max_tokens,
-            'temperature': API_CONFIG['temperature_response']
+            'temperature': API_CONFIG['temperature_response']  # Default 1.0
         }
         response = self.gemini_model.generate_content(
             prompt,
