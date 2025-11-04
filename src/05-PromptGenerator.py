@@ -171,7 +171,13 @@ class PromptGenerator:
         batch_size = API_CONFIG['prompt_generation_batch_size']
         num_batches = (num_prompts + batch_size - 1) // batch_size
 
-        with tqdm(total=num_batches, desc=f"{category} ({refusal_type})", leave=False) as pbar:
+        # Print category header
+        print(f"\n{'─'*60}")
+        print(f"📝 {category.upper().replace('_', ' ')} ({refusal_type})")
+        print(f"   Target: {num_prompts} prompts | Batches: {num_batches} × {batch_size}")
+        print(f"{'─'*60}")
+
+        with tqdm(total=num_batches, desc=f"  Batches", leave=False, position=1) as pbar:
             for i in range(num_batches):
                 current_batch_size = min(batch_size, num_prompts - len(all_prompts))
 
@@ -214,7 +220,14 @@ class PromptGenerator:
                     # No evaluation - use all generated prompts
                     all_prompts.extend(batch_prompts)
 
+                # Print detailed batch progress
                 pbar.update(1)
+                print(f"  ✓ Batch {i+1}/{num_batches}: Generated {current_batch_size} → Total: {len(all_prompts)}/{num_prompts} prompts")
+
+        # Print category summary
+        print(f"{'─'*60}")
+        print(f"✅ {category.upper().replace('_', ' ')} COMPLETE: {len(all_prompts)}/{num_prompts} prompts")
+        print(f"{'─'*60}\n")
 
         # Calculate quality pass rate
         if self.stats['total_generated'] > 0:

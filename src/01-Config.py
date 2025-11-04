@@ -45,7 +45,7 @@ API_CONFIG = {
     'judge_max_tokens': 50,                     # Small JSON response
 
     # Batch Sizes
-    'prompt_generation_batch_size': 50,         # Batch size for generating prompts
+    'prompt_generation_batch_size': 10,         # Batch size for generating prompts (smaller = more progress updates)
     'inference_batch_size': 16                  # Batch size for model inference/analysis
 }
 
