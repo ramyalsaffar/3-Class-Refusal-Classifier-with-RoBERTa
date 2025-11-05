@@ -122,7 +122,7 @@ CodeFilePath = glob.glob(project_path + "/*Code/*Python/")[0]
 code_files_ls = os.listdir(CodeFilePath)
 code_files_ls.sort()
 code_files_ls = [x for x in code_files_ls if "py" in x]
-code_files_ls = code_files_ls[1:30]
+code_files_ls = code_files_ls[1:31]  # Load files 02-31 (skip 01-Imports.py, skip production files 32-35)
 
 
 # Loop over cde files
