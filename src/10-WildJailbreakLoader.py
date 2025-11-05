@@ -124,7 +124,20 @@ class WildJailbreakLoader:
             print(f"🔍 Filtering for successful jailbreaks...")
 
             # Convert to pandas for easier filtering
-            df = self.dataset.to_pandas()
+            # WildJailbreak returns a DatasetDict - need to access the split first
+            if hasattr(self.dataset, 'to_pandas'):
+                # It's a Dataset object - convert directly
+                df = self.dataset.to_pandas()
+            else:
+                # It's a DatasetDict - access the 'train' split (the config we loaded)
+                # The dataset structure is DatasetDict({'train': Dataset(...)})
+                if 'train' in self.dataset:
+                    df = self.dataset['train'].to_pandas()
+                else:
+                    # Fallback: use the first available split
+                    first_split = list(self.dataset.keys())[0]
+                    print(f"  ℹ️  Using split: {first_split}")
+                    df = self.dataset[first_split].to_pandas()
 
             # Filter for specified data type from config (no hardcoded values)
             # These are adversarial jailbreaks that successfully conveyed harmful requests

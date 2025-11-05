@@ -383,6 +383,9 @@ class ResponseCollector:
                 {"role": "user", "content": prompt}
             ]
         )
+        # Defensive check for empty content
+        if not response.content or len(response.content) == 0:
+            return ERROR_RESPONSE
         return response.content[0].text
 
     def _query_gpt5(self, prompt: str) -> str:
@@ -404,6 +407,10 @@ class ResponseCollector:
             # temperature not included - GPT-5 only supports default 1.0
             reasoning_effort="minimal"  # Minimal reasoning = faster, no token exhaustion
         )
+        # Defensive check for empty choices
+        if not response.choices or len(response.choices) == 0:
+            raise ValueError(f"GPT-5 returned empty choices array")
+
         content = response.choices[0].message.content
         # WHY: GPT-5 may return None if all tokens used for reasoning
         if content is None or content == "":

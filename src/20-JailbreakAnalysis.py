@@ -506,6 +506,11 @@ class JailbreakAnalysis:
             print("  ⚠️  No real data available for model-attack matrix")
             return pd.DataFrame()
 
+        # Check if category column exists
+        if 'category' not in real_df.columns:
+            print("  ⚠️  No category metadata available for model-attack matrix")
+            return pd.DataFrame()
+
         # Create matrix
         models = sorted(real_df['model'].unique())
         categories = sorted(real_df['category'].unique())

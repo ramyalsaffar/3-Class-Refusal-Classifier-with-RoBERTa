@@ -101,9 +101,11 @@ class ShapAnalyzer:
         print(f"Background samples: {len(background_texts)}")
         print(f"Texts to explain: {len(texts)}")
 
-        # Create SHAP explainer
+        # Create SHAP explainer with proper masker for text data
         print("\nInitializing SHAP explainer...")
-        explainer = shap.Explainer(self._predict_proba, background_texts)
+        # Use PartitionExplainer with text masker for transformer models
+        masker = shap.maskers.Text(tokenizer=self.tokenizer.tokenize)
+        explainer = shap.Explainer(self._predict_proba, masker, algorithm="partition")
 
         # Compute SHAP values
         print("Computing SHAP values (this may take a while)...")

@@ -189,12 +189,12 @@ class AdversarialTester:
 
                 if attempt == 0:
                     if is_rate_limit:
-                        print(f"\n⚠️  Rate limit error during paraphrasing (attempt {attempt + 1}/{max_attempts})")
+                        print(f"\n⚠️  Rate limit error during paraphrasing (attempt {attempt + 1}/{self.max_paraphrase_attempts})")
                     else:
-                        print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}/{max_attempts}): {e}")
+                        print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}/{self.max_paraphrase_attempts}): {e}")
 
                 # Wait before retry (longer for rate limits)
-                if attempt < max_attempts - 1:
+                if attempt < self.max_paraphrase_attempts - 1:
                     wait_time = self.rate_limit_backoff if is_rate_limit else API_CONFIG['rate_limit_delay']
                     if is_rate_limit:
                         print(f"   ⏳ Waiting {wait_time}s for rate limit recovery...")

@@ -578,6 +578,10 @@ Output ONLY a JSON array of {{num}} strings."""
                 max_tokens=self.max_tokens
             )
 
+            # Defensive check for empty choices
+            if not response.choices or len(response.choices) == 0:
+                raise ValueError("GPT-4o returned empty choices array")
+
             content = response.choices[0].message.content.strip()
 
             # Check for refusal
@@ -694,6 +698,10 @@ Be HARSH but FAIR."""
                 max_tokens=self.max_tokens
             )
 
+            # Defensive check for empty choices
+            if not response.choices or len(response.choices) == 0:
+                raise ValueError("GPT-4o returned empty choices array during evaluation")
+
             content = response.choices[0].message.content.strip()
 
             # Parse JSON
@@ -788,6 +796,10 @@ OUTPUT: Single prompt as plain text (not JSON)."""
                 temperature=self.temperature,
                 max_tokens=API_CONFIG['max_tokens_regenerate']
             )
+
+            # Defensive check for empty choices
+            if not response.choices or len(response.choices) == 0:
+                raise ValueError("GPT-4o returned empty choices array during regeneration")
 
             regenerated = response.choices[0].message.content.strip()
 
