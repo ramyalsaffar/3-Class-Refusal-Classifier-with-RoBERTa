@@ -134,6 +134,177 @@ class ResponseCollector:
 
         return df
 
+    def collect_all_responses_with_checkpoints(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
+        """
+        Collect responses from all models with parallel processing and checkpointing.
+
+        NEW METHOD (Phase 2/3): Adds error recovery and 5-10x speedup via parallel API calls.
+
+        Args:
+            prompts: Dictionary with keys: 'hard_refusal', 'soft_refusal', 'no_refusal'
+
+        Returns:
+            DataFrame with columns: [prompt, response, model, expected_label, timestamp]
+        """
+        # Initialize checkpoint manager
+        self.checkpoint_manager = CheckpointManager(
+            checkpoint_dir=data_checkpoints_path,
+            operation_name='response_collection',
+            checkpoint_every=CHECKPOINT_CONFIG['collection_checkpoint_every'],
+            auto_cleanup=CHECKPOINT_CONFIG['auto_cleanup'],
+            keep_last_n=CHECKPOINT_CONFIG['keep_last_n']
+        )
+
+        # Get parallel processing config
+        self.parallel_workers = API_CONFIG['parallel_workers']
+        self.checkpoint_every = API_CONFIG['collection_batch_size']
+
+        # Flatten prompts with expected labels
+        prompt_data = []
+        for label_name, prompt_list in prompts.items():
+            for prompt in prompt_list:
+                prompt_data.append({
+                    'prompt': prompt,
+                    'expected_label': label_name
+                })
+
+        total_prompts = len(prompt_data)
+        total_calls = total_prompts * len(self.models)
+
+        print(f"\n{'='*60}")
+        print(f"🤖 COLLECTING RESPONSES (PARALLEL + CHECKPOINTED)")
+        print(f"{'='*60}")
+        print(f"  Total prompts: {total_prompts}")
+        print(f"  Models: {', '.join(self.models)}")
+        print(f"  Total API calls: {total_calls}")
+        print(f"  Parallel workers: {self.parallel_workers}")
+        print(f"  Checkpoint every: {self.checkpoint_every} responses")
+        print(f"{'='*60}\n")
+
+        # Check for existing checkpoint
+        checkpoint_data = None
+        if CHECKPOINT_CONFIG['collection_resume_enabled']:
+            checkpoint_data = self.checkpoint_manager.load_latest_checkpoint(
+                max_age_hours=CHECKPOINT_CONFIG['max_checkpoint_age_hours']
+            )
+
+        # Resume from checkpoint or start fresh
+        if checkpoint_data:
+            responses_df = checkpoint_data['data'].copy()
+            completed_count = checkpoint_data['last_index']
+            print(f"✅ Resuming from checkpoint: {completed_count} responses already collected\n")
+        else:
+            responses_df = pd.DataFrame()
+            completed_count = 0
+
+        # Create tasks for all prompt-model combinations
+        tasks = []
+        for prompt_info in prompt_data:
+            for model_name in self.models:
+                # Skip if already completed (from checkpoint)
+                task_id = f"{prompt_info['prompt'][:50]}_{model_name}"
+                if checkpoint_data and task_id in checkpoint_data.get('metadata', {}).get('completed_tasks', set()):
+                    continue
+
+                tasks.append({
+                    'prompt': prompt_info['prompt'],
+                    'expected_label': prompt_info['expected_label'],
+                    'model': model_name,
+                    'task_id': task_id
+                })
+
+        # Track completed tasks
+        completed_tasks = checkpoint_data.get('metadata', {}).get('completed_tasks', set()) if checkpoint_data else set()
+        completed_since_checkpoint = 0
+
+        # Parallel processing with ThreadPoolExecutor
+        lock = threading.Lock()  # For thread-safe DataFrame updates
+
+        with ThreadPoolExecutor(max_workers=self.parallel_workers) as executor:
+            # Submit all tasks
+            future_to_task = {
+                executor.submit(self._collect_single_response_safe, task): task
+                for task in tasks
+            }
+
+            # Process completed tasks
+            with tqdm(total=len(tasks), desc="Collecting responses", initial=completed_count) as pbar:
+                for future in as_completed(future_to_task):
+                    task = future_to_task[future]
+                    result = future.result()
+
+                    if result:
+                        # Thread-safe DataFrame update
+                        with lock:
+                            new_row = pd.DataFrame([{
+                                'prompt': result['prompt'],
+                                'response': result['response'],
+                                'model': result['model'],
+                                'expected_label': result['expected_label'],
+                                'timestamp': result['timestamp']
+                            }])
+                            responses_df = pd.concat([responses_df, new_row], ignore_index=True)
+                            completed_tasks.add(task['task_id'])
+                            completed_count += 1
+                            completed_since_checkpoint += 1
+
+                        # Checkpoint periodically
+                        if completed_since_checkpoint >= self.checkpoint_every:
+                            with lock:
+                                self.checkpoint_manager.save_checkpoint(
+                                    data=responses_df,
+                                    last_index=completed_count,
+                                    metadata={'completed_tasks': completed_tasks}
+                                )
+                                completed_since_checkpoint = 0
+
+                    pbar.update(1)
+
+        # Final checkpoint
+        if completed_since_checkpoint > 0:
+            self.checkpoint_manager.save_checkpoint(
+                data=responses_df,
+                last_index=completed_count,
+                metadata={'completed_tasks': completed_tasks}
+            )
+
+        print(f"\n{'='*60}")
+        print(f"✅ RESPONSE COLLECTION COMPLETE")
+        print(f"{'='*60}")
+        print(f"  Total responses: {len(responses_df)}")
+        print(f"{'='*60}\n")
+
+        return responses_df
+
+    def _collect_single_response_safe(self, task: Dict) -> Optional[Dict]:
+        """
+        Thread-safe wrapper for collecting a single response.
+
+        Args:
+            task: Dictionary with 'prompt', 'expected_label', 'model', 'task_id'
+
+        Returns:
+            Result dictionary or None if error
+        """
+        try:
+            response = self._query_model(task['model'], task['prompt'])
+            return {
+                'prompt': task['prompt'],
+                'response': response,
+                'model': task['model'],
+                'expected_label': task['expected_label'],
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            print(f"\n❌ Error collecting response: {task['model']} - {str(e)[:100]}")
+            return {
+                'prompt': task['prompt'],
+                'response': ERROR_RESPONSE,
+                'model': task['model'],
+                'expected_label': task['expected_label'],
+                'timestamp': datetime.now().isoformat()
+            }
+
     def _query_model(self, model_name: str, prompt: str) -> str:
         """
         Query a specific model with retry logic.

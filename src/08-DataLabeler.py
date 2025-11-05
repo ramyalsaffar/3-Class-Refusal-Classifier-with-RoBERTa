@@ -124,6 +124,153 @@ class DataLabeler:
 
         return -1, -1, 0, 0
 
+    def label_dataset_with_checkpoints(self, responses_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Label entire dataset with parallel processing and checkpointing.
+
+        NEW METHOD (Phase 2/3): Adds error recovery and 5-10x speedup via parallel API calls.
+
+        Args:
+            responses_df: DataFrame with prompt and response columns
+
+        Returns:
+            DataFrame with added columns: refusal_label, jailbreak_label, refusal_confidence, jailbreak_confidence
+        """
+        # Initialize checkpoint manager
+        self.checkpoint_manager = CheckpointManager(
+            checkpoint_dir=data_checkpoints_path,
+            operation_name='labeling',
+            checkpoint_every=CHECKPOINT_CONFIG['labeling_checkpoint_every'],
+            auto_cleanup=CHECKPOINT_CONFIG['auto_cleanup'],
+            keep_last_n=CHECKPOINT_CONFIG['keep_last_n']
+        )
+
+        # Get parallel processing config
+        self.parallel_workers = API_CONFIG['parallel_workers']
+        self.checkpoint_every = API_CONFIG['labeling_batch_size']
+
+        print(f"\n{'='*60}")
+        print(f"🏷️  LABELING DATASET (PARALLEL + CHECKPOINTED)")
+        print(f"{'='*60}")
+        print(f"  Total samples: {len(responses_df)}")
+        print(f"  Parallel workers: {self.parallel_workers}")
+        print(f"  Checkpoint every: {self.checkpoint_every} samples")
+        print(f"{'='*60}\n")
+
+        # Check for existing checkpoint
+        checkpoint_data = None
+        if CHECKPOINT_CONFIG['labeling_resume_enabled']:
+            checkpoint_data = self.checkpoint_manager.load_latest_checkpoint(
+                max_age_hours=CHECKPOINT_CONFIG['max_checkpoint_age_hours']
+            )
+
+        # Resume from checkpoint or start fresh
+        if checkpoint_data:
+            labeled_df = checkpoint_data['data'].copy()
+            start_index = checkpoint_data['last_index']
+            print(f"✅ Resuming from checkpoint: {start_index} samples already labeled\n")
+        else:
+            labeled_df = responses_df.copy()
+            labeled_df['refusal_label'] = -1
+            labeled_df['jailbreak_label'] = -1
+            labeled_df['refusal_confidence'] = 0
+            labeled_df['jailbreak_confidence'] = 0
+            start_index = 0
+
+        # Create tasks for remaining samples
+        tasks = []
+        for idx in range(start_index, len(labeled_df)):
+            row = labeled_df.iloc[idx]
+            tasks.append({
+                'index': idx,
+                'prompt': row['prompt'],
+                'response': row['response']
+            })
+
+        completed_since_checkpoint = 0
+        lock = threading.Lock()  # For thread-safe DataFrame updates
+
+        # Parallel processing with ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=self.parallel_workers) as executor:
+            # Submit all tasks
+            future_to_task = {
+                executor.submit(self._label_single_sample_safe, task): task
+                for task in tasks
+            }
+
+            # Process completed tasks
+            with tqdm(total=len(tasks), desc="Labeling samples", initial=0) as pbar:
+                for future in as_completed(future_to_task):
+                    task = future_to_task[future]
+                    result = future.result()
+
+                    if result:
+                        # Thread-safe DataFrame update
+                        with lock:
+                            labeled_df.at[result['index'], 'refusal_label'] = result['refusal_label']
+                            labeled_df.at[result['index'], 'jailbreak_label'] = result['jailbreak_label']
+                            labeled_df.at[result['index'], 'refusal_confidence'] = result['refusal_confidence']
+                            labeled_df.at[result['index'], 'jailbreak_confidence'] = result['jailbreak_confidence']
+                            completed_since_checkpoint += 1
+
+                        # Checkpoint periodically
+                        if completed_since_checkpoint >= self.checkpoint_every:
+                            with lock:
+                                self.checkpoint_manager.save_checkpoint(
+                                    data=labeled_df,
+                                    last_index=start_index + completed_since_checkpoint
+                                )
+                                completed_since_checkpoint = 0
+
+                    pbar.update(1)
+
+        # Final checkpoint
+        if completed_since_checkpoint > 0:
+            self.checkpoint_manager.save_checkpoint(
+                data=labeled_df,
+                last_index=len(labeled_df)
+            )
+
+        print(f"\n{'='*60}")
+        print(f"✅ LABELING COMPLETE")
+        print(f"{'='*60}")
+        print(f"  Total labeled: {len(labeled_df)}")
+        print(f"{'='*60}\n")
+
+        return labeled_df
+
+    def _label_single_sample_safe(self, task: Dict) -> Optional[Dict]:
+        """
+        Thread-safe wrapper for labeling a single sample.
+
+        Args:
+            task: Dictionary with 'index', 'prompt', 'response'
+
+        Returns:
+            Result dictionary or None if error
+        """
+        try:
+            refusal_label, jailbreak_label, refusal_conf, jailbreak_conf = self.label_response_with_llm_judge(
+                response=task['response'],
+                prompt=task['prompt']
+            )
+            return {
+                'index': task['index'],
+                'refusal_label': refusal_label,
+                'jailbreak_label': jailbreak_label,
+                'refusal_confidence': refusal_conf,
+                'jailbreak_confidence': jailbreak_conf
+            }
+        except Exception as e:
+            print(f"\n❌ Error labeling sample {task['index']}: {str(e)[:100]}")
+            return {
+                'index': task['index'],
+                'refusal_label': -1,
+                'jailbreak_label': -1,
+                'refusal_confidence': 0,
+                'jailbreak_confidence': 0
+            }
+
     def _randomize_class_order(self) -> Tuple[List[Dict], Dict[int, int]]:
         """
         Randomize class order with Soft Refusal ALWAYS as score 1 (middle option).

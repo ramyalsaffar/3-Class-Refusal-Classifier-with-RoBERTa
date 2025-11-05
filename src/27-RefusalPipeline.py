@@ -82,7 +82,11 @@ class RefusalPipeline:
         return prompts
 
     def collect_responses(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
-        """Step 2: Collect LLM responses."""
+        """
+        Step 2: Collect LLM responses.
+
+        UPDATED (Phase 2/3): Uses parallel processing if enabled in config.
+        """
         print("\n" + "="*60)
         print("STEP 2: COLLECTING RESPONSES")
         print("="*60)
@@ -92,7 +96,13 @@ class RefusalPipeline:
             self.api_keys['openai'],
             self.api_keys['google']
         )
-        responses_df = collector.collect_all_responses(prompts)
+
+        # Use checkpointed version if async is enabled
+        if API_CONFIG.get('use_async', True):
+            responses_df = collector.collect_all_responses_with_checkpoints(prompts)
+        else:
+            responses_df = collector.collect_all_responses(prompts)
+
         collector.save_responses(responses_df, data_responses_path)
 
         return responses_df
@@ -102,6 +112,8 @@ class RefusalPipeline:
         Step 4: Label responses using LLM Judge (dual-task).
 
         Labels ONLY clean data (after cleaning), saving API costs.
+
+        UPDATED (Phase 2/3): Uses parallel processing if enabled in config.
         """
         print("\n" + "="*60)
         print("STEP 4: LABELING DATA WITH LLM JUDGE (DUAL-TASK)")
@@ -110,26 +122,31 @@ class RefusalPipeline:
         # Initialize labeler with OpenAI API key (for GPT-4o judge)
         labeler = DataLabeler(api_key=self.api_keys['openai'])
 
-        # Label each response using the judge (returns labels + confidence scores)
-        refusal_labels = []
-        jailbreak_labels = []
-        refusal_confidences = []
-        jailbreak_confidences = []
+        # Use checkpointed version if async is enabled
+        if API_CONFIG.get('use_async', True):
+            labeled_df = labeler.label_dataset_with_checkpoints(responses_df)
+            return labeled_df
+        else:
+            # Sequential labeling (original implementation)
+            refusal_labels = []
+            jailbreak_labels = []
+            refusal_confidences = []
+            jailbreak_confidences = []
 
-        for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
-            refusal_label, jailbreak_label, refusal_conf, jailbreak_conf = labeler.label_response(
-                response=row['response'],
-                prompt=row['prompt']
-            )
-            refusal_labels.append(refusal_label)
-            jailbreak_labels.append(jailbreak_label)
-            refusal_confidences.append(refusal_conf)
-            jailbreak_confidences.append(jailbreak_conf)
+            for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
+                refusal_label, jailbreak_label, refusal_conf, jailbreak_conf = labeler.label_response(
+                    response=row['response'],
+                    prompt=row['prompt']
+                )
+                refusal_labels.append(refusal_label)
+                jailbreak_labels.append(jailbreak_label)
+                refusal_confidences.append(refusal_conf)
+                jailbreak_confidences.append(jailbreak_conf)
 
-        responses_df['refusal_label'] = refusal_labels
-        responses_df['jailbreak_label'] = jailbreak_labels
-        responses_df['refusal_confidence'] = refusal_confidences
-        responses_df['jailbreak_confidence'] = jailbreak_confidences
+            responses_df['refusal_label'] = refusal_labels
+            responses_df['jailbreak_label'] = jailbreak_labels
+            responses_df['refusal_confidence'] = refusal_confidences
+            responses_df['jailbreak_confidence'] = jailbreak_confidences
 
         # Print refusal label distribution
         print(f"\n{'='*60}")
