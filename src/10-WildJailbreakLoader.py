@@ -64,10 +64,32 @@ class WildJailbreakLoader:
                 return False
 
             # Load dataset from config (no hardcoded values)
-            self.dataset = load_dataset(
-                WILDJAILBREAK_CONFIG['dataset_name'],
-                split=WILDJAILBREAK_CONFIG['dataset_split']
-            )
+            # Try loading with authentication token if available
+            try:
+                self.dataset = load_dataset(
+                    WILDJAILBREAK_CONFIG['dataset_name'],
+                    split=WILDJAILBREAK_CONFIG['dataset_split'],
+                    token=True  # Use HuggingFace token if available
+                )
+            except Exception as auth_error:
+                # If authentication fails, provide helpful instructions
+                error_msg = str(auth_error).lower()
+                if 'gated' in error_msg or 'authenticated' in error_msg or 'authentication' in error_msg:
+                    print(f"\n{'='*60}")
+                    print(f"🔒 WildJailbreak is a GATED dataset!")
+                    print(f"{'='*60}")
+                    print(f"\nYou need to:")
+                    print(f"  1. Create a HuggingFace account: https://huggingface.co/join")
+                    print(f"  2. Request access to WildJailbreak:")
+                    print(f"     https://huggingface.co/datasets/allenai/wildjailbreak")
+                    print(f"  3. Get your access token:")
+                    print(f"     https://huggingface.co/settings/tokens")
+                    print(f"  4. Login with token:")
+                    print(f"     huggingface-cli login")
+                    print(f"     (or) pip install huggingface_hub && huggingface-cli login")
+                    print(f"\nAfter authentication, re-run your experiment.")
+                    print(f"{'='*60}\n")
+                raise
 
             print(f"  ✓ Loaded {len(self.dataset):,} total samples")
             print(f"{'='*60}\n")
@@ -75,8 +97,10 @@ class WildJailbreakLoader:
             return True
 
         except Exception as e:
-            print(f"\n❌ ERROR loading WildJailbreak dataset: {e}")
-            print(f"   Ensure you have internet connection and 'datasets' library installed")
+            error_msg = str(e).lower()
+            if 'gated' not in error_msg:  # Only print generic error if not already handled
+                print(f"\n❌ ERROR loading WildJailbreak dataset: {e}")
+                print(f"   Ensure you have internet connection and 'datasets' library installed")
             return False
 
     def filter_successful_jailbreaks(self) -> pd.DataFrame:

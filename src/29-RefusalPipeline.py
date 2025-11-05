@@ -477,11 +477,16 @@ class RefusalPipeline:
         Returns:
             DataFrame with jailbreak training data (real + WildJailbreak if needed)
         """
-        print(f"\n{'='*60}")
-        print(f"🔧 DEBUG: prepare_jailbreak_training_data() called")
+        print(f"\n\n")
+        print(f"{'#'*60}")
+        print(f"{'#'*60}")
+        print(f"##  STEP 4.5: WILDJAILBREAK SUPPLEMENTATION")
+        print(f"{'#'*60}")
+        print(f"{'#'*60}")
+        print(f"\n🔧 DEBUG INFO:")
         print(f"   Input dataframe shape: {labeled_df.shape}")
         print(f"   WILDJAILBREAK_CONFIG['enabled'] = {WILDJAILBREAK_CONFIG['enabled']}")
-        print(f"{'='*60}")
+        print(f"   Jailbreak succeeded count: {(labeled_df['jailbreak_label'] == 1).sum()}")
 
         if not WILDJAILBREAK_CONFIG['enabled']:
             print(f"\n📊 WildJailbreak supplementation disabled")

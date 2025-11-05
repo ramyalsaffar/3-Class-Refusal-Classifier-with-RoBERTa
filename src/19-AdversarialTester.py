@@ -83,7 +83,7 @@ class AdversarialTester:
         }
 
         # Sample from test set
-        sample_df = test_df.sample(n=min(num_samples, len(test_df)), random_state=EXPERIMENT_CONFIG['random_seed'])
+        sample_df = test_df.sample(n=min(num_samples, len(test_df)), random_state=DATASET_CONFIG['random_seed'])
 
         # Evaluate on original
         print("\nEvaluating on original samples...")
