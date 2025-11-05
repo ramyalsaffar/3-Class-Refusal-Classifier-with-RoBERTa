@@ -45,7 +45,13 @@ API_CONFIG = {
 
     # Batch Sizes
     'prompt_generation_batch_size': 10,         # Batch size for generating prompts (smaller = more progress updates)
-    'inference_batch_size': 16                  # Batch size for model inference/analysis
+    'inference_batch_size': 16,                 # Batch size for model inference/analysis
+
+    # Parallel Processing (NEW - Phase 2)
+    'parallel_workers': 5 if not IS_AWS else 10,  # Concurrent API calls (5 local, 10 AWS)
+    'use_async': True,                          # Enable async/parallel processing
+    'labeling_batch_size': 100,                 # Checkpoint every N labeled samples
+    'collection_batch_size': 500                # Checkpoint every N collected responses
 }
 
 
@@ -204,6 +210,25 @@ PROMPT_GENERATION_CONFIG = {
 #-----------------------
 LABELING_CONFIG = {
     'low_confidence_threshold': 60,             # Confidence threshold (0-100 scale)
+}
+
+
+# Checkpointing Configuration (NEW - Phase 2)
+#----------------------------------------------
+# Automatic checkpointing for error recovery during long-running operations
+CHECKPOINT_CONFIG = {
+    # Checkpoint Frequency
+    'labeling_checkpoint_every': 100,           # Save checkpoint every N labeled samples
+    'collection_checkpoint_every': 500,         # Save checkpoint every N collected responses
+
+    # Resume Settings
+    'labeling_resume_enabled': True,            # Auto-resume labeling from checkpoint
+    'collection_resume_enabled': True,          # Auto-resume collection from checkpoint
+
+    # Cleanup Settings
+    'auto_cleanup': True,                       # Auto-delete old checkpoints
+    'keep_last_n': 2,                           # Keep only last N checkpoints
+    'max_checkpoint_age_hours': 48              # Delete checkpoints older than N hours
 }
 
 
