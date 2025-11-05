@@ -27,6 +27,11 @@ from typing import List, Dict, Tuple, Optional
 import getpass
 import atexit
 
+# Async and Parallel Processing (NEW - for Phase 2)
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
 # Data Science
 import pandas as pd
 import numpy as np

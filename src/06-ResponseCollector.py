@@ -27,6 +27,12 @@ class ResponseCollector:
         self.rate_delay = API_CONFIG['rate_limit_delay']
         self.max_retries = API_CONFIG['max_retries']
 
+        # NEW: Parallel processing and checkpointing support
+        self.parallel_workers = API_CONFIG.get('parallel_workers', 5)
+        self.use_async = API_CONFIG.get('use_async', True)
+        self.checkpoint_every = CHECKPOINT_CONFIG['collection_checkpoint_every']
+        self.checkpoint_manager = None  # Initialized when needed
+
     def collect_all_responses(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
         """
         Collect responses from all models for all prompts.
