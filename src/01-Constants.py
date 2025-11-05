@@ -4,14 +4,6 @@
 # This must be loaded FIRST before Config.py since Config references DEVICE and paths.
 ###############################################################################
 
-import os
-import sys
-import glob
-import torch
-
-
-#------------------------------------------------------------------------------
-
 
 # Environment Detection (Smart Defaults)
 #----------------------------------------
@@ -86,6 +78,116 @@ else:
 
 
 #------------------------------------------------------------------------------
+
+
+# Python Display Settings
+#------------------------
+pd.set_option('display.max_rows', 500)
+pd.set_option("display.max_columns", 500)
+pd.set_option("display.max_colwidth", 250)
+pd.set_option('display.width', 1000)
+pd.set_option('display.precision', 5)
+pd.options.display.float_format = '{:.4f}'.format
+
+
+#------------------------------------------------------------------------------
+
+
+# macOS Sleep Prevention
+#-----------------------
+# Prevents Mac from sleeping during long-running experiments
+# Uses native 'caffeinate' command to keep system awake
+
+class KeepAwake:
+    """
+    Context manager to prevent macOS from sleeping during long operations.
+
+    Uses the native 'caffeinate' command which prevents:
+    - Display sleep
+    - System sleep
+    - Disk sleep
+
+    Automatically restores normal sleep behavior when done or on error.
+    Only active on macOS - no-op on other platforms.
+
+    Usage:
+        with KeepAwake():
+            # Your long-running code here
+            pipeline.run_full_pipeline()
+    """
+
+    def __init__(self, verbose: bool = True):
+        """
+        Initialize KeepAwake context manager.
+
+        Args:
+            verbose: Print status messages (default: True)
+        """
+        self.verbose = verbose
+        self.process = None
+        self.is_mac = sys.platform == 'darwin'
+
+    def __enter__(self):
+        """Start preventing sleep when entering context."""
+        if not self.is_mac:
+            if self.verbose:
+                print("ℹ️  Sleep prevention only available on macOS")
+            return self
+
+        try:
+            # Start caffeinate process
+            # -d: Prevent display sleep
+            # -i: Prevent system idle sleep
+            # -m: Prevent disk sleep
+            self.process = subprocess.Popen(
+                ['caffeinate', '-dims'],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            if self.verbose:
+                print("☕ caffeinate activated - Mac will stay awake during execution")
+
+            # Register cleanup in case of unexpected termination
+            atexit.register(self._cleanup)
+
+        except FileNotFoundError:
+            if self.verbose:
+                print("⚠️  caffeinate command not found - sleep prevention unavailable")
+        except Exception as e:
+            if self.verbose:
+                print(f"⚠️  Could not activate sleep prevention: {e}")
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Stop preventing sleep when exiting context."""
+        self._cleanup()
+        return False  # Don't suppress exceptions
+
+    def _cleanup(self):
+        """Terminate caffeinate process and restore normal sleep behavior."""
+        if self.process is not None:
+            try:
+                self.process.terminate()
+                self.process.wait(timeout=5)
+                if self.verbose:
+                    print("☕ caffeinate deactivated - Mac sleep settings restored")
+            except Exception:
+                # Force kill if terminate doesn't work
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+            finally:
+                self.process = None
+                # Unregister from atexit to avoid double cleanup
+                try:
+                    atexit.unregister(self._cleanup)
+                except Exception:
+                    pass
+
+
 
 
 # =============================================================================
