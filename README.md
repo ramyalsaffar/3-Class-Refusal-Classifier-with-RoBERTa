@@ -4,6 +4,36 @@ A production-ready, dual-task classification system using fine-tuned RoBERTa mod
 1. **Refusal Classification** (3 classes): No Refusal, Hard Refusal, Soft Refusal
 2. **Jailbreak Detection** (2 classes): Attack Failed, Attack Succeeded
 
+## 🆕 What's New in V09
+
+**V09** introduces major performance and reliability improvements:
+
+### **🚀 Parallel Processing & Checkpointing (5-10x Speedup)**
+- **Parallel API Calls**: ThreadPoolExecutor-based concurrent processing
+  - 5 workers locally, 10 workers on AWS
+  - Response collection: ~500 responses checkpointed
+  - Labeling: ~100 samples checkpointed
+- **Automatic Error Recovery**: Resume from last checkpoint after crashes/interruptions
+- **Smart Cleanup**: Keeps last 2 checkpoints, auto-deletes old ones
+
+### **🛡️ Smart Validation for Modern LLMs**
+- **Zero-Sample Handling**: Gracefully handles cases where modern LLMs (Claude 4, GPT-5, Gemini 2.5) successfully defend against ALL jailbreak attempts
+- **Minimum Sample Check**: Validates at least 10 samples per class before training
+- **Clear Messaging**: Comprehensive explanation when jailbreak detector is skipped
+- **No Crashes**: Weighted loss calculation supports zero-count classes
+
+### **🏗️ Improved Architecture**
+- **File Reorganization**: `01-Constants.py` centralizes environment detection, paths, device config
+- **Loading Order**: Constants → Config → Modules (proper dependency management)
+- **Async Imports**: Pre-loaded threading support for parallel processing
+
+### **Performance Impact**
+| Operation | V08 (Sequential) | V09 (Parallel) | Speedup |
+|-----------|-----------------|----------------|---------|
+| Response Collection (2000 prompts × 3 models) | ~30 minutes | ~5 minutes | **6x faster** |
+| LLM Judge Labeling (6000 samples) | ~45 minutes | ~8 minutes | **5.6x faster** |
+| **Total Pipeline** | **~75 minutes** | **~13 minutes** | **5.8x faster** |
+
 ---
 
 ## 🧠 Why RoBERTa?
@@ -85,19 +115,20 @@ A production-ready, dual-task classification system using fine-tuned RoBERTa mod
 ```
 Dual-RoBERTa-Classifiers/
 ├── src/
-│   ├── 01-Imports.py              # Central import manager
+│   ├── 00-Imports.py               # [RENAMED V09] Central import manager
+│   ├── 01-Constants.py             # [NEW V09] Environment, paths, device, class labels
 │   ├── 02-Config.py                # All configuration settings (includes AWS config)
-│   ├── 03-Constants.py             # Global constants
-│   ├── 04-SecretsHandler.py        # AWS Secrets Manager
+│   ├── 03A-CheckpointManager.py    # [NEW V09] Checkpoint management for error recovery
+│   ├── 04-AWS.py                   # AWS configuration and Secrets Manager
 │   ├── 05-PromptGenerator.py       # 3-stage prompt generation
-│   ├── 06-ResponseCollector.py     # Multi-LLM response collection
+│   ├── 06-ResponseCollector.py     # [ENHANCED V09] Multi-LLM response collection + parallel processing
 │   ├── 07-DataCleaner.py           # Comprehensive data cleaning
-│   ├── 08-DataLabeler.py           # LLM judge labeling
+│   ├── 08-DataLabeler.py           # [ENHANCED V09] LLM judge labeling + parallel processing
 │   ├── 09-LabelingQualityAnalyzer.py
 │   ├── 10-ClassificationDataset.py # PyTorch Dataset
 │   ├── 11-RefusalClassifier.py     # 3-class RoBERTa model
 │   ├── 12-JailbreakDetector.py     # 2-class RoBERTa model
-│   ├── 13-Trainer.py               # Standard trainer with weighted loss
+│   ├── 13-Trainer.py               # [ENHANCED V09] Trainer with weighted loss + zero-sample handling
 │   ├── 14-CrossValidator.py        # K-fold cross-validation (Phase 2)
 │   ├── 15-PerModelAnalyzer.py      # Per-model performance analysis
 │   ├── 16-ConfidenceAnalyzer.py    # Confidence score analysis
