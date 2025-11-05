@@ -305,6 +305,19 @@ class RefusalPipeline:
             labeled_df = labeled_df[labeled_df['refusal_label'] != -1].copy()
             print(f"✓ Remaining samples: {len(labeled_df)}")
 
+        # Filter out NaN values in critical columns (COMPREHENSIVE FILTERING)
+        # This prevents downstream errors in analyzers (PerModelAnalyzer, AttentionVisualizer, AdversarialTester)
+        initial_count = len(labeled_df)
+        labeled_df = labeled_df.dropna(subset=['response', 'prompt', 'model', 'refusal_label', 'jailbreak_label']).copy()
+        nan_filtered = initial_count - len(labeled_df)
+
+        if nan_filtered > 0:
+            print(f"⚠️  Filtered out {nan_filtered} samples with NaN values in critical columns")
+            print(f"✓ Remaining samples: {len(labeled_df)}")
+
+        if len(labeled_df) == 0:
+            raise ValueError("No valid samples remaining after filtering! Check data quality.")
+
         # Split data (same splits for both classifiers to maintain consistency)
         train_df, temp_df = train_test_split(
             labeled_df,

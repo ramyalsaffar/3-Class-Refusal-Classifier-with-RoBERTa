@@ -37,8 +37,16 @@ class JailbreakDetector(nn.Module):
         self.model_name = model_name or MODEL_CONFIG['model_name']
         dropout = dropout or MODEL_CONFIG['dropout']
 
-        # Load pre-trained RoBERTa
-        self.roberta = RobertaModel.from_pretrained(self.model_name)
+        # Load pre-trained RoBERTa with attn_implementation="eager" to suppress warnings
+        # WHY: Prevents "RobertaSdpaSelfAttention" warning for compatibility
+        # The "some weights not initialized" warning is expected for fine-tuning (pooler layer)
+        import transformers
+        transformers.logging.set_verbosity_error()  # Suppress initialization warnings
+        self.roberta = RobertaModel.from_pretrained(
+            self.model_name,
+            attn_implementation="eager"  # Use eager attention to suppress compatibility warnings
+        )
+        transformers.logging.set_verbosity_warning()  # Restore normal logging
 
         # Get hidden size from config
         self.hidden_size = self.roberta.config.hidden_size  # 768 for roberta-base

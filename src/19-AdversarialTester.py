@@ -83,8 +83,16 @@ class AdversarialTester:
             'retry_distribution': {}
         }
 
-        # Sample from test set
-        sample_df = test_df.sample(n=min(num_samples, len(test_df)), random_state=DATASET_CONFIG['random_seed'])
+        # Filter out NaN responses BEFORE sampling to prevent paraphrasing errors
+        valid_df = test_df[test_df['response'].notna() & (test_df['response'].str.len() > 0)].copy()
+
+        if len(valid_df) == 0:
+            print(f"❌ ERROR: No valid responses found in test set (all NaN or empty)")
+            return {'error': 'No valid responses'}
+
+        # Sample from filtered test set
+        sample_df = valid_df.sample(n=min(num_samples, len(valid_df)), random_state=DATASET_CONFIG['random_seed'])
+        print(f"Sampled {len(sample_df)} valid responses (filtered {len(test_df) - len(valid_df)} NaN/empty)")
 
         # Evaluate on original
         print("\nEvaluating on original samples...")

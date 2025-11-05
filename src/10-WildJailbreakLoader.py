@@ -284,24 +284,39 @@ class WildJailbreakLoader:
         try:
             standardized = pd.DataFrame()
 
-            # Map fields (adjust based on actual WildJailbreak schema)
-            # WildJailbreak likely has: 'prompt', 'completion', 'data_type', 'tactics'
-            if 'prompt' in df.columns:
+            # Map fields based on ACTUAL WildJailbreak schema (validated 2024)
+            # WildJailbreak has: 'adversarial', 'vanilla', 'completion', 'data_type'
+            # For adversarial_harmful data, use 'adversarial' field (non-empty)
+            # For vanilla_harmful data, use 'vanilla' field
+
+            # Prompt field mapping
+            if 'adversarial' in df.columns and 'vanilla' in df.columns:
+                # Use adversarial if non-empty, otherwise vanilla
+                standardized['prompt'] = df.apply(
+                    lambda row: row['adversarial'] if (pd.notna(row['adversarial']) and str(row['adversarial']).strip() != '')
+                               else row['vanilla'] if pd.notna(row['vanilla']) else '',
+                    axis=1
+                )
+            elif 'adversarial' in df.columns:
+                standardized['prompt'] = df['adversarial']
+            elif 'vanilla' in df.columns:
+                standardized['prompt'] = df['vanilla']
+            elif 'prompt' in df.columns:
                 standardized['prompt'] = df['prompt']
-            elif 'vanilla_prompt' in df.columns:
-                standardized['prompt'] = df['vanilla_prompt']
             else:
-                print(f"⚠️  WARNING: 'prompt' field not found, using index as placeholder")
-                standardized['prompt'] = [f"WildJailbreak sample {i}" for i in range(len(df))]
+                print(f"❌ ERROR: No prompt field found ('adversarial', 'vanilla', or 'prompt')")
+                print(f"   Available columns: {list(df.columns)}")
+                return pd.DataFrame()
 
             # Response field
             if 'completion' in df.columns:
-                standardized['response'] = df['completion']
+                standardized['response'] = df['completion'].fillna('')  # Handle NaN values
             elif 'response' in df.columns:
-                standardized['response'] = df['response']
+                standardized['response'] = df['response'].fillna('')  # Handle NaN values
             else:
-                print(f"⚠️  WARNING: 'response'/'completion' field not found, using empty string")
-                standardized['response'] = ""
+                print(f"❌ ERROR: No response field found ('completion' or 'response')")
+                print(f"   Available columns: {list(df.columns)}")
+                return pd.DataFrame()
 
             # Expected label (all are jailbreak prompts)
             standardized['expected_label'] = 'jailbreaks'

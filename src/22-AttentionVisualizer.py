@@ -208,6 +208,11 @@ class AttentionVisualizer:
                 row = class_samples.iloc[idx]
                 text = row['response']
 
+                # Validate text is a string and not NaN
+                if not isinstance(text, str) or pd.isna(text) or len(text) == 0:
+                    print(f"\n⚠️  Skipping invalid text at index {idx} (NaN or empty)")
+                    continue
+
                 # Get attention
                 attention_data = self.get_attention_weights(text)
 

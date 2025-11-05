@@ -38,7 +38,13 @@ class PerModelAnalyzer:
         Returns:
             Dictionary with per-model results
         """
-        models = test_df['model'].unique()
+        # Filter out NaN model values before analysis
+        models = test_df['model'].dropna().unique()
+
+        if len(models) == 0:
+            print(f"❌ ERROR: No valid model names found in test data")
+            return {}
+
         results = {}
 
         print("\n" + "="*50)

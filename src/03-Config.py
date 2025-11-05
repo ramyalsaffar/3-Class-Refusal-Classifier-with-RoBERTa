@@ -49,7 +49,9 @@ API_CONFIG = {
     'inference_batch_size': 16,                 # Batch size for model inference/analysis
 
     # Parallel Processing (NEW - Phase 2)
-    'parallel_workers': 5 if not IS_AWS else 10,  # Concurrent API calls (5 local, 10 AWS)
+    # IMPORTANT: Reduced from 5→2 to prevent OpenAI rate limit errors (429)
+    # 2 workers provides good balance: 2x speed vs sequential, minimal rate limits
+    'parallel_workers': 2 if not IS_AWS else 10,  # Concurrent API calls (2 local, 10 AWS)
     'use_async': True,                          # Enable async/parallel processing
     'labeling_batch_size': 100,                 # Checkpoint every N labeled samples
     'collection_batch_size': 500                # Checkpoint every N collected responses
