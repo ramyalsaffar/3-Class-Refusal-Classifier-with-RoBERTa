@@ -82,7 +82,12 @@ class RefusalPipeline:
         return prompts
 
     def collect_responses(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
-        """Step 2: Collect LLM responses."""
+        """
+        Step 2: Collect LLM responses.
+
+        NEW: Uses parallel processing with checkpointing for error recovery.
+        Falls back to sequential if parallel is disabled in config.
+        """
         print("\n" + "="*60)
         print("STEP 2: COLLECTING RESPONSES")
         print("="*60)
@@ -92,13 +97,25 @@ class RefusalPipeline:
             self.api_keys['openai'],
             self.api_keys['google']
         )
-        responses_df = collector.collect_all_responses(prompts)
+
+        # Use checkpointed version if async is enabled
+        if API_CONFIG.get('use_async', True):
+            responses_df = collector.collect_all_responses_with_checkpoints(prompts)
+        else:
+            print("(Using sequential collection - parallel processing disabled)")
+            responses_df = collector.collect_all_responses(prompts)
+
         collector.save_responses(responses_df, data_responses_path)
 
         return responses_df
 
     def label_data(self, responses_df: pd.DataFrame) -> pd.DataFrame:
-        """Step 3: Label responses using LLM Judge (dual-task)."""
+        """
+        Step 3: Label responses using LLM Judge (dual-task).
+
+        NEW: Uses parallel processing with checkpointing for error recovery.
+        Falls back to sequential if parallel is disabled in config.
+        """
         print("\n" + "="*60)
         print("STEP 3: LABELING DATA WITH LLM JUDGE (DUAL-TASK)")
         print("="*60)
@@ -106,47 +123,53 @@ class RefusalPipeline:
         # Initialize labeler with OpenAI API key (for GPT-4 judge)
         labeler = DataLabeler(api_key=self.api_keys['openai'])
 
-        # Label each response using the judge (returns both refusal + jailbreak labels)
-        refusal_labels = []
-        jailbreak_labels = []
+        # Use checkpointed version if async is enabled
+        if API_CONFIG.get('use_async', True):
+            labeled_df = labeler.label_dataset_with_checkpoints(responses_df)
+        else:
+            print("(Using sequential labeling - parallel processing disabled)")
 
-        for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
-            refusal_label, jailbreak_label = labeler.label_response(
-                response=row['response'],
-                prompt=row['prompt']
-            )
-            refusal_labels.append(refusal_label)
-            jailbreak_labels.append(jailbreak_label)
+            # Sequential labeling (original implementation)
+            refusal_labels = []
+            jailbreak_labels = []
 
-        responses_df['refusal_label'] = refusal_labels
-        responses_df['jailbreak_label'] = jailbreak_labels
+            for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
+                refusal_label, jailbreak_label = labeler.label_response(
+                    response=row['response'],
+                    prompt=row['prompt']
+                )
+                refusal_labels.append(refusal_label)
+                jailbreak_labels.append(jailbreak_label)
 
-        # Print refusal label distribution
-        print(f"\n{'='*60}")
-        print(f"REFUSAL LABELING SUMMARY")
-        print(f"{'='*60}")
-        for i in range(-1, 3):
-            count = (responses_df['refusal_label'] == i).sum()
-            pct = count / len(responses_df) * 100
-            label_name = labeler.get_label_name(i)
-            print(f"  {label_name}: {count} ({pct:.1f}%)")
+            responses_df['refusal_label'] = refusal_labels
+            responses_df['jailbreak_label'] = jailbreak_labels
+            labeled_df = responses_df
 
-        # Print jailbreak label distribution
-        print(f"\n{'='*60}")
-        print(f"JAILBREAK DETECTION SUMMARY")
-        print(f"{'='*60}")
-        for i in [0, 1]:
-            count = (responses_df['jailbreak_label'] == i).sum()
-            pct = count / len(responses_df) * 100
-            label_name = labeler.get_jailbreak_label_name(i)
-            print(f"  {label_name}: {count} ({pct:.1f}%)")
+            # Print distributions for sequential mode
+            print(f"\n{'='*60}")
+            print(f"REFUSAL LABELING SUMMARY")
+            print(f"{'='*60}")
+            for i in range(-1, 3):
+                count = (labeled_df['refusal_label'] == i).sum()
+                pct = count / len(labeled_df) * 100
+                label_name = labeler.get_label_name(i)
+                print(f"  {label_name}: {count} ({pct:.1f}%)")
+
+            print(f"\n{'='*60}")
+            print(f"JAILBREAK DETECTION SUMMARY")
+            print(f"{'='*60}")
+            for i in [0, 1]:
+                count = (labeled_df['jailbreak_label'] == i).sum()
+                pct = count / len(labeled_df) * 100
+                label_name = labeler.get_jailbreak_label_name(i)
+                print(f"  {label_name}: {count} ({pct:.1f}%)")
 
         # Save labeled data
         labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")
-        responses_df.to_pickle(labeled_path)
+        labeled_df.to_pickle(labeled_path)
         print(f"\n✓ Saved labeled data to {labeled_path}")
 
-        return responses_df
+        return labeled_df
 
     def clean_data(self, labeled_df: pd.DataFrame) -> pd.DataFrame:
         """

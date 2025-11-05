@@ -23,6 +23,11 @@ class DataLabeler:
         self.max_retries = API_CONFIG['max_retries']
         self.retry_delay = API_CONFIG['rate_limit_delay']
 
+        # NEW: Parallel processing and checkpointing support
+        self.parallel_workers = API_CONFIG.get('parallel_workers', 5)
+        self.checkpoint_every = CHECKPOINT_CONFIG['labeling_checkpoint_every']
+        self.checkpoint_manager = None  # Initialized when needed
+
     def label_response(self, response: str, prompt: str) -> Tuple[int, int]:
         """
         Label a response using LLM judge with randomized class order.
@@ -322,6 +327,171 @@ Your response:"""
         except Exception as e:
             print(f"⚠️  Failed to parse judge response: {e}")
             return None
+
+    def label_dataset_with_checkpoints(self, responses_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        NEW: Label dataset with parallel processing and checkpointing.
+
+        Features:
+        - Parallel labeling using ThreadPoolExecutor
+        - Checkpoint every N samples for error recovery
+        - Resume from last checkpoint if interrupted
+        - Thread-safe progress tracking
+
+        Args:
+            responses_df: DataFrame with columns: [prompt, response, ...]
+
+        Returns:
+            DataFrame with added columns: [refusal_label, jailbreak_label]
+        """
+        # Initialize checkpoint manager
+        self.checkpoint_manager = CheckpointManager(
+            checkpoint_dir=CHECKPOINT_CONFIG['labeling_checkpoint_dir'],
+            checkpoint_prefix='labeling',
+            verbose=CHECKPOINT_CONFIG['verbose']
+        )
+
+        total_samples = len(responses_df)
+
+        print(f"\nLabeling dataset (with checkpointing & parallel processing):")
+        print(f"  Total samples: {total_samples}")
+        print(f"  Parallel workers: {self.parallel_workers}")
+        print(f"  Checkpoint every: {self.checkpoint_every} samples")
+
+        # Check for existing checkpoint
+        checkpoint_data = None
+        if CHECKPOINT_CONFIG['labeling_resume_enabled']:
+            checkpoint_data = self.checkpoint_manager.load_latest_checkpoint(
+                max_age_hours=CHECKPOINT_CONFIG['max_checkpoint_age_hours']
+            )
+
+        # Resume from checkpoint or start fresh
+        if checkpoint_data:
+            print(f"\n📂 Resuming from checkpoint...")
+            labeled_df = checkpoint_data['data'].copy()
+            start_index = checkpoint_data['last_index']
+            print(f"   Already labeled: {start_index}/{total_samples} samples")
+        else:
+            print(f"\n🆕 Starting fresh labeling...")
+            labeled_df = responses_df.copy()
+            labeled_df['refusal_label'] = -1  # Initialize
+            labeled_df['jailbreak_label'] = -1  # Initialize
+            start_index = 0
+
+        # Create task list (remaining tasks only)
+        tasks = []
+        for idx in range(start_index, total_samples):
+            tasks.append({
+                'index': idx,
+                'prompt': labeled_df.iloc[idx]['prompt'],
+                'response': labeled_df.iloc[idx]['response']
+            })
+
+        print(f"   Remaining: {len(tasks)} samples to label")
+
+        # Parallel processing with ThreadPoolExecutor
+        completed_since_checkpoint = 0
+        lock = threading.Lock()  # Thread-safe updates
+
+        with ThreadPoolExecutor(max_workers=self.parallel_workers) as executor:
+            # Submit all tasks
+            future_to_task = {
+                executor.submit(self._label_single_sample_safe, task): task
+                for task in tasks
+            }
+
+            # Process completed tasks
+            with tqdm(total=len(tasks), desc="Labeling samples") as pbar:
+                for future in as_completed(future_to_task):
+                    task = future_to_task[future]
+
+                    try:
+                        result = future.result()
+
+                        # Thread-safe update
+                        with lock:
+                            labeled_df.at[result['index'], 'refusal_label'] = result['refusal_label']
+                            labeled_df.at[result['index'], 'jailbreak_label'] = result['jailbreak_label']
+                            completed_since_checkpoint += 1
+
+                            # Checkpoint periodically
+                            if completed_since_checkpoint >= self.checkpoint_every:
+                                self.checkpoint_manager.save_checkpoint(
+                                    data=labeled_df,
+                                    last_index=result['index'] + 1,
+                                    metadata={'total_samples': total_samples}
+                                )
+                                completed_since_checkpoint = 0
+
+                    except Exception as e:
+                        print(f"\n❌ Labeling task {task['index']} failed: {e}")
+
+                    pbar.update(1)
+
+        # Final checkpoint
+        self.checkpoint_manager.save_checkpoint(
+            data=labeled_df,
+            last_index=total_samples,
+            metadata={'total_samples': total_samples, 'status': 'complete'}
+        )
+
+        # Cleanup old checkpoints
+        if CHECKPOINT_CONFIG['auto_cleanup']:
+            self.checkpoint_manager.cleanup_checkpoints(
+                keep_last_n=CHECKPOINT_CONFIG['keep_last_n']
+            )
+
+        # Print summary
+        print(f"\n✓ Labeling complete!")
+        print(f"  Total labeled: {total_samples}")
+
+        # Refusal label distribution
+        print(f"\n  Refusal label distribution:")
+        for i in range(-1, 3):
+            count = (labeled_df['refusal_label'] == i).sum()
+            pct = count / total_samples * 100
+            label_name = self.get_label_name(i)
+            print(f"    {label_name}: {count} ({pct:.1f}%)")
+
+        # Jailbreak label distribution
+        print(f"\n  Jailbreak label distribution:")
+        for i in [0, 1]:
+            count = (labeled_df['jailbreak_label'] == i).sum()
+            pct = count / total_samples * 100
+            label_name = self.get_jailbreak_label_name(i)
+            print(f"    {label_name}: {count} ({pct:.1f}%)")
+
+        return labeled_df
+
+    def _label_single_sample_safe(self, task: Dict) -> Dict:
+        """
+        Safely label a single sample with error handling.
+
+        Args:
+            task: Dict with keys: index, prompt, response
+
+        Returns:
+            Result dict with keys: index, refusal_label, jailbreak_label
+        """
+        try:
+            refusal_label, jailbreak_label = self.label_response(
+                response=task['response'],
+                prompt=task['prompt']
+            )
+
+            return {
+                'index': task['index'],
+                'refusal_label': refusal_label,
+                'jailbreak_label': jailbreak_label
+            }
+
+        except Exception as e:
+            print(f"\n⚠️  Error labeling sample {task['index']}: {str(e)[:100]}")
+            return {
+                'index': task['index'],
+                'refusal_label': -1,
+                'jailbreak_label': -1
+            }
 
     def get_label_name(self, label: int) -> str:
         """Convert numeric refusal label to name."""
