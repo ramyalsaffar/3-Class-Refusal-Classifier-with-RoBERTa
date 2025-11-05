@@ -2,6 +2,9 @@
 #---------------------------
 # This file contains all configuration settings.
 # This is your CONTROL ROOM - modify parameters here.
+#
+# NOTE: This is 02-Config.py (renamed from 01-Config.py)
+# It loads AFTER 01-Constants.py so it can reference DEVICE and other constants.
 ###############################################################################
 
 
@@ -46,7 +49,18 @@ API_CONFIG = {
 
     # Batch Sizes
     'prompt_generation_batch_size': 50,         # Batch size for generating prompts
-    'inference_batch_size': 16                  # Batch size for model inference/analysis
+    'inference_batch_size': 16,                 # Batch size for model inference/analysis
+
+    # Parallel Processing (NEW - for performance optimization)
+    'parallel_workers': 5 if not IS_AWS else 10,  # Concurrent API calls (5 local, 10 AWS)
+    'use_async': True,                          # Use async I/O for API calls
+    'labeling_batch_size': 100,                 # Checkpoint labeling every N samples
+    'collection_batch_size': 500,               # Checkpoint response collection every N samples
+
+    # AWS-Specific Batch Processing (only used when IS_AWS=True)
+    'aws_batch_size': 1000,                     # Larger batches for cloud processing
+    'use_sqs_queue': False,                     # Enable SQS for distributed processing (future)
+    'lambda_workers': 10                        # Lambda functions for parallel work (future)
 }
 
 
@@ -256,6 +270,31 @@ DATA_CLEANING_CONFIG = {
 
     # Verbose Output
     'verbose': True                             # Print detailed cleaning reports
+}
+
+
+# Checkpointing Configuration (NEW - for error recovery)
+#--------------------------------------------------------
+CHECKPOINT_CONFIG = {
+    # Labeling Checkpoints (most critical - expensive GPT-4 calls)
+    'labeling_checkpoint_every': 100,           # Save checkpoint every N samples
+    'labeling_checkpoint_dir': data_checkpoints_path + 'labeling/',
+    'labeling_resume_enabled': True,            # Auto-resume from last checkpoint
+
+    # Response Collection Checkpoints
+    'collection_checkpoint_every': 500,         # Save checkpoint every N responses
+    'collection_checkpoint_dir': data_checkpoints_path + 'collection/',
+    'collection_resume_enabled': True,          # Auto-resume from last checkpoint
+
+    # Checkpoint Management
+    'auto_cleanup': True,                       # Delete checkpoints after success
+    'keep_last_n': 2,                           # Keep N most recent checkpoints (safety)
+    'checkpoint_format': 'pickle',              # Serialization format (pickle/json)
+    'verbose': True,                            # Print checkpoint progress
+
+    # Validation
+    'validate_on_load': True,                   # Validate checkpoint integrity
+    'max_checkpoint_age_hours': 48              # Ignore checkpoints older than N hours
 }
 
 
