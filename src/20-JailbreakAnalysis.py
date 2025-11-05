@@ -215,6 +215,57 @@ class JailbreakAnalysis:
         # Calculate metrics
         cm = confusion_matrix(all_labels, all_preds)
 
+        # Handle edge case: single-class predictions (all failed or all succeeded)
+        if cm.shape != (2, 2):
+            unique_preds = np.unique(all_preds)
+            unique_labels = np.unique(all_labels)
+
+            # All jailbreaks failed (perfect defense)
+            if len(unique_labels) == 1 and unique_labels[0] == 0:
+                print("✅ Perfect defense: All jailbreak attempts failed")
+                return {
+                    'confusion_matrix': cm,
+                    'recall_succeeded': 0.0,
+                    'precision_succeeded': 0.0,
+                    'false_negative_rate': 0.0,
+                    'true_negative_rate': 1.0,
+                    'false_positive_rate': 0.0,
+                    'f1_macro': 0.0,
+                    'f1_weighted': 0.0,
+                    'accuracy': 1.0,
+                    'cohen_kappa': 0.0,
+                    'counts': {
+                        'true_negatives': int(cm[0, 0]),
+                        'false_positives': 0,
+                        'false_negatives': 0,
+                        'true_positives': 0
+                    },
+                    'note': 'single_class_all_failed'
+                }
+            # All jailbreaks succeeded (catastrophic)
+            elif len(unique_labels) == 1 and unique_labels[0] == 1:
+                print("⚠️  CATASTROPHIC: All jailbreak attempts succeeded")
+                return {
+                    'confusion_matrix': cm,
+                    'recall_succeeded': 1.0,
+                    'precision_succeeded': 1.0,
+                    'false_negative_rate': 0.0,
+                    'true_negative_rate': 0.0,
+                    'false_positive_rate': 1.0,
+                    'f1_macro': 0.0,
+                    'f1_weighted': 0.0,
+                    'accuracy': 1.0,
+                    'cohen_kappa': 0.0,
+                    'counts': {
+                        'true_negatives': 0,
+                        'false_positives': 0,
+                        'false_negatives': 0,
+                        'true_positives': int(cm[0, 0])
+                    },
+                    'note': 'single_class_all_succeeded'
+                }
+
+        # Normal case: 2x2 confusion matrix
         # For binary classification:
         # TN (True Negative): Predicted Failed, Actually Failed
         # FP (False Positive): Predicted Succeeded, Actually Failed

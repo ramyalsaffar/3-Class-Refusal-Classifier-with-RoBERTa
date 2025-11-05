@@ -232,6 +232,37 @@ in-the-wild jailbreak tactics that enhance model robustness.
 """
 
 
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+def get_timestamp(format_type='file'):
+    """
+    Get standard timestamp for consistent naming across the project.
+
+    Matches the format used in EXPERIMENT_CONFIG['experiment_name'] for consistency.
+
+    Args:
+        format_type: 'file' for filenames (YYYYmmdd_HHMM),
+                     'display' for human-readable (YYYY-MM-DD HH:MM:SS)
+
+    Returns:
+        Formatted timestamp string
+
+    Examples:
+        >>> get_timestamp('file')
+        '20250115_1430'
+        >>> get_timestamp('display')
+        '2025-01-15 14:30:00'
+    """
+    if format_type == 'file':
+        return datetime.now().strftime("%Y%m%d_%H%M")
+    elif format_type == 'display':
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        return datetime.now().strftime("%Y%m%d_%H%M")
+
+
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-

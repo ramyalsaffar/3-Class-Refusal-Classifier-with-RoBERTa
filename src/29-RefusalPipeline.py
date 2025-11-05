@@ -201,17 +201,20 @@ class RefusalPipeline:
         quality_analyzer = LabelingQualityAnalyzer(verbose=True)
         quality_results = quality_analyzer.analyze_full(responses_df)
 
+        # Generate timestamp for saving
+        timestamp = get_timestamp()
+
         # Save quality analysis results
-        quality_analysis_path = os.path.join(results_path, "labeling_quality_analysis.json")
+        quality_analysis_path = os.path.join(results_path, f"labeling_quality_analysis_{timestamp}.json")
         quality_analyzer.save_results(quality_results, quality_analysis_path)
 
         # Export low-confidence samples for review
         if quality_results['low_confidence']['low_both_count'] > 0:
-            flagged_samples_path = os.path.join(results_path, "flagged_samples_for_review.csv")
+            flagged_samples_path = os.path.join(results_path, f"flagged_samples_for_review_{timestamp}.csv")
             quality_analyzer.export_flagged_samples(responses_df, flagged_samples_path, threshold=LABELING_CONFIG['low_confidence_threshold'])
 
         # Save labeled data
-        labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")
+        labeled_path = os.path.join(data_processed_path, f"labeled_responses_{timestamp}.pkl")
         responses_df.to_pickle(labeled_path)
         print(f"\n✓ Saved labeled data to {labeled_path}")
 
@@ -255,7 +258,8 @@ class RefusalPipeline:
         cleaned_df = cleaner.clean_dataset(responses_df, strategy=strategy)
 
         # Save cleaned data
-        cleaned_path = os.path.join(data_processed_path, "cleaned_responses.pkl")
+        timestamp = get_timestamp()
+        cleaned_path = os.path.join(data_processed_path, f"cleaned_responses_{timestamp}.pkl")
         cleaned_df.to_pickle(cleaned_path)
         print(f"\n✓ Saved cleaned data to {cleaned_path}")
 
@@ -315,9 +319,10 @@ class RefusalPipeline:
         print(f"  Test: {len(test_df)} ({len(test_df)/len(labeled_df)*100:.1f}%)")
 
         # Save splits
-        train_df.to_pickle(os.path.join(data_splits_path, "train.pkl"))
-        val_df.to_pickle(os.path.join(data_splits_path, "val.pkl"))
-        test_df.to_pickle(os.path.join(data_splits_path, "test.pkl"))
+        timestamp = get_timestamp()
+        train_df.to_pickle(os.path.join(data_splits_path, f"train_{timestamp}.pkl"))
+        val_df.to_pickle(os.path.join(data_splits_path, f"val_{timestamp}.pkl"))
+        test_df.to_pickle(os.path.join(data_splits_path, f"test_{timestamp}.pkl"))
 
         # Add 'label' column for backward compatibility with analysis modules
         # Analysis modules expect 'label' column, so copy 'refusal_label' to 'label'
@@ -709,6 +714,9 @@ class RefusalPipeline:
 
         analysis_results = {}
 
+        # Generate timestamp for all analysis outputs
+        timestamp = get_timestamp()
+
         # ═══════════════════════════════════════════════════════
         # REFUSAL CLASSIFIER ANALYSIS
         # ═══════════════════════════════════════════════════════
@@ -722,7 +730,7 @@ class RefusalPipeline:
         per_model_results = per_model_analyzer.analyze(test_df)
         per_model_analyzer.save_results(
             per_model_results,
-            os.path.join(results_path, "per_model_analysis.json")
+            os.path.join(results_path, f"per_model_analysis_{timestamp}.json")
         )
         analysis_results['per_model'] = per_model_results
 
@@ -732,7 +740,7 @@ class RefusalPipeline:
         conf_results, preds, labels, confidences = confidence_analyzer.analyze(test_df)
         confidence_analyzer.save_results(
             conf_results,
-            os.path.join(results_path, "confidence_analysis.json")
+            os.path.join(results_path, f"confidence_analysis_{timestamp}.json")
         )
         analysis_results['confidence'] = conf_results
         analysis_results['predictions'] = {
@@ -749,7 +757,7 @@ class RefusalPipeline:
         adv_results = adversarial_tester.test_robustness(test_df)
         adversarial_tester.save_results(
             adv_results,
-            os.path.join(results_path, "adversarial_testing.json")
+            os.path.join(results_path, f"adversarial_testing_{timestamp}.json")
         )
         analysis_results['adversarial'] = adv_results
 
@@ -810,7 +818,7 @@ class RefusalPipeline:
         jailbreak_results = jailbreak_analyzer.analyze_full(test_df)
         jailbreak_analyzer.save_results(
             jailbreak_results,
-            os.path.join(results_path, "jailbreak_analysis.json")
+            os.path.join(results_path, f"jailbreak_analysis_{timestamp}.json")
         )
         analysis_results['jailbreak'] = jailbreak_results
 
@@ -846,7 +854,7 @@ class RefusalPipeline:
         correlation_results = correlation_analyzer.analyze_full()
         correlation_analyzer.save_results(
             correlation_results,
-            os.path.join(results_path, "correlation_analysis.pkl")
+            os.path.join(results_path, f"correlation_analysis_{timestamp}.pkl")
         )
         correlation_analyzer.visualize_correlation(output_dir=visualizations_path)
         analysis_results['correlation'] = correlation_results

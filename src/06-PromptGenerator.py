@@ -804,11 +804,12 @@ OUTPUT: Single prompt as plain text (not JSON)."""
                                           category, refusal_type, attempt + 1)
 
     def save_prompts(self, prompts: Dict[str, List[str]], output_dir: str):
-        """Save generated prompts to pickle files."""
+        """Save generated prompts to pickle files with timestamps."""
         os.makedirs(output_dir, exist_ok=True)
 
+        timestamp = get_timestamp()
         for prompt_type, prompt_list in prompts.items():
-            filepath = os.path.join(output_dir, f"prompts_{prompt_type}.pkl")
+            filepath = os.path.join(output_dir, f"prompts_{prompt_type}_{timestamp}.pkl")
             pd.DataFrame({'prompt': prompt_list}).to_pickle(filepath)
             print(f"✓ Saved {len(prompt_list)} prompts to {filepath}")
 

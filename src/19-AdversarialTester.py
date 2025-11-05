@@ -125,85 +125,115 @@ class AdversarialTester:
 
         return results
 
-    def _test_dimension(self, df: pd.DataFrame, dimension: str) -> float:
-        """Test one paraphrasing dimension with quality tracking and retry logic."""
-        paraphrased_texts = []
+    def _paraphrase_with_retry(self, text: str, dimension: str) -> str:
+        """
+        Paraphrase a single text with retry logic.
 
-        for text in tqdm(df['response'].tolist(), desc=f"Paraphrasing ({dimension})"):
-            paraphrase_succeeded = False
-            final_paraphrase = None
+        Returns the paraphrased text or original if all attempts fail.
 
-            # Try paraphrasing up to max_paraphrase_attempts times
-            for attempt in range(self.max_paraphrase_attempts):
-                self.quality_stats['total_attempts'] += 1
+        Args:
+            text: Original text to paraphrase
+            dimension: Paraphrasing dimension
 
-                try:
-                    paraphrase = self._generate_paraphrase(text, dimension)
-                    validation_result = self._validate_paraphrase(text, paraphrase)
+        Returns:
+            Paraphrased text or original text if all attempts fail
+        """
+        for attempt in range(self.max_paraphrase_attempts):
+            self.quality_stats['total_attempts'] += 1
 
-                    if validation_result['valid']:
-                        # SUCCESS!
-                        final_paraphrase = paraphrase
-                        paraphrase_succeeded = True
-                        self.quality_stats['successful_paraphrases'] += 1
+            try:
+                paraphrase = self._generate_paraphrase(text, dimension)
+                validation_result = self._validate_paraphrase(text, paraphrase)
 
-                        # Track which attempt succeeded
-                        if attempt == 0:
-                            self.quality_stats['succeeded_first_try'] += 1
-                        else:
-                            self.quality_stats['succeeded_after_retry'] += 1
-                            self.quality_stats['total_retries'] += attempt
+                if validation_result['valid']:
+                    # SUCCESS!
+                    self.quality_stats['successful_paraphrases'] += 1
 
-                        # Track retry distribution
-                        attempt_key = f'attempt_{attempt + 1}'
-                        self.quality_stats['retry_distribution'][attempt_key] = \
-                            self.quality_stats['retry_distribution'].get(attempt_key, 0) + 1
-
-                        # Track semantic similarity
-                        if validation_result['semantic_similarity'] is not None:
-                            self.quality_stats['avg_semantic_similarity'].append(
-                                validation_result['semantic_similarity']
-                            )
-
-                        break  # Success, no need to retry
-
-                    else:
-                        # Validation failed, will retry if attempts remain
-                        if attempt == 0:
-                            # Track failure reasons on first attempt only (to avoid double counting)
-                            if not validation_result['length_ok']:
-                                self.quality_stats['length_failures'] += 1
-                            if not validation_result['semantic_ok']:
-                                self.quality_stats['semantic_similarity_failures'] += 1
-                            if not validation_result['category_ok']:
-                                self.quality_stats['category_preservation_failures'] += 1
-
-                        # Continue to next retry
-                        continue
-
-                except Exception as e:
+                    # Track which attempt succeeded
                     if attempt == 0:
-                        print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}): {e}")
-                    # Continue to next retry
+                        self.quality_stats['succeeded_first_try'] += 1
+                    else:
+                        self.quality_stats['succeeded_after_retry'] += 1
+                        self.quality_stats['total_retries'] += attempt
+
+                    # Track retry distribution
+                    attempt_key = f'attempt_{attempt + 1}'
+                    self.quality_stats['retry_distribution'][attempt_key] = \
+                        self.quality_stats['retry_distribution'].get(attempt_key, 0) + 1
+
+                    # Track semantic similarity
+                    if validation_result['semantic_similarity'] is not None:
+                        self.quality_stats['avg_semantic_similarity'].append(
+                            validation_result['semantic_similarity']
+                        )
+
+                    return paraphrase
+
+                else:
+                    # Validation failed, track on first attempt only
+                    if attempt == 0:
+                        if not validation_result['length_ok']:
+                            self.quality_stats['length_failures'] += 1
+                        if not validation_result['semantic_ok']:
+                            self.quality_stats['semantic_similarity_failures'] += 1
+                        if not validation_result['category_ok']:
+                            self.quality_stats['category_preservation_failures'] += 1
+
                     continue
 
-            # After all attempts
-            if paraphrase_succeeded:
-                paraphrased_texts.append(final_paraphrase)
-            else:
-                # Failed all attempts - fallback to original
-                paraphrased_texts.append(text)
-                self.quality_stats['fallback_to_original'] += 1
-                self.quality_stats['failed_all_retries'] += 1
+            except Exception as e:
+                if attempt == 0:
+                    print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}): {e}")
+                continue
 
-            # Rate limiting
-            time.sleep(API_CONFIG['rate_limit_delay'])
+        # Failed all attempts - fallback to original
+        self.quality_stats['fallback_to_original'] += 1
+        self.quality_stats['failed_all_retries'] += 1
+        return text
 
-        # Create paraphrased dataframe
+    def _test_dimension(self, df: pd.DataFrame, dimension: str) -> float:
+        """Test one paraphrasing dimension with parallel processing and quality tracking."""
+        texts = df['response'].tolist()
+
+        # Use parallel processing if enabled
+        if API_CONFIG.get('use_async', True):
+            workers = API_CONFIG['parallel_workers']
+            print(f"Using {workers} parallel workers for paraphrasing")
+
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                # Submit all tasks
+                future_to_idx = {
+                    executor.submit(self._paraphrase_with_retry, text, dimension): idx
+                    for idx, text in enumerate(texts)
+                }
+
+                # Collect results with progress bar
+                paraphrased_texts = [None] * len(texts)
+                with tqdm(total=len(texts), desc=f"Paraphrasing ({dimension})") as pbar:
+                    for future in as_completed(future_to_idx):
+                        idx = future_to_idx[future]
+                        try:
+                            paraphrased_texts[idx] = future.result()
+                        except Exception as e:
+                            print(f"\n⚠️  Paraphrasing failed for sample {idx}: {e}")
+                            paraphrased_texts[idx] = texts[idx]  # Fallback
+
+                        pbar.update(1)
+
+                        # Rate limiting between completions
+                        time.sleep(API_CONFIG['rate_limit_delay'])
+        else:
+            # Sequential processing (original behavior)
+            print("Using sequential processing (parallel disabled)")
+            paraphrased_texts = []
+            for text in tqdm(texts, desc=f"Paraphrasing ({dimension})"):
+                paraphrased = self._paraphrase_with_retry(text, dimension)
+                paraphrased_texts.append(paraphrased)
+                time.sleep(API_CONFIG['rate_limit_delay'])
+
+        # Create paraphrased dataframe and evaluate
         paraphrased_df = df.copy()
         paraphrased_df['response'] = paraphrased_texts
-
-        # Evaluate
         return self._evaluate_samples(paraphrased_df)
 
     def _generate_paraphrase(self, text: str, dimension: str) -> str:

@@ -415,19 +415,21 @@ class ResponseCollector:
         return response.text
 
     def save_responses(self, df: pd.DataFrame, output_dir: str):
-        """Save responses to files."""
+        """Save responses to files with timestamps."""
         os.makedirs(output_dir, exist_ok=True)
+
+        timestamp = get_timestamp()
 
         # Save by model
         for model_name in self.models:
             model_df = df[df['model'] == model_name]
             safe_name = model_name.replace('-', '_').replace('.', '_')
-            filepath = os.path.join(output_dir, f"{safe_name}_responses.pkl")
+            filepath = os.path.join(output_dir, f"{safe_name}_responses_{timestamp}.pkl")
             model_df.to_pickle(filepath)
             print(f"Saved {len(model_df)} responses to {filepath}")
 
         # Save combined
-        combined_path = os.path.join(output_dir, "all_responses.pkl")
+        combined_path = os.path.join(output_dir, f"all_responses_{timestamp}.pkl")
         df.to_pickle(combined_path)
         print(f"Saved combined responses to {combined_path}")
 
