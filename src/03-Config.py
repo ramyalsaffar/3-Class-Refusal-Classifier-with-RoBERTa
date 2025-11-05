@@ -83,8 +83,8 @@ JAILBREAK_CONFIG = {
 }
 
 
-# WildJailbreak Supplementation Configuration (NEW - V09)
-#----------------------------------------------------------
+# WildJailbreak Supplementation Configuration
+#--------------------------------------------
 # Supplements jailbreak training data when modern LLMs successfully defend against all attacks
 WILDJAILBREAK_CONFIG = {
     # Enable/Disable Supplementation
