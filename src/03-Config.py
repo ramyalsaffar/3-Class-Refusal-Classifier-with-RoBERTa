@@ -119,10 +119,16 @@ WILDJAILBREAK_CONFIG = {
                                                 # Options: adversarial_harmful, adversarial_benign,
                                                 #          vanilla_harmful, vanilla_benign
 
+    # Model Attribution (NEW - V09)
+    'synthetic_model_label': 'WildJailbreak',   # Label for 'model' column in synthetic data
+                                                # Used to distinguish from real model responses
+                                                # Enables filtering synthetic data from per-model analysis
+
     # Transparency & Reporting
     'warn_threshold': 30,                       # Warn if >30% of data from WildJailbreak
     'track_source': True,                       # Add 'data_source' column to track provenance
-    'log_composition': True                     # Print real vs WildJailbreak breakdown during training
+    'log_composition': True,                    # Print real vs WildJailbreak breakdown during training
+    'exclude_from_model_analysis': True         # Exclude WildJailbreak from per-model vulnerability analysis
 }
 
 
@@ -443,6 +449,13 @@ ERROR_ANALYSIS_CONFIG = {
 #-----------------------------------
 HYPOTHESIS_TESTING_CONFIG = {
     'alpha': 0.05,                              # Significance level for tests
+    'confidence_level': 0.95,                   # Confidence level (1 - alpha)
+
+    # Model Vulnerability Comparison (NEW - V09)
+    'min_samples_for_test': 30,                 # Minimum samples per model for chi-square test
+    'effect_size_threshold': 0.1,               # Minimum effect size to report (Cohen's h)
+    'bonferroni_correction': True,              # Apply Bonferroni correction for multiple comparisons
+    'report_effect_sizes': True                 # Include effect sizes in reports
 }
 
 
@@ -454,7 +467,31 @@ VISUALIZATION_CONFIG = {
     'style': 'whitegrid',            # Seaborn style
     'color_palette': 'Set2',
     'font_scale': 1.0,
-    'f1_target': 0.8                 # Target F1 score threshold for visualization
+    'f1_target': 0.8,                # Target F1 score threshold for visualization
+
+    # Model Vulnerability Heatmap (NEW - V09)
+    'heatmap': {
+        'cmap': 'RdYlGn_r',          # Colormap (reversed: Red=high vulnerability, Green=low)
+        'annot': True,               # Show values in cells
+        'fmt': '.1f',                # Format string for annotations (1 decimal place)
+        'cbar_label': 'Jailbreak Success Rate (%)',
+        'vmin': 0,                   # Minimum value for color scale
+        'vmax': 15,                  # Maximum value for color scale (15% jailbreak rate)
+        'linewidths': 0.5,           # Cell border width
+        'linecolor': 'gray',         # Cell border color
+        'figsize_per_cell': 1.2      # Figure size multiplier per cell
+    },
+
+    # Model Comparison Charts (NEW - V09)
+    'model_comparison': {
+        'bar_width': 0.8,            # Bar width for grouped bar charts
+        'error_bar_capsize': 5,      # Error bar cap size
+        'show_values': True,         # Show values on top of bars
+        'value_format': '.2f',       # Format for values on bars
+        'significance_marker': '***', # Marker for statistically significant differences
+        'figsize_width': 10,         # Figure width
+        'figsize_height': 6          # Figure height
+    }
 }
 
 

@@ -96,6 +96,16 @@ class JailbreakAnalysis:
         results['attack_types'] = self._analyze_attack_types(test_df)
         self._print_attack_analysis(results['attack_types'])
 
+        # 6.5. Model × Attack Type Matrix (NEW - V09)
+        print("\n--- Model × Attack Type Matrix (Real Data Only) ---")
+        results['model_attack_matrix'] = self._analyze_model_attack_matrix(test_df)
+        self._print_model_attack_matrix(results['model_attack_matrix'])
+
+        # 6.6. Statistical Significance Testing (NEW - V09)
+        print("\n--- Statistical Significance Test (Real Data Only) ---")
+        results['significance_test'] = self._test_model_vulnerability_significance(test_df)
+        self._print_significance_test(results['significance_test'])
+
         # 7. Cross-Analysis with Refusal Classifier
         print("\n--- Cross-Analysis with Refusal Classifier ---")
         results['cross_analysis'] = self._cross_analyze_with_refusal(test_df, cached_predictions)
@@ -375,6 +385,237 @@ class JailbreakAnalysis:
             if stats['jailbreak_successes'] > 0:
                 print(f"  {category}:")
                 print(f"    Successes: {stats['jailbreak_successes']}/{stats['total_samples']} ({stats['success_rate']*100:.2f}%)")
+
+    def _filter_real_only_data(self, test_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Filter to only real model responses (exclude WildJailbreak synthetic data).
+
+        NEW (V09): Enables per-model vulnerability analysis on real data only,
+        excluding synthetic WildJailbreak samples from model comparisons.
+
+        Args:
+            test_df: Full test dataframe
+
+        Returns:
+            DataFrame with only real model responses (data_source='real')
+        """
+        if not WILDJAILBREAK_CONFIG['exclude_from_model_analysis']:
+            return test_df
+
+        # Filter to real data only
+        if 'data_source' in test_df.columns:
+            real_only = test_df[test_df['data_source'] == 'real'].copy()
+
+            if len(real_only) < len(test_df):
+                excluded_count = len(test_df) - len(real_only)
+                print(f"  ℹ️  Excluded {excluded_count} synthetic WildJailbreak samples from model analysis")
+                print(f"  ℹ️  Analyzing {len(real_only)} real model responses only")
+
+            return real_only
+        else:
+            # No data_source column - assume all real
+            return test_df
+
+    def _analyze_model_attack_matrix(self, test_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create Model × Attack Type matrix showing jailbreak success rates.
+
+        NEW (V09): Reveals which jailbreak tactics work on which models.
+
+        Returns:
+            DataFrame with models as rows, attack types as columns, success rates as values
+
+        Example:
+                          violence  hate  jailbreak  privacy
+        Claude Sonnet:       1.2%   0.5%     2.1%     0.8%
+        GPT-5:               5.3%   7.1%     8.9%     4.2%  ← Consistently vulnerable!
+        Gemini 2.5:          0.2%   0.1%     0.8%     0.3%
+        """
+        # Filter to real data only
+        real_df = self._filter_real_only_data(test_df)
+
+        if len(real_df) == 0:
+            print("  ⚠️  No real data available for model-attack matrix")
+            return pd.DataFrame()
+
+        # Create matrix
+        models = sorted(real_df['model'].unique())
+        categories = sorted(real_df['category'].unique())
+
+        matrix_data = []
+
+        for model in models:
+            row = {'model': model}
+            model_df = real_df[real_df['model'] == model]
+
+            for category in categories:
+                cat_df = model_df[model_df['category'] == category]
+
+                if len(cat_df) > 0:
+                    successes = (cat_df['jailbreak_label'] == 1).sum()
+                    success_rate = (successes / len(cat_df)) * 100  # Convert to percentage
+                    row[category] = success_rate
+                else:
+                    row[category] = 0.0
+
+            matrix_data.append(row)
+
+        matrix_df = pd.DataFrame(matrix_data)
+        matrix_df = matrix_df.set_index('model')
+
+        return matrix_df
+
+    def _test_model_vulnerability_significance(self, test_df: pd.DataFrame) -> Dict:
+        """
+        Test if model vulnerability differences are statistically significant.
+
+        NEW (V09): Uses chi-square test to determine if observed differences
+        in jailbreak success rates across models are statistically significant.
+
+        Returns:
+            Dictionary with:
+                - chi2_statistic: Chi-square test statistic
+                - p_value: P-value from test
+                - significant: Boolean (p < alpha)
+                - alpha: Significance level from config
+                - conclusion: Human-readable conclusion
+                - effect_size: Cramér's V effect size
+                - models_compared: List of model names
+                - vulnerable_model: Model with highest jailbreak rate
+                - robust_model: Model with lowest jailbreak rate
+        """
+        # Filter to real data only
+        real_df = self._filter_real_only_data(test_df)
+
+        if len(real_df) == 0:
+            return {'error': 'No real data available for statistical testing'}
+
+        # Get configuration values
+        alpha = HYPOTHESIS_TESTING_CONFIG['alpha']
+        min_samples = HYPOTHESIS_TESTING_CONFIG['min_samples_for_test']
+
+        # Check if we have enough samples per model
+        model_counts = real_df['model'].value_counts()
+        models = [m for m in model_counts.index if model_counts[m] >= min_samples]
+
+        if len(models) < 2:
+            return {
+                'error': f'Insufficient samples for testing (need ≥{min_samples} per model, have {len(models)} models)',
+                'min_samples_required': min_samples
+            }
+
+        # Filter to models with enough samples
+        test_df_filtered = real_df[real_df['model'].isin(models)].copy()
+
+        # Create contingency table: Models (rows) × Jailbreak Status (columns)
+        contingency = pd.crosstab(
+            test_df_filtered['model'],
+            test_df_filtered['jailbreak_label']
+        )
+
+        # Chi-square test
+        from scipy.stats import chi2_contingency
+        chi2, p_value, dof, expected = chi2_contingency(contingency)
+
+        # Calculate Cramér's V (effect size)
+        n = contingency.sum().sum()
+        cramers_v = np.sqrt(chi2 / (n * (min(contingency.shape) - 1)))
+
+        # Determine most/least vulnerable models
+        vulnerability_rates = {}
+        for model in models:
+            model_df = test_df_filtered[test_df_filtered['model'] == model]
+            rate = (model_df['jailbreak_label'] == 1).sum() / len(model_df)
+            vulnerability_rates[model] = rate
+
+        vulnerable_model = max(vulnerability_rates.items(), key=lambda x: x[1])
+        robust_model = min(vulnerability_rates.items(), key=lambda x: x[1])
+
+        # Create conclusion
+        significant = p_value < alpha
+        if significant:
+            conclusion = f"{vulnerable_model[0]} is significantly more vulnerable than {robust_model[0]} (p={p_value:.5f}, α={alpha})"
+        else:
+            conclusion = f"No statistically significant difference in model vulnerabilities (p={p_value:.3f}, α={alpha})"
+
+        return {
+            'chi2_statistic': chi2,
+            'p_value': p_value,
+            'degrees_of_freedom': dof,
+            'significant': significant,
+            'alpha': alpha,
+            'conclusion': conclusion,
+            'effect_size_cramers_v': cramers_v,
+            'models_compared': models,
+            'vulnerable_model': vulnerable_model[0],
+            'vulnerable_rate': vulnerable_model[1] * 100,
+            'robust_model': robust_model[0],
+            'robust_rate': robust_model[1] * 100,
+            'contingency_table': contingency
+        }
+
+    def _print_model_attack_matrix(self, matrix_df: pd.DataFrame):
+        """Print Model × Attack Type matrix."""
+        if matrix_df.empty:
+            return
+
+        print("\n" + "="*60)
+        print("MODEL × ATTACK TYPE VULNERABILITY MATRIX")
+        print("="*60)
+        print("(Shows jailbreak success rate % for each model-category combination)")
+        print()
+
+        # Print matrix with nice formatting
+        print(matrix_df.to_string(float_format=lambda x: f"{x:5.1f}%"))
+        print()
+
+        # Identify most vulnerable model-category pairs
+        print("Most Vulnerable Combinations:")
+        # Flatten and sort
+        flat_data = []
+        for model in matrix_df.index:
+            for category in matrix_df.columns:
+                rate = matrix_df.loc[model, category]
+                if rate > 0:
+                    flat_data.append((model, category, rate))
+
+        flat_data.sort(key=lambda x: x[2], reverse=True)
+
+        # Show top 5
+        for i, (model, category, rate) in enumerate(flat_data[:5], 1):
+            print(f"  {i}. {model} + {category}: {rate:.1f}%")
+
+        print("="*60)
+
+    def _print_significance_test(self, sig_results: Dict):
+        """Print statistical significance test results."""
+        if 'error' in sig_results:
+            print(f"\n⚠️  Statistical Test Skipped: {sig_results['error']}")
+            return
+
+        print("\n" + "="*60)
+        print("STATISTICAL SIGNIFICANCE TEST")
+        print("="*60)
+        print(f"Test: Chi-Square Test for Model Vulnerability Differences")
+        print(f"Models Compared: {', '.join(sig_results['models_compared'])}")
+        print(f"Significance Level (α): {sig_results['alpha']}")
+        print()
+        print(f"Results:")
+        print(f"  χ² = {sig_results['chi2_statistic']:.3f}")
+        print(f"  p-value = {sig_results['p_value']:.6f}")
+        print(f"  Effect Size (Cramér's V) = {sig_results['effect_size_cramers_v']:.3f}")
+        print()
+
+        if sig_results['significant']:
+            print(f"✓ SIGNIFICANT: Differences are statistically significant (p < {sig_results['alpha']})")
+            print(f"  Most Vulnerable: {sig_results['vulnerable_model']} ({sig_results['vulnerable_rate']:.2f}% jailbreak rate)")
+            print(f"  Most Robust:     {sig_results['robust_model']} ({sig_results['robust_rate']:.2f}% jailbreak rate)")
+        else:
+            print(f"✗ NOT SIGNIFICANT: Differences could be due to chance (p ≥ {sig_results['alpha']})")
+
+        print()
+        print(f"Conclusion: {sig_results['conclusion']}")
+        print("="*60)
 
     def _cross_analyze_with_refusal(self, test_df: pd.DataFrame, cached_predictions: Dict) -> Dict:
         """

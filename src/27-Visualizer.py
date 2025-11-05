@@ -196,6 +196,158 @@ class Visualizer:
         plt.close()
         print(f"✓ Saved training curves to {output_path}")
 
+    def plot_model_vulnerability_heatmap(self, matrix_df: pd.DataFrame, output_path: str):
+        """
+        Plot Model × Attack Type vulnerability heatmap.
+
+        NEW (V09): Visualizes which jailbreak tactics work on which models.
+
+        Args:
+            matrix_df: DataFrame with models as rows, attack types as columns, values = success rate %
+            output_path: Path to save the plot
+
+        NO HARDCODED VALUES: All visual parameters from VISUALIZATION_CONFIG
+        """
+        if matrix_df.empty:
+            print("⚠️  No data for heatmap - skipping")
+            return
+
+        # Get heatmap config
+        heatmap_config = VISUALIZATION_CONFIG['heatmap']
+
+        # Calculate figure size based on matrix dimensions
+        n_rows = len(matrix_df.index)
+        n_cols = len(matrix_df.columns)
+        figsize_per_cell = heatmap_config['figsize_per_cell']
+        figsize = (n_cols * figsize_per_cell + 2, n_rows * figsize_per_cell + 1)
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # Create heatmap
+        sns.heatmap(
+            matrix_df,
+            annot=heatmap_config['annot'],
+            fmt=heatmap_config['fmt'],
+            cmap=heatmap_config['cmap'],
+            vmin=heatmap_config['vmin'],
+            vmax=heatmap_config['vmax'],
+            linewidths=heatmap_config['linewidths'],
+            linecolor=heatmap_config['linecolor'],
+            cbar_kws={'label': heatmap_config['cbar_label']},
+            ax=ax
+        )
+
+        # Title and labels
+        ax.set_title('Model Vulnerability Heatmap: Jailbreak Success Rate (%)',
+                    fontsize=14, fontweight='bold', pad=15)
+        ax.set_xlabel('Attack Category', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Model', fontsize=12, fontweight='bold')
+
+        # Rotate labels
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
+        plt.close()
+        print(f"✓ Saved vulnerability heatmap to {output_path}")
+
+    def plot_model_vulnerability_comparison(self, vulnerability_stats: Dict, significance_results: Dict, output_path: str):
+        """
+        Plot bar chart comparing model vulnerability rates with significance markers.
+
+        NEW (V09): Shows jailbreak success rate per model with statistical significance.
+
+        Args:
+            vulnerability_stats: Dict from JailbreakAnalysis._analyze_vulnerability_per_model()
+            significance_results: Dict from JailbreakAnalysis._test_model_vulnerability_significance()
+            output_path: Path to save the plot
+
+        NO HARDCODED VALUES: All visual parameters from VISUALIZATION_CONFIG
+        """
+        if not vulnerability_stats:
+            print("⚠️  No vulnerability data - skipping comparison chart")
+            return
+
+        # Get model comparison config
+        comp_config = VISUALIZATION_CONFIG['model_comparison']
+
+        # Extract data
+        models = list(vulnerability_stats.keys())
+        success_rates = [vulnerability_stats[m]['success_rate'] * 100 for m in models]  # Convert to percentage
+        total_samples = [vulnerability_stats[m]['total_samples'] for m in models]
+
+        # Create figure
+        fig, ax = plt.subplots(figsize=(comp_config['figsize_width'], comp_config['figsize_height']))
+
+        # Create bar chart
+        bars = ax.bar(
+            range(len(models)),
+            success_rates,
+            width=comp_config['bar_width'],
+            color=['#e74c3c' if rate == max(success_rates) else '#2ecc71' if rate == min(success_rates) else '#3498db'
+                   for rate in success_rates],
+            edgecolor='black',
+            linewidth=1.5
+        )
+
+        # Add value labels on bars if configured
+        if comp_config['show_values']:
+            for i, (bar, rate, n) in enumerate(zip(bars, success_rates, total_samples)):
+                height = bar.get_height()
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2.,
+                    height,
+                    f'{rate:{comp_config["value_format"]}}%\n(n={n})',
+                    ha='center',
+                    va='bottom',
+                    fontsize=10,
+                    fontweight='bold'
+                )
+
+        # Add significance marker if test shows significance
+        if significance_results and not significance_results.get('error'):
+            if significance_results['significant']:
+                # Add marker above most vulnerable model
+                vulnerable_idx = models.index(significance_results['vulnerable_model'])
+                ax.text(
+                    vulnerable_idx,
+                    success_rates[vulnerable_idx] + max(success_rates) * 0.1,
+                    comp_config['significance_marker'],
+                    ha='center',
+                    va='bottom',
+                    fontsize=16,
+                    color='red',
+                    fontweight='bold'
+                )
+
+                # Add note
+                ax.text(
+                    0.98,
+                    0.98,
+                    f'{comp_config["significance_marker"]} p < {significance_results["alpha"]}',
+                    transform=ax.transAxes,
+                    ha='right',
+                    va='top',
+                    fontsize=10,
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+                )
+
+        # Labels and title
+        ax.set_xlabel('Model', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Jailbreak Success Rate (%)', fontsize=12, fontweight='bold')
+        ax.set_title('Model Vulnerability Comparison\n(Lower is Better)',
+                    fontsize=14, fontweight='bold', pad=15)
+        ax.set_xticks(range(len(models)))
+        ax.set_xticklabels(models, rotation=45, ha='right')
+        ax.set_ylim(0, max(success_rates) * 1.3)  # Add space for labels
+        ax.grid(axis='y', alpha=0.3)
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
+        plt.close()
+        print(f"✓ Saved vulnerability comparison to {output_path}")
+
 
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3

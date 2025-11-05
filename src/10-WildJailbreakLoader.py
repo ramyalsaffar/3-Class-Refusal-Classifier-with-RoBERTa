@@ -230,6 +230,7 @@ class WildJailbreakLoader:
         - expected_label: 'jailbreaks' (for jailbreak prompts)
         - jailbreak_label: 1 (Jailbreak Succeeded)
         - data_source: 'wildjailbreak'
+        - model: WILDJAILBREAK_CONFIG['synthetic_model_label'] (for filtering from model analysis)
 
         Args:
             df: DataFrame in WildJailbreak format
@@ -267,6 +268,10 @@ class WildJailbreakLoader:
 
             # Data source tracking
             standardized['data_source'] = 'wildjailbreak'
+
+            # Model attribution (NEW - V09)
+            # Mark as synthetic to enable filtering from per-model vulnerability analysis
+            standardized['model'] = WILDJAILBREAK_CONFIG['synthetic_model_label']
 
             # Optional: preserve tactics for analysis
             if 'tactics' in df.columns:
