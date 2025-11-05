@@ -151,6 +151,70 @@ class ExperimentRunner:
             'google': google_key
         }
 
+    def _check_and_prompt_for_resume(self) -> bool:
+        """
+        Check for existing checkpoints and prompt user to resume or start fresh.
+
+        Returns:
+            True if user wants to resume, False if starting fresh
+        """
+        # Check for both operation types
+        checkpoint_patterns = [
+            'checkpoint_response_collection_*.pkl',
+            'checkpoint_labeling_*.pkl'
+        ]
+
+        found_checkpoints = {}
+        for pattern in checkpoint_patterns:
+            checkpoints = glob.glob(os.path.join(data_checkpoints_path, pattern))
+            if checkpoints:
+                # Get most recent
+                latest = max(checkpoints, key=os.path.getmtime)
+                operation = pattern.split('_')[1]  # Extract operation name
+                timestamp = os.path.basename(latest).split('_')[-1].replace('.pkl', '')
+                age_hours = (time.time() - os.path.getmtime(latest)) / 3600
+
+                found_checkpoints[operation] = {
+                    'path': latest,
+                    'timestamp': timestamp,
+                    'age_hours': age_hours
+                }
+
+        if not found_checkpoints:
+            return False  # No checkpoints, start fresh
+
+        # Display checkpoint information
+        print("\n" + "="*60)
+        print("⚠️  EXISTING CHECKPOINTS FOUND")
+        print("="*60)
+
+        for operation, info in found_checkpoints.items():
+            print(f"\n{operation.title()}:")
+            print(f"  Timestamp: {info['timestamp']}")
+            print(f"  Age: {info['age_hours']:.1f} hours")
+
+        print("\n" + "="*60)
+
+        # Prompt user
+        while True:
+            response = input("\nResume from checkpoint? (y/n): ").strip().lower()
+            if response in ['y', 'yes']:
+                print("✓ Will resume from existing checkpoints")
+                return True
+            elif response in ['n', 'no']:
+                print("✓ Will start fresh (checkpoints will be deleted)")
+                # Cleanup old checkpoints
+                for operation in found_checkpoints:
+                    checkpoint_manager = CheckpointManager(
+                        checkpoint_dir=data_checkpoints_path,
+                        operation_name=operation,
+                        auto_cleanup=False
+                    )
+                    checkpoint_manager.cleanup_checkpoints(keep_last_n=0)
+                return False
+            else:
+                print("⚠️  Please enter 'y' or 'n'")
+
     def _print_experiment_header(self, mode_name: str, description: str = ""):
         """Print formatted experiment header."""
         print("\n" + "="*60)
@@ -172,11 +236,14 @@ class ExperimentRunner:
             f"Testing with {EXPERIMENT_CONFIG['test_sample_size']} total prompts (distributed across categories)"
         )
 
+        # Check for existing checkpoints and prompt user
+        resume_from_checkpoint = self._check_and_prompt_for_resume()
+
         # Get API keys
         api_keys = self._get_api_keys()
 
-        # Initialize pipeline with quick test mode
-        self.pipeline = RefusalPipeline(api_keys)
+        # Initialize pipeline with quick test mode and resume flag
+        self.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
 
         # Override pipeline behavior for quick test
         print("\n🚀 Quick test mode active - using reduced dataset")
@@ -204,11 +271,14 @@ class ExperimentRunner:
             f"Running complete pipeline with {DATASET_CONFIG['total_prompts']} prompts"
         )
 
+        # Check for existing checkpoints and prompt user
+        resume_from_checkpoint = self._check_and_prompt_for_resume()
+
         # Get API keys
         api_keys = self._get_api_keys()
 
-        # Run pipeline with sleep prevention
-        self.pipeline = RefusalPipeline(api_keys)
+        # Run pipeline with sleep prevention and resume flag
+        self.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
         with KeepAwake():
             self.pipeline.run_full_pipeline()
 

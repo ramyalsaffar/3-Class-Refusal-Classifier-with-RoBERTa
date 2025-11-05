@@ -124,7 +124,8 @@ class DataLabeler:
 
         return -1, -1, 0, 0
 
-    def label_dataset_with_checkpoints(self, responses_df: pd.DataFrame) -> pd.DataFrame:
+    def label_dataset_with_checkpoints(self, responses_df: pd.DataFrame,
+                                       resume_from_checkpoint: bool = False) -> pd.DataFrame:
         """
         Label entire dataset with parallel processing and checkpointing.
 
@@ -132,6 +133,7 @@ class DataLabeler:
 
         Args:
             responses_df: DataFrame with prompt and response columns
+            resume_from_checkpoint: If True, resume from existing checkpoint
 
         Returns:
             DataFrame with added columns: refusal_label, jailbreak_label, refusal_confidence, jailbreak_confidence
@@ -159,7 +161,7 @@ class DataLabeler:
 
         # Check for existing checkpoint
         checkpoint_data = None
-        if CHECKPOINT_CONFIG['labeling_resume_enabled']:
+        if resume_from_checkpoint:
             checkpoint_data = self.checkpoint_manager.load_latest_checkpoint(
                 max_age_hours=CHECKPOINT_CONFIG['max_checkpoint_age_hours']
             )

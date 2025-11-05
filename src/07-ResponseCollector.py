@@ -134,7 +134,8 @@ class ResponseCollector:
 
         return df
 
-    def collect_all_responses_with_checkpoints(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
+    def collect_all_responses_with_checkpoints(self, prompts: Dict[str, List[str]],
+                                               resume_from_checkpoint: bool = False) -> pd.DataFrame:
         """
         Collect responses from all models with parallel processing and checkpointing.
 
@@ -142,6 +143,7 @@ class ResponseCollector:
 
         Args:
             prompts: Dictionary with keys: 'hard_refusal', 'soft_refusal', 'no_refusal'
+            resume_from_checkpoint: If True, resume from existing checkpoint
 
         Returns:
             DataFrame with columns: [prompt, response, model, expected_label, timestamp]
@@ -183,7 +185,7 @@ class ResponseCollector:
 
         # Check for existing checkpoint
         checkpoint_data = None
-        if CHECKPOINT_CONFIG['collection_resume_enabled']:
+        if resume_from_checkpoint:
             checkpoint_data = self.checkpoint_manager.load_latest_checkpoint(
                 max_age_hours=CHECKPOINT_CONFIG['max_checkpoint_age_hours']
             )

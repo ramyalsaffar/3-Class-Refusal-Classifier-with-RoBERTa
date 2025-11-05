@@ -9,14 +9,16 @@
 class RefusalPipeline:
     """Orchestrates the complete refusal classification pipeline with dual classifiers."""
 
-    def __init__(self, api_keys: Dict):
+    def __init__(self, api_keys: Dict, resume_from_checkpoint: bool = False):
         """
         Initialize pipeline.
 
         Args:
             api_keys: Dictionary with keys: 'openai', 'anthropic', 'google'
+            resume_from_checkpoint: If True, resume from existing checkpoints
         """
         self.api_keys = api_keys
+        self.resume_from_checkpoint = resume_from_checkpoint
         self.results = {}
         self.refusal_model = None
         self.jailbreak_model = None
@@ -103,7 +105,10 @@ class RefusalPipeline:
 
         # Use checkpointed version if async is enabled
         if API_CONFIG.get('use_async', True):
-            responses_df = collector.collect_all_responses_with_checkpoints(prompts)
+            responses_df = collector.collect_all_responses_with_checkpoints(
+                prompts,
+                resume_from_checkpoint=self.resume_from_checkpoint
+            )
         else:
             responses_df = collector.collect_all_responses(prompts)
 
@@ -128,7 +133,10 @@ class RefusalPipeline:
 
         # Use checkpointed version if async is enabled
         if API_CONFIG.get('use_async', True):
-            labeled_df = labeler.label_dataset_with_checkpoints(responses_df)
+            labeled_df = labeler.label_dataset_with_checkpoints(
+                responses_df,
+                resume_from_checkpoint=self.resume_from_checkpoint
+            )
             return labeled_df
         else:
             # Sequential labeling (original implementation)
