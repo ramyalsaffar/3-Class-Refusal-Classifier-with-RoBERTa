@@ -67,12 +67,21 @@ class WildJailbreakLoader:
             # Load dataset from config (no hardcoded values)
             # Try loading with authentication token if available
             try:
-                self.dataset = load_dataset(
-                    WILDJAILBREAK_CONFIG['dataset_name'],
-                    WILDJAILBREAK_CONFIG['dataset_config'],  # Config name required by WildJailbreak
-                    split=WILDJAILBREAK_CONFIG['dataset_split'],
-                    token=True  # Use HuggingFace token if available
-                )
+                # Check if dataset requires config parameter
+                if WILDJAILBREAK_CONFIG['dataset_config'] is not None:
+                    self.dataset = load_dataset(
+                        WILDJAILBREAK_CONFIG['dataset_name'],
+                        WILDJAILBREAK_CONFIG['dataset_config'],
+                        split=WILDJAILBREAK_CONFIG['dataset_split'],
+                        token=True  # Use HuggingFace token if available
+                    )
+                else:
+                    # No config needed (WildJailbreak case)
+                    self.dataset = load_dataset(
+                        WILDJAILBREAK_CONFIG['dataset_name'],
+                        split=WILDJAILBREAK_CONFIG['dataset_split'],
+                        token=True  # Use HuggingFace token if available
+                    )
             except Exception as auth_error:
                 # If authentication fails, provide helpful instructions
                 error_msg = str(auth_error).lower()

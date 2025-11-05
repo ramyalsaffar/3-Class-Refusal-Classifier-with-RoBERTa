@@ -329,7 +329,7 @@ WILDJAILBREAK_CONFIG = {
     'max_response_length': 10000,               # Maximum response length (characters)
 
     # Dataset Loading Parameters
-    'dataset_config': 'train',                  # Dataset config name ('train' or 'eval')
+    'dataset_config': None,                     # Dataset config name (None for WildJailbreak - no configs)
     'dataset_split': 'train',                   # Dataset split to load (train/test/validation)
     'data_type_filter': 'adversarial_harmful',  # WildJailbreak data type to filter for
                                                 # Options: adversarial_harmful, adversarial_benign,

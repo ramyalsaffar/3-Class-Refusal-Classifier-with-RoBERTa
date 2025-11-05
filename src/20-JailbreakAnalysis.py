@@ -78,13 +78,18 @@ class JailbreakAnalysis:
 
         # 3. Confidence Analysis
         print("\n--- Confidence Analysis ---")
-        conf_results, preds, labels, confidences = self.confidence_analyzer.analyze(test_df)
+        # Create temporary df with 'label' column for analyzer compatibility
+        # Analyzers expect 'label' column, but jailbreak test_df has 'jailbreak_label'
+        test_df_for_analysis = test_df.copy()
+        test_df_for_analysis['label'] = test_df_for_analysis['jailbreak_label']
+
+        conf_results, preds, labels, confidences = self.confidence_analyzer.analyze(test_df_for_analysis)
         results['confidence'] = conf_results
         results['predictions'] = {'preds': preds, 'labels': labels, 'confidences': confidences}
 
         # 4. Per-Model Analysis (NEW!)
         print("\n--- Per-Model Analysis ---")
-        results['per_model'] = self.per_model_analyzer.analyze(test_df)
+        results['per_model'] = self.per_model_analyzer.analyze(test_df_for_analysis)
 
         # 5. Per-Model Vulnerability
         print("\n--- Per-Model Vulnerability Analysis ---")
