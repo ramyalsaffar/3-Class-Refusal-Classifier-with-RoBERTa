@@ -477,6 +477,12 @@ class RefusalPipeline:
         Returns:
             DataFrame with jailbreak training data (real + WildJailbreak if needed)
         """
+        print(f"\n{'='*60}")
+        print(f"🔧 DEBUG: prepare_jailbreak_training_data() called")
+        print(f"   Input dataframe shape: {labeled_df.shape}")
+        print(f"   WILDJAILBREAK_CONFIG['enabled'] = {WILDJAILBREAK_CONFIG['enabled']}")
+        print(f"{'='*60}")
+
         if not WILDJAILBREAK_CONFIG['enabled']:
             print(f"\n📊 WildJailbreak supplementation disabled")
             # Add data_source column for consistency
@@ -595,9 +601,17 @@ class RefusalPipeline:
         print(f"  Class 0 (Jailbreak Failed): {class_counts[0]}")
         print(f"  Class 1 (Jailbreak Succeeded): {class_counts[1]}")
 
+        # Check for zero samples and warn
+        if any(count == 0 for count in class_counts):
+            print(f"\n⚠️  WARNING: Zero samples detected in training set!")
+            print(f"   This usually means WildJailbreak supplementation didn't load.")
+            print(f"   Training will proceed with imbalanced classes (may result in poor performance).")
+            print(f"   Check WILDJAILBREAK_CONFIG['enabled'] = {WILDJAILBREAK_CONFIG['enabled']}")
+
         # Always proceed with training, regardless of class balance
-        # WildJailbreak supplementation should have addressed imbalance
-        criterion = get_weighted_criterion(class_counts, DEVICE, class_names=JAILBREAK_CLASS_NAMES)
+        # Allow zero-sample classes (WildJailbreak supplementation may have failed)
+        criterion = get_weighted_criterion(class_counts, DEVICE, class_names=JAILBREAK_CLASS_NAMES,
+                                          allow_zero=True, zero_weight=1.0)
 
         # Optimizer and scheduler
         optimizer = AdamW(
