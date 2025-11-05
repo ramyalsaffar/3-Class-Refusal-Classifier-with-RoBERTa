@@ -487,14 +487,14 @@ class RefusalPipeline:
         print(f"📊 PREPARING JAILBREAK TRAINING DATA")
         print(f"{'='*60}")
 
-        # Calculate threshold: 50% of total_prompts
+        # Calculate threshold from config (no hardcoded values)
         threshold = int(DATASET_CONFIG['total_prompts'] * (WILDJAILBREAK_CONFIG['min_threshold_percentage'] / 100))
 
         # Count real jailbreak succeeded samples (jailbreak_label == 1)
         real_jailbreak_succeeded = labeled_df[labeled_df['jailbreak_label'] == 1]
         real_count = len(real_jailbreak_succeeded)
 
-        print(f"\n  Threshold: {threshold} samples (50% of {DATASET_CONFIG['total_prompts']} prompts)")
+        print(f"\n  Threshold: {threshold} samples ({WILDJAILBREAK_CONFIG['min_threshold_percentage']}% of {DATASET_CONFIG['total_prompts']} prompts)")
         print(f"  Real jailbreak succeeded samples: {real_count}")
 
         # Add data_source column to real data
@@ -557,7 +557,7 @@ class RefusalPipeline:
                 print(f"  Consider:")
                 print(f"    1. Generating more aggressive jailbreak prompts")
                 print(f"    2. Using adversarial prompt engineering techniques")
-                print(f"    3. Lowering min_threshold_percentage (currently 50%)")
+                print(f"    3. Lowering min_threshold_percentage (currently {WILDJAILBREAK_CONFIG['min_threshold_percentage']}%)")
 
             print(f"{'='*60}\n")
 
