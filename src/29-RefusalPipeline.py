@@ -520,6 +520,26 @@ class RefusalPipeline:
         print(f"\n  Loading WildJailbreak dataset...")
 
         try:
+            # Check if datasets library is installed
+            try:
+                import datasets
+                print(f"  ✓ 'datasets' library found (version {datasets.__version__})")
+            except ImportError:
+                raise ImportError(
+                    "\n\n"
+                    "="*60 + "\n"
+                    "❌ CRITICAL ERROR: 'datasets' library not installed!\n"
+                    "="*60 + "\n"
+                    "WildJailbreak supplementation requires the HuggingFace datasets library.\n"
+                    "\n"
+                    "Install with:\n"
+                    "  pip install datasets\n"
+                    "\n"
+                    "Or install all requirements:\n"
+                    "  pip install -r requirements.txt\n"
+                    "="*60
+                )
+
             # Initialize WildJailbreak loader
             loader = WildJailbreakLoader(random_seed=WILDJAILBREAK_CONFIG['random_seed'])
 
@@ -527,9 +547,11 @@ class RefusalPipeline:
             wildjailbreak_samples = loader.load_and_sample(n_samples=samples_needed)
 
             if len(wildjailbreak_samples) == 0:
-                print(f"  ❌ Failed to load WildJailbreak samples")
-                print(f"  Proceeding with real data only")
-                return labeled_df_copy
+                raise RuntimeError(
+                    f"WildJailbreak loader returned 0 samples! "
+                    f"Requested {samples_needed} samples but got none. "
+                    f"Cannot proceed with jailbreak training."
+                )
 
             # Apply quality filters
             wildjailbreak_filtered = wildjailbreak_samples[
@@ -570,10 +592,22 @@ class RefusalPipeline:
             return combined_df
 
         except Exception as e:
-            print(f"  ❌ ERROR loading WildJailbreak: {e}")
-            print(f"  Proceeding with real data only")
+            print(f"\n{'='*60}")
+            print(f"❌ CRITICAL ERROR: WildJailbreak supplementation failed!")
+            print(f"{'='*60}")
+            print(f"\nError: {e}")
+            print(f"\nThis means jailbreak training CANNOT proceed because:")
+            print(f"  - Real jailbreak succeeded samples: {real_count}")
+            print(f"  - Threshold required: {threshold}")
+            print(f"  - Shortfall: {samples_needed} samples")
+            print(f"\nFull traceback:")
             import traceback
             traceback.print_exc()
+            print(f"\n{'='*60}")
+            print(f"SOLUTION: Fix the WildJailbreak loading error above")
+            print(f"{'='*60}\n")
+
+            # Return original data - training will be skipped due to zero samples
             return labeled_df_copy
 
     def train_jailbreak_detector(self, train_loader, val_loader) -> Dict:
@@ -601,17 +635,25 @@ class RefusalPipeline:
         print(f"  Class 0 (Jailbreak Failed): {class_counts[0]}")
         print(f"  Class 1 (Jailbreak Succeeded): {class_counts[1]}")
 
-        # Check for zero samples and warn
-        if any(count == 0 for count in class_counts):
-            print(f"\n⚠️  WARNING: Zero samples detected in training set!")
-            print(f"   This usually means WildJailbreak supplementation didn't load.")
-            print(f"   Training will proceed with imbalanced classes (may result in poor performance).")
-            print(f"   Check WILDJAILBREAK_CONFIG['enabled'] = {WILDJAILBREAK_CONFIG['enabled']}")
+        # CRITICAL: Cannot train with zero samples in any class
+        zero_classes = [i for i, count in enumerate(class_counts) if count == 0]
+        if zero_classes:
+            print(f"\n{'='*60}")
+            print(f"🛑 JAILBREAK DETECTOR TRAINING SKIPPED")
+            print(f"{'='*60}")
+            print(f"\nREASON: Zero samples in class(es): {zero_classes}")
+            for i, count in enumerate(class_counts):
+                status = "❌ ZERO" if i in zero_classes else f"✓ {count}"
+                print(f"  Class {i} ({JAILBREAK_CLASS_NAMES[i]}): {status}")
 
-        # Always proceed with training, regardless of class balance
-        # Allow zero-sample classes (WildJailbreak supplementation may have failed)
-        criterion = get_weighted_criterion(class_counts, DEVICE, class_names=JAILBREAK_CLASS_NAMES,
-                                          allow_zero=True, zero_weight=1.0)
+            print(f"\nWildJailbreak supplementation should have fixed this!")
+            print(f"Check the output above for WildJailbreak loading errors.")
+            print(f"{'='*60}\n")
+
+            return {'status': 'skipped', 'reason': 'zero_samples', 'class_counts': class_counts}
+
+        # Proceed with training
+        criterion = get_weighted_criterion(class_counts, DEVICE, class_names=JAILBREAK_CLASS_NAMES)
 
         # Optimizer and scheduler
         optimizer = AdamW(
