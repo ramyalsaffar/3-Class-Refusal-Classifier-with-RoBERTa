@@ -31,6 +31,11 @@ from io import BytesIO
 import getpass
 import atexit
 
+# Async and Parallel Processing (NEW - for Phase 2)
+import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
 # Data Science
 import pandas as pd
 import numpy as np
@@ -110,60 +115,6 @@ except ImportError:
 #------------------------------------------------------------------------------
 
 
-# Environment Detection (Smart Defaults)
-#----------------------------------------
-# Detects if running locally or in AWS/Docker
-# Defaults to 'local' if ENVIRONMENT variable not set
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'local')
-IS_MAC = sys.platform == 'darwin'
-IS_AWS = ENVIRONMENT == 'aws'
-
-print(f"🌍 Running in: {ENVIRONMENT.upper()} mode")
-if IS_MAC:
-    print("🍎 Mac detected - using MPS acceleration if available")
-
-
-#------------------------------------------------------------------------------
-
-
-# Environment-Aware Paths
-#------------------------
-# Sets appropriate paths based on where code is running
-if IS_AWS:
-    # AWS/Docker paths
-    project_path = "/app"
-    base_results_path = "/app/results/"
-    CodeFilePath = "/app/src/"
-else:
-    # Local paths (Mac default)
-    main_path = "/Users/ramyalsaffar/Ramy/C.V..V/1-Resume/06- LLM Model Behavior Projects/"
-    folder = "3-Class Refusal Classifier with RoBERTa"
-    project_path = glob.glob(main_path + "*" + folder)[0]
-    base_results_path = glob.glob(project_path + "/*Code/*Results")[0]
-    CodeFilePath = project_path + "/src/"
-
-
-# Specific Subdirectories
-#------------------------
-data_path = glob.glob(base_results_path + "/*Data/")[0]
-data_raw_path = glob.glob(data_path + "*Raw/")[0]
-data_responses_path = glob.glob(data_path + "*Responses/")[0]
-data_processed_path = glob.glob(data_path + "*Processed/")[0]
-data_splits_path = glob.glob(data_path + "*Splits/")[0]
-
-models_path = glob.glob(base_results_path + "/*Models/")[0]
-results_path = base_results_path
-
-visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
-reports_path = glob.glob(base_results_path + "/*Reports/")[0]
-
-# API Keys (local file storage)
-api_keys_file_path = glob.glob(project_path + "/*API Keys/API Keys.txt")[0]
-
-
-#------------------------------------------------------------------------------
-
-
 # Python Display Settings
 #------------------------
 pd.set_option('display.max_rows', 500)
@@ -172,23 +123,6 @@ pd.set_option("display.max_colwidth", 250)
 pd.set_option('display.width', 1000)
 pd.set_option('display.precision', 5)
 pd.options.display.float_format = '{:.4f}'.format
-
-
-#------------------------------------------------------------------------------
-
-
-# Device Configuration
-#---------------------
-# Auto-detect best available device
-if torch.cuda.is_available():
-    DEVICE = torch.device('cuda')
-    print(f"🚀 CUDA available - using GPU: {torch.cuda.get_device_name(0)}")
-elif IS_MAC and hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-    DEVICE = torch.device('mps')
-    print("🚀 MPS available - using Apple Silicon GPU")
-else:
-    DEVICE = torch.device('cpu')
-    print("⚠️  No GPU available - using CPU (training will be slow)")
 
 
 #------------------------------------------------------------------------------
@@ -295,23 +229,95 @@ class KeepAwake:
 # Execute Code Files
 #-------------------
 
-CodeFilePath = glob.glob(project_path + "/*Code/*Python/")[0]
+# Import Constants and Configuration FIRST (before other modules)
+#------------------------------------------------------------------
+# NEW LOADING ORDER (after refactoring):
+# 1. 01-Constants.py (environment, paths, device, class labels)
+# 2. 02-Config.py (user configuration - can reference constants)
+# 3. Remaining modules (03-34)
+
+print("\n" + "="*60)
+print("LOADING CONSTANTS & CONFIGURATION")
+print("="*60)
+
+# Step 1: Load Constants (environment, paths, device detection)
+# This must load FIRST so Config can reference DEVICE
+exec(open(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src/01-Constants.py").read())
+print("✓ Loaded 01-Constants.py")
+
+# Step 2: Load Configuration (user settings)
+exec(open(CodeFilePath+"02-Config.py").read())
+print("✓ Loaded 02-Config.py")
+
+
+# Load remaining code files (03-34, excluding 29-34)
+#--------------------------------------------------------
+# Files are numbered 00-34:
+#   00-Imports.py (this file)
+#   01-Constants.py (loaded above - environment, paths, device, class labels)
+#   02-Config.py (loaded above - user configuration)
+#   03-Constants.py (old file - will be deleted)
+#   04-AWS.py (AWS configuration)
+#   05-PromptGenerator.py (3-stage prompt generation)
+#   06-ResponseCollector.py (multi-LLM response collection)
+#   07-DataCleaner.py (comprehensive data cleaning)
+#   08-DataLabeler.py (LLM judge labeling)
+#   09-LabelingQualityAnalyzer.py (labeling quality metrics)
+#   10-ClassificationDataset.py (PyTorch Dataset)
+#   11-RefusalClassifier.py (3-class RoBERTa model)
+#   12-JailbreakDetector.py (2-class RoBERTa model)
+#   13-Trainer.py (standard trainer with weighted loss)
+#   14-CrossValidator.py (k-fold cross-validation)
+#   15-PerModelAnalyzer.py (per-model performance analysis)
+#   16-ConfidenceAnalyzer.py (confidence score analysis)
+#   17-AdversarialTester.py (paraphrasing robustness tests)
+#   18-JailbreakAnalysis.py (security-focused jailbreak analysis)
+#   19-CorrelationAnalysis.py (refusal ↔ jailbreak correlation)
+#   20-AttentionVisualizer.py (attention heatmaps)
+#   21-ShapAnalyzer.py (SHAP interpretability)
+#   22-PowerLawAnalyzer.py (power law analysis)
+#   23-HypothesisTesting.py (statistical hypothesis tests)
+#   24-ErrorAnalysis.py (comprehensive error analysis)
+#   25-Visualizer.py (basic plotting functions)
+#   26-ReportGenerator.py (PDF report generation)
+#   27-RefusalPipeline.py (main training pipeline)
+#   28-ExperimentRunner.py (experiment orchestration)
+#   29-Execute.py (main entry point - don't load)
+#   30-Analyze.py (analysis script - don't load)
+#   31-ProductionAPI.py (FastAPI server - don't load)
+#   32-MonitoringSystem.py (production monitoring - don't load)
+#   33-RetrainingPipeline.py (automated retraining - don't load)
+#   34-DataManager.py (production data management - don't load)
+
+print("\nLoading modules...")
+
+# Get CodeFilePath from Constants
+CodeFilePath = glob.glob(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/*Code/*Python/")[0]
 code_files_ls = os.listdir(CodeFilePath)
 code_files_ls.sort()
 code_files_ls = [x for x in code_files_ls if "py" in x]
-code_files_ls = code_files_ls[1:30]
 
+# Remove files we don't want to auto-load
+code_files_ls = [x for x in code_files_ls if x not in [
+    "00-Imports.py",      # This file
+    "01-Constants.py",    # Already loaded (environment, paths, device)
+    "02-Config.py",       # Already loaded (user configuration)
+    "03-Constants.py",    # Old file (will be deleted)
+    "29-Execute.py",      # Execution script
+    "30-Analyze.py",      # Execution script
+    "31-ProductionAPI.py",      # Production API server (load manually)
+    "32-MonitoringSystem.py",   # Production monitoring (load manually)
+    "33-RetrainingPipeline.py", # Production retraining (load manually)
+    "34-DataManager.py"         # Production data management (load manually)
+]]
 
-# Loop over cde files
-#--------------------
-for i in range(0,len(code_files_ls)):
-
-    file = code_files_ls[i]
-
-    print(file)
-
-    exec(open(CodeFilePath+file).read())
-    print(f"✓ Loaded {file}")
+# Loop over code files and load them
+for file in code_files_ls:
+    try:
+        exec(open(CodeFilePath+file).read())
+        print(f"✓ Loaded {file}")
+    except Exception as e:
+        print(f"✗ Error loading {file}: {e}")
 
 
 print("="*60)
