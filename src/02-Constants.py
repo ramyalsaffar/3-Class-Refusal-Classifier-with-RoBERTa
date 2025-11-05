@@ -246,6 +246,46 @@ ERROR_VALUE = -1
 ERROR_RESPONSE = "[ERROR]"
 
 
+# =============================================================================
+# WILDJAILBREAK DATASET CITATION (NEW - V09)
+# =============================================================================
+
+# WildJailbreak Dataset - Used for supplementing jailbreak training data
+#------------------------------------------------------------------------
+# When modern LLMs successfully defend against all jailbreak attempts,
+# we supplement training data from the WildJailbreak dataset to ensure
+# the jailbreak detector has sufficient positive samples.
+
+WILDJAILBREAK_DATASET_INFO = {
+    'name': 'WildJailbreak',
+    'source': 'AllenAI',
+    'url': 'https://huggingface.co/datasets/allenai/wildjailbreak',
+    'paper_url': 'https://arxiv.org/abs/2406.18510',
+    'size': '262K prompt-response pairs',
+    'adversarial_harmful_samples': '82,728',  # Successful jailbreaks
+    'license': 'Apache 2.0'
+}
+
+WILDJAILBREAK_CITATION = """
+@inproceedings{jiang2024wildteaming,
+    title={WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models},
+    author={Liwei Jiang and Kavel Rao and Seungju Han and Allyson Ettinger and Faeze Brahman and Sachin Kumar and Niloofar Mireshghallah and Ximing Lu and Maarten Sap and Yejin Choi and Nouha Dziri},
+    booktitle={Advances in Neural Information Processing Systems (NeurIPS)},
+    year={2024},
+    volume={37},
+    url={https://arxiv.org/abs/2406.18510}
+}
+"""
+
+# Dataset Acknowledgment
+WILDJAILBREAK_ACKNOWLEDGMENT = """
+This project uses the WildJailbreak dataset from AllenAI for supplementing
+jailbreak detection training data when insufficient positive samples are
+collected from our primary pipeline. WildJailbreak provides diverse,
+in-the-wild jailbreak tactics that enhance model robustness.
+"""
+
+
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-

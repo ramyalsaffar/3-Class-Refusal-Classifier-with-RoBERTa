@@ -123,6 +123,94 @@ class ReportGenerator:
 
         return elements
 
+    def _create_data_composition_section(self, data_composition_stats: Dict) -> List:
+        """
+        Create data composition section for WildJailbreak supplementation reporting.
+
+        Args:
+            data_composition_stats: Dictionary with keys:
+                - real_count: Number of real samples
+                - wildjailbreak_count: Number of WildJailbreak samples
+                - total_count: Total samples
+                - real_percentage: Percentage of real samples
+                - wildjailbreak_percentage: Percentage of WildJailbreak samples
+                - supplementation_used: Boolean indicating if supplementation was used
+
+        Returns:
+            List of ReportLab elements
+        """
+        elements = []
+
+        if not data_composition_stats or not data_composition_stats.get('supplementation_used', False):
+            # No supplementation used - all real data
+            elements.append(Paragraph("Training Data Composition", self.styles['SectionHeading']))
+            elements.append(Paragraph(
+                "All training data was collected from real model responses. "
+                "No supplementation from external datasets was required.",
+                self.styles['BodyText']
+            ))
+            elements.append(Spacer(1, 12))
+            return elements
+
+        # Supplementation was used
+        elements.append(Paragraph("Training Data Composition", self.styles['SectionHeading']))
+
+        real_count = data_composition_stats.get('real_count', 0)
+        wildjailbreak_count = data_composition_stats.get('wildjailbreak_count', 0)
+        total_count = data_composition_stats.get('total_count', real_count + wildjailbreak_count)
+        real_pct = data_composition_stats.get('real_percentage', (real_count / total_count * 100) if total_count > 0 else 0)
+        wild_pct = data_composition_stats.get('wildjailbreak_percentage', (wildjailbreak_count / total_count * 100) if total_count > 0 else 0)
+
+        composition_text = f"""
+        Training data was supplemented with samples from the <b>WildJailbreak dataset</b> to ensure
+        sufficient positive samples for jailbreak detection. Modern LLMs (Claude Sonnet 4.5, GPT-5,
+        Gemini 2.5 Flash) successfully defended against all jailbreak attempts in initial testing,
+        requiring external supplementation.
+        <br/><br/>
+        <b>Data Composition:</b>
+        <br/>• Real model responses: <b>{real_count:,} samples ({real_pct:.1f}%)</b>
+        <br/>• WildJailbreak samples: <b>{wildjailbreak_count:,} samples ({wild_pct:.1f}%)</b>
+        <br/>• Total training samples: <b>{total_count:,}</b>
+        """
+
+        elements.append(Paragraph(composition_text, self.styles['BodyText']))
+        elements.append(Spacer(1, 12))
+
+        # Add citation if WildJailbreak was used
+        if wildjailbreak_count > 0:
+            elements.extend(self._create_wildjailbreak_citation())
+
+        return elements
+
+    def _create_wildjailbreak_citation(self) -> List:
+        """
+        Create WildJailbreak dataset citation section.
+
+        Returns:
+            List of ReportLab elements
+        """
+        elements = []
+
+        elements.append(Paragraph("WildJailbreak Dataset Attribution", self.styles['SubsectionHeading']))
+
+        citation_text = f"""
+        <b>Dataset:</b> {WILDJAILBREAK_DATASET_INFO['name']} by {WILDJAILBREAK_DATASET_INFO['source']}
+        <br/><b>Paper:</b> WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models
+        <br/><b>Authors:</b> Liwei Jiang, Kavel Rao, Seungju Han, et al.
+        <br/><b>Conference:</b> NeurIPS 2024
+        <br/><b>Dataset Size:</b> {WILDJAILBREAK_DATASET_INFO['size']}
+        <br/><b>License:</b> {WILDJAILBREAK_DATASET_INFO['license']}
+        <br/><b>URL:</b> <link href="{WILDJAILBREAK_DATASET_INFO['url']}">{WILDJAILBREAK_DATASET_INFO['url']}</link>
+        <br/><br/>
+        <i>This project uses WildJailbreak's adversarial harmful subset ({WILDJAILBREAK_DATASET_INFO['adversarial_harmful_samples']} samples)
+        for supplementing jailbreak detection training when insufficient positive samples are collected from our primary pipeline.</i>
+        """
+
+        elements.append(Paragraph(citation_text, self.styles['BodyText']))
+        elements.append(Spacer(1, 12))
+
+        return elements
+
     def _create_metrics_table(self, metrics_dict: Dict, title: str = None) -> List:
         """
         Create a formatted table from metrics dictionary.
@@ -174,7 +262,8 @@ class ReportGenerator:
         confusion_matrix_fig,
         training_curves_fig,
         class_distribution_fig,
-        output_path: str
+        output_path: str,
+        data_composition_stats: Dict = None
     ):
         """
         Generate comprehensive model performance report.
@@ -186,6 +275,7 @@ class ReportGenerator:
             training_curves_fig: Matplotlib figure of training curves
             class_distribution_fig: Matplotlib figure of class distribution
             output_path: Path to save PDF report
+            data_composition_stats: Optional dict with WildJailbreak supplementation stats (NEW - V09)
         """
         doc = SimpleDocTemplate(output_path, pagesize=letter)
         elements = []
@@ -206,6 +296,11 @@ class ReportGenerator:
         """
         elements.append(Paragraph(summary_text, self.styles['BodyText']))
         elements.append(Spacer(1, 12))
+
+        # Data Composition Section (NEW - V09)
+        if data_composition_stats:
+            elements.extend(self._create_data_composition_section(data_composition_stats))
+            elements.append(Spacer(1, 12))
 
         # Overall Metrics
         overall_metrics = {
@@ -464,7 +559,8 @@ class ReportGenerator:
         key_metrics: Dict,
         performance_chart_fig,
         recommendations: List[str],
-        output_path: str
+        output_path: str,
+        data_composition_stats: Dict = None
     ):
         """
         Generate 1-2 page executive summary for stakeholders.
@@ -475,6 +571,7 @@ class ReportGenerator:
             performance_chart_fig: Summary performance visualization
             recommendations: List of actionable recommendations
             output_path: Path to save PDF report
+            data_composition_stats: Optional dict with WildJailbreak supplementation stats (NEW - V09)
         """
         doc = SimpleDocTemplate(output_path, pagesize=letter)
         elements = []
@@ -484,6 +581,11 @@ class ReportGenerator:
             f"{model_name} - Executive Summary",
             "High-level performance overview and recommendations"
         ))
+
+        # Data Composition (if applicable) (NEW - V09)
+        if data_composition_stats and data_composition_stats.get('supplementation_used', False):
+            elements.extend(self._create_data_composition_section(data_composition_stats))
+            elements.append(Spacer(1, 12))
 
         # Key Metrics
         elements.append(Paragraph("Key Performance Indicators", self.styles['SectionHeading']))

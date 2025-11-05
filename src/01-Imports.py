@@ -118,11 +118,12 @@ except ImportError:
 # Execute Code Files
 #-------------------
 
-CodeFilePath = glob.glob(project_path + "/*Code/*Python/")[0]
+exec(open(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src/02-Constants.py").read())
+exec(open(CodeFilePath+"03-Config.py").read())
 code_files_ls = os.listdir(CodeFilePath)
 code_files_ls.sort()
 code_files_ls = [x for x in code_files_ls if "py" in x]
-code_files_ls = code_files_ls[1:31]  # Load files 02-31 (skip 01-Imports.py, skip production files 32-35)
+code_files_ls = code_files_ls[3:29]  # Load files 04-29 (skip 01-03 already loaded, skip execution/production files 30-36)
 
 
 # Loop over cde files

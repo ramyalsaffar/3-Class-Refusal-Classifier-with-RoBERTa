@@ -44,8 +44,12 @@ class RefusalPipeline:
         # Step 4: Label data (dual-task labeling - only clean data)
         labeled_df = self.label_data(cleaned_df)
 
+        # Step 4.5: Prepare jailbreak training data (NEW - V09)
+        # Supplements with WildJailbreak if insufficient real jailbreak succeeded samples
+        labeled_df_augmented = self.prepare_jailbreak_training_data(labeled_df)
+
         # Step 5: Prepare datasets for BOTH classifiers
-        datasets = self.prepare_datasets(labeled_df)
+        datasets = self.prepare_datasets(labeled_df_augmented)
 
         # Step 6: Train refusal classifier
         refusal_history = self.train_refusal_classifier(
@@ -459,6 +463,112 @@ class RefusalPipeline:
         except Exception as e:
             print(f"\n❌ Refusal classifier training failed: {e}")
             raise
+
+    def prepare_jailbreak_training_data(self, labeled_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Prepare jailbreak training data with WildJailbreak supplementation if needed.
+
+        NEW METHOD (V09): Supplements training data when modern LLMs successfully
+        defend against all jailbreak attempts, resulting in insufficient positive samples.
+
+        Args:
+            labeled_df: DataFrame with labeled data (includes jailbreak_label column)
+
+        Returns:
+            DataFrame with jailbreak training data (real + WildJailbreak if needed)
+        """
+        if not WILDJAILBREAK_CONFIG['enabled']:
+            print(f"\n📊 WildJailbreak supplementation disabled")
+            # Add data_source column for consistency
+            labeled_df['data_source'] = 'real'
+            return labeled_df
+
+        print(f"\n{'='*60}")
+        print(f"📊 PREPARING JAILBREAK TRAINING DATA")
+        print(f"{'='*60}")
+
+        # Calculate threshold: 50% of total_prompts
+        threshold = int(DATASET_CONFIG['total_prompts'] * (WILDJAILBREAK_CONFIG['min_threshold_percentage'] / 100))
+
+        # Count real jailbreak succeeded samples (jailbreak_label == 1)
+        real_jailbreak_succeeded = labeled_df[labeled_df['jailbreak_label'] == 1]
+        real_count = len(real_jailbreak_succeeded)
+
+        print(f"\n  Threshold: {threshold} samples (50% of {DATASET_CONFIG['total_prompts']} prompts)")
+        print(f"  Real jailbreak succeeded samples: {real_count}")
+
+        # Add data_source column to real data
+        labeled_df_copy = labeled_df.copy()
+        labeled_df_copy['data_source'] = 'real'
+
+        # Check if supplementation needed
+        if real_count >= threshold:
+            print(f"  ✓ Sufficient real data - no supplementation needed")
+            print(f"  Real data: 100%")
+            print(f"{'='*60}\n")
+            return labeled_df_copy
+
+        # Need supplementation
+        samples_needed = threshold - real_count
+        print(f"  ⚠️  Insufficient data - need {samples_needed} more samples")
+        print(f"\n  Loading WildJailbreak dataset...")
+
+        try:
+            # Initialize WildJailbreak loader
+            loader = WildJailbreakLoader(random_seed=WILDJAILBREAK_CONFIG['random_seed'])
+
+            # Load and sample
+            wildjailbreak_samples = loader.load_and_sample(n_samples=samples_needed)
+
+            if len(wildjailbreak_samples) == 0:
+                print(f"  ❌ Failed to load WildJailbreak samples")
+                print(f"  Proceeding with real data only")
+                return labeled_df_copy
+
+            # Apply quality filters
+            wildjailbreak_filtered = wildjailbreak_samples[
+                (wildjailbreak_samples['prompt'].str.len() >= WILDJAILBREAK_CONFIG['min_prompt_length']) &
+                (wildjailbreak_samples['prompt'].str.len() <= WILDJAILBREAK_CONFIG['max_prompt_length']) &
+                (wildjailbreak_samples['response'].str.len() >= WILDJAILBREAK_CONFIG['min_response_length']) &
+                (wildjailbreak_samples['response'].str.len() <= WILDJAILBREAK_CONFIG['max_response_length'])
+            ].copy()
+
+            print(f"  ✓ Loaded {len(wildjailbreak_filtered)} WildJailbreak samples (after quality filters)")
+
+            # Combine datasets
+            combined_df = pd.concat([labeled_df_copy, wildjailbreak_filtered], ignore_index=True)
+
+            # Calculate composition
+            total_jailbreak_succeeded = len(combined_df[combined_df['jailbreak_label'] == 1])
+            real_percentage = (real_count / total_jailbreak_succeeded * 100) if total_jailbreak_succeeded > 0 else 0
+            wildjailbreak_percentage = 100 - real_percentage
+
+            print(f"\n  {'='*56}")
+            print(f"  📈 JAILBREAK TRAINING DATA COMPOSITION")
+            print(f"  {'='*56}")
+            print(f"  Real data:        {real_count:4d} samples ({real_percentage:5.1f}%)")
+            print(f"  WildJailbreak:    {len(wildjailbreak_filtered):4d} samples ({wildjailbreak_percentage:5.1f}%)")
+            print(f"  Total succeeded:  {total_jailbreak_succeeded:4d} samples")
+            print(f"  {'='*56}")
+
+            # Warning if too much supplementation
+            if wildjailbreak_percentage > WILDJAILBREAK_CONFIG['warn_threshold']:
+                print(f"\n  ⚠️  WARNING: {wildjailbreak_percentage:.1f}% of data from WildJailbreak")
+                print(f"  Consider:")
+                print(f"    1. Generating more aggressive jailbreak prompts")
+                print(f"    2. Using adversarial prompt engineering techniques")
+                print(f"    3. Lowering min_threshold_percentage (currently 50%)")
+
+            print(f"{'='*60}\n")
+
+            return combined_df
+
+        except Exception as e:
+            print(f"  ❌ ERROR loading WildJailbreak: {e}")
+            print(f"  Proceeding with real data only")
+            import traceback
+            traceback.print_exc()
+            return labeled_df_copy
 
     def train_jailbreak_detector(self, train_loader, val_loader) -> Dict:
         """Step 7: Train RoBERTa jailbreak detector (2 classes)."""

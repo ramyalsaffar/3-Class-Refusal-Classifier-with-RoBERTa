@@ -22,6 +22,26 @@ A production-ready, dual-task classification system using fine-tuned RoBERTa mod
 - **Clear Messaging**: Comprehensive explanation when jailbreak detector is skipped
 - **No Crashes**: Weighted loss calculation supports zero-count classes
 
+### **🔄 WildJailbreak Dataset Integration (NEW)**
+- **Intelligent Data Supplementation**: Automatically supplements training data from [WildJailbreak](https://huggingface.co/datasets/allenai/wildjailbreak) when insufficient real jailbreak samples
+- **Threshold-Based**: Targets 50% of total_prompts (e.g., 2000 prompts → 1000 jailbreak samples needed)
+- **Diverse Sampling**: Stratified sampling across jailbreak tactics for maximum diversity
+- **Full Transparency**:
+  - Real-time composition reporting (% real vs. WildJailbreak)
+  - Source tracking in all outputs and reports
+  - Warning system if >30% supplemented
+- **Quality Filters**: Length validation and deduplication
+- **Reproducible**: Uses config seed for consistent sampling
+
+**Example Output:**
+```
+📈 JAILBREAK TRAINING DATA COMPOSITION
+Real data:         45 samples (35.2%)
+WildJailbreak:     83 samples (64.8%)
+Total succeeded:  128 samples
+⚠️  WARNING: 64.8% of data from WildJailbreak
+```
+
 ### **🏗️ Improved Architecture**
 - **File Reorganization**: `01-Constants.py` centralizes environment detection, paths, device config
 - **Loading Order**: Constants → Config → Modules (proper dependency management)
@@ -115,41 +135,42 @@ A production-ready, dual-task classification system using fine-tuned RoBERTa mod
 ```
 Dual-RoBERTa-Classifiers/
 ├── src/
-│   ├── 00-Imports.py               # [RENAMED V09] Central import manager
-│   ├── 01-Constants.py             # [NEW V09] Environment, paths, device, class labels
-│   ├── 02-Config.py                # All configuration settings (includes AWS config)
-│   ├── 03A-CheckpointManager.py    # [NEW V09] Checkpoint management for error recovery
-│   ├── 04-AWS.py                   # AWS configuration and Secrets Manager
-│   ├── 05-PromptGenerator.py       # 3-stage prompt generation
-│   ├── 06-ResponseCollector.py     # [ENHANCED V09] Multi-LLM response collection + parallel processing
-│   ├── 07-DataCleaner.py           # Comprehensive data cleaning
-│   ├── 08-DataLabeler.py           # [ENHANCED V09] LLM judge labeling + parallel processing
-│   ├── 09-LabelingQualityAnalyzer.py
-│   ├── 10-ClassificationDataset.py # PyTorch Dataset
-│   ├── 11-RefusalClassifier.py     # 3-class RoBERTa model
-│   ├── 12-JailbreakDetector.py     # 2-class RoBERTa model
-│   ├── 13-Trainer.py               # [ENHANCED V09] Trainer with weighted loss + zero-sample handling
-│   ├── 14-CrossValidator.py        # K-fold cross-validation (Phase 2)
-│   ├── 15-PerModelAnalyzer.py      # Per-model performance analysis
-│   ├── 16-ConfidenceAnalyzer.py    # Confidence score analysis
-│   ├── 17-AdversarialTester.py     # Paraphrasing robustness tests
-│   ├── 18-JailbreakAnalysis.py     # Security-focused jailbreak analysis
-│   ├── 19-CorrelationAnalysis.py   # Refusal ↔ Jailbreak correlation (Phase 2)
-│   ├── 20-AttentionVisualizer.py   # Attention heatmaps
-│   ├── 21-ShapAnalyzer.py          # SHAP interpretability
-│   ├── 22-PowerLawAnalyzer.py      # Power law analysis
-│   ├── 23-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
-│   ├── 24-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
-│   ├── 25-Visualizer.py            # Basic plotting functions
-│   ├── 26-ReportGenerator.py       # PDF report generation
-│   ├── 27-RefusalPipeline.py       # Main training pipeline
-│   ├── 28-ExperimentRunner.py      # Experiment orchestration
-│   ├── 29-Execute.py               # Main entry point
-│   ├── 30-Analyze.py               # Analysis script
-│   ├── 31-ProductionAPI.py         # FastAPI server
-│   ├── 32-MonitoringSystem.py      # Production monitoring
-│   ├── 33-RetrainingPipeline.py    # Automated retraining
-│   └── 34-DataManager.py           # Production data management
+│   ├── 01-Imports.py               # [RENAMED V09] Central import manager
+│   ├── 02-Constants.py             # [ENHANCED V09] Environment, paths, device, class labels + WildJailbreak citation
+│   ├── 03-Config.py                # [ENHANCED V09] All configuration settings + WildJailbreak config
+│   ├── 04-CheckpointManager.py     # [NEW V09] Checkpoint management for error recovery
+│   ├── 05-AWS.py                   # AWS configuration and Secrets Manager
+│   ├── 06-PromptGenerator.py       # 3-stage prompt generation
+│   ├── 07-ResponseCollector.py     # [ENHANCED V09] Multi-LLM response collection + parallel processing
+│   ├── 08-DataCleaner.py           # Comprehensive data cleaning
+│   ├── 09-DataLabeler.py           # [ENHANCED V09] LLM judge labeling + parallel processing
+│   ├── 10-LabelingQualityAnalyzer.py
+│   ├── 11-WildJailbreakLoader.py   # [NEW V09] WildJailbreak dataset loader for supplementation
+│   ├── 12-ClassificationDataset.py # PyTorch Dataset
+│   ├── 13-RefusalClassifier.py     # 3-class RoBERTa model
+│   ├── 14-JailbreakDetector.py     # 2-class RoBERTa model
+│   ├── 15-Trainer.py               # [ENHANCED V09] Trainer with weighted loss + zero-sample handling
+│   ├── 16-CrossValidator.py        # K-fold cross-validation (Phase 2)
+│   ├── 17-PerModelAnalyzer.py      # Per-model performance analysis
+│   ├── 18-ConfidenceAnalyzer.py    # Confidence score analysis
+│   ├── 19-AdversarialTester.py     # Paraphrasing robustness tests
+│   ├── 20-JailbreakAnalysis.py     # Security-focused jailbreak analysis
+│   ├── 21-CorrelationAnalysis.py   # Refusal ↔ Jailbreak correlation (Phase 2)
+│   ├── 22-AttentionVisualizer.py   # Attention heatmaps
+│   ├── 23-ShapAnalyzer.py          # SHAP interpretability
+│   ├── 24-PowerLawAnalyzer.py      # Power law analysis
+│   ├── 25-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
+│   ├── 26-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
+│   ├── 27-Visualizer.py            # Basic plotting functions
+│   ├── 28-ReportGenerator.py       # PDF report generation
+│   ├── 29-RefusalPipeline.py       # [ENHANCED V09] Main training pipeline + WildJailbreak supplementation
+│   ├── 30-ExperimentRunner.py      # Experiment orchestration
+│   ├── 31-Execute.py               # Main entry point
+│   ├── 32-Analyze.py               # Analysis script
+│   ├── 33-ProductionAPI.py         # FastAPI server
+│   ├── 34-MonitoringSystem.py      # Production monitoring
+│   ├── 35-RetrainingPipeline.py    # Automated retraining
+│   └── 36-DataManager.py           # Production data management
 ├── data/                           # Created automatically
 ├── models/                         # Created automatically
 ├── results/                        # Created automatically
@@ -484,7 +505,7 @@ Reports are saved to `reports/` directory.
 ## 🛠️ Development
 
 ### **File Numbering Convention:**
-Files are numbered 01-31 for clear execution order. Auto-loaded files: 04-25.
+Files are numbered 01-36 for clear execution order. Auto-loaded files: 05-28.
 
 ### **Generic Design:**
 All analyzers and visualizers use `class_names` parameter - works with any N-class classifier.
@@ -529,10 +550,20 @@ Ramy Alsaffar
 
 ## 🙏 Acknowledgments
 
-- **RoBERTa**: Liu et al., 2019
-- **SHAP**: Lundberg & Lee, 2017
-- **Transformers**: Hugging Face team
-- **FastAPI**: Sebastián Ramírez
+### **Models & Libraries:**
+- **RoBERTa**: Liu et al., 2019 - [RoBERTa: A Robustly Optimized BERT Pretraining Approach](https://arxiv.org/abs/1907.11692)
+- **SHAP**: Lundberg & Lee, 2017 - [A Unified Approach to Interpreting Model Predictions](https://arxiv.org/abs/1705.07874)
+- **Transformers**: Hugging Face team - [State-of-the-art NLP](https://github.com/huggingface/transformers)
+- **FastAPI**: Sebastián Ramírez - [Modern web framework](https://fastapi.tiangolo.com/)
+
+### **Datasets:**
+- **WildJailbreak**: AllenAI, 2024 - Used for supplementing jailbreak detection training data
+  - Paper: [WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models](https://arxiv.org/abs/2406.18510)
+  - Authors: Liwei Jiang, Kavel Rao, Seungju Han, Allyson Ettinger, Faeze Brahman, Sachin Kumar, Niloofar Mireshghallah, Ximing Lu, Maarten Sap, Yejin Choi, Nouha Dziri
+  - Dataset: [allenai/wildjailbreak on Hugging Face](https://huggingface.co/datasets/allenai/wildjailbreak)
+  - License: Apache 2.0
+  - 262K prompt-response pairs with 82,728 adversarial harmful samples
+  - This project uses WildJailbreak's adversarial harmful subset for supplementing jailbreak detection training when insufficient positive samples are collected from our primary pipeline
 
 ---
 
