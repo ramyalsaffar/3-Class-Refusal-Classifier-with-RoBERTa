@@ -113,6 +113,12 @@ WILDJAILBREAK_CONFIG = {
     'min_response_length': 5,                   # Minimum response length (characters)
     'max_response_length': 10000,               # Maximum response length (characters)
 
+    # Dataset Loading Parameters
+    'dataset_split': 'train',                   # Dataset split to load (train/test/validation)
+    'data_type_filter': 'adversarial_harmful',  # WildJailbreak data type to filter for
+                                                # Options: adversarial_harmful, adversarial_benign,
+                                                #          vanilla_harmful, vanilla_benign
+
     # Transparency & Reporting
     'warn_threshold': 30,                       # Warn if >30% of data from WildJailbreak
     'track_source': True,                       # Add 'data_source' column to track provenance

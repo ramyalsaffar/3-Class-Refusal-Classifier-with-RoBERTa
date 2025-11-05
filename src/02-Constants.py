@@ -261,6 +261,10 @@ WILDJAILBREAK_DATASET_INFO = {
     'source': 'AllenAI',
     'url': 'https://huggingface.co/datasets/allenai/wildjailbreak',
     'paper_url': 'https://arxiv.org/abs/2406.18510',
+    'paper_title': 'WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models',
+    'authors': 'Liwei Jiang, Kavel Rao, Seungju Han, et al.',
+    'conference': 'NeurIPS',
+    'year': '2024',
     'size': '262K prompt-response pairs',
     'adversarial_harmful_samples': '82,728',  # Successful jailbreaks
     'license': 'Apache 2.0'

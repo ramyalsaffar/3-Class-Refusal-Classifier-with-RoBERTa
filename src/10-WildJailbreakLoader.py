@@ -51,7 +51,8 @@ class WildJailbreakLoader:
             print(f"\n{'='*60}")
             print(f"📦 LOADING WILDJAILBREAK DATASET")
             print(f"{'='*60}")
-            print(f"  Source: allenai/wildjailbreak")
+            print(f"  Source: {WILDJAILBREAK_CONFIG['dataset_name']}")
+            print(f"  Split: {WILDJAILBREAK_CONFIG['dataset_split']}")
             print(f"  Loading...")
 
             # Import datasets library
@@ -62,8 +63,11 @@ class WildJailbreakLoader:
                 print(f"   Install with: pip install datasets")
                 return False
 
-            # Load dataset
-            self.dataset = load_dataset('allenai/wildjailbreak', split='train')
+            # Load dataset from config (no hardcoded values)
+            self.dataset = load_dataset(
+                WILDJAILBREAK_CONFIG['dataset_name'],
+                split=WILDJAILBREAK_CONFIG['dataset_split']
+            )
 
             print(f"  ✓ Loaded {len(self.dataset):,} total samples")
             print(f"{'='*60}\n")
@@ -92,12 +96,13 @@ class WildJailbreakLoader:
             # Convert to pandas for easier filtering
             df = self.dataset.to_pandas()
 
-            # Filter for adversarial_harmful (successful jailbreaks)
+            # Filter for specified data type from config (no hardcoded values)
             # These are adversarial jailbreaks that successfully conveyed harmful requests
-            self.filtered_data = df[df['data_type'] == 'adversarial_harmful'].copy()
+            data_type = WILDJAILBREAK_CONFIG['data_type_filter']
+            self.filtered_data = df[df['data_type'] == data_type].copy()
 
             print(f"  ✓ Found {len(self.filtered_data):,} successful jailbreak samples")
-            print(f"  Type: adversarial_harmful (successful jailbreak attempts)")
+            print(f"  Type: {data_type} (successful jailbreak attempts)")
 
             # Print available fields for diversity sampling
             print(f"\n  Available fields:")

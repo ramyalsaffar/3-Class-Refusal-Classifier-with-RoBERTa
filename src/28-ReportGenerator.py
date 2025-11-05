@@ -195,9 +195,9 @@ class ReportGenerator:
 
         citation_text = f"""
         <b>Dataset:</b> {WILDJAILBREAK_DATASET_INFO['name']} by {WILDJAILBREAK_DATASET_INFO['source']}
-        <br/><b>Paper:</b> WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models
-        <br/><b>Authors:</b> Liwei Jiang, Kavel Rao, Seungju Han, et al.
-        <br/><b>Conference:</b> NeurIPS 2024
+        <br/><b>Paper:</b> {WILDJAILBREAK_DATASET_INFO['paper_title']}
+        <br/><b>Authors:</b> {WILDJAILBREAK_DATASET_INFO['authors']}
+        <br/><b>Conference:</b> {WILDJAILBREAK_DATASET_INFO['conference']} {WILDJAILBREAK_DATASET_INFO['year']}
         <br/><b>Dataset Size:</b> {WILDJAILBREAK_DATASET_INFO['size']}
         <br/><b>License:</b> {WILDJAILBREAK_DATASET_INFO['license']}
         <br/><b>URL:</b> <link href="{WILDJAILBREAK_DATASET_INFO['url']}">{WILDJAILBREAK_DATASET_INFO['url']}</link>
