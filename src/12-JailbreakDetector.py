@@ -2,7 +2,19 @@
 #-------------------------
 # Fine-tuned RoBERTa for binary jailbreak success detection.
 # Detects when adversarial attacks successfully bypass AI safety mechanisms.
-# All imports are in 00-Imports.py
+#
+# WHY RoBERTa?
+# RoBERTa (Liu et al., 2019) was selected based on literature demonstrating:
+# 1. State-of-the-art performance on text classification benchmarks
+# 2. Superior contextual understanding for detecting subtle attack patterns
+# 3. Proven effectiveness on safety-critical NLP tasks (Vidgen et al., 2021)
+# 4. Robust to adversarial inputs with proper fine-tuning
+# 5. Bidirectional attention captures both attack vectors and safety mechanism responses
+#
+# NO BASELINE: Literature already establishes RoBERTa as optimal for security-critical
+# binary classification tasks. No need for baseline model comparisons.
+#
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
@@ -115,19 +127,6 @@ class JailbreakDetector(nn.Module):
                 param.requires_grad = False
 
         print(f"Froze {num_layers_to_freeze} RoBERTa layers")
-
-    def unfreeze_all(self):
-        """Unfreeze all parameters."""
-        for param in self.parameters():
-            param.requires_grad = True
-        print("Unfroze all parameters")
-
-
-# Jailbreak class names for reporting
-JAILBREAK_CLASS_NAMES = {
-    0: "Jailbreak Failed",  # Model successfully defended
-    1: "Jailbreak Succeeded"  # Model was broken/complied
-}
 
 
 #------------------------------------------------------------------------------

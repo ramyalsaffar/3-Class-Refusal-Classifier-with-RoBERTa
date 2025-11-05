@@ -3,7 +3,7 @@
 # Comprehensive data quality management for text classification datasets.
 # Detects and cleans duplicates, outliers, invalid data, and label inconsistencies.
 # Adapted from OutlierHandler principles for NLP text data.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
@@ -37,9 +37,9 @@ class DataCleaner:
         self.max_prompt_length = DATA_CLEANING_CONFIG['max_prompt_length']
         self.similarity_threshold = DATA_CLEANING_CONFIG['similarity_threshold']
 
-        # Error indicators
+        # Error indicators (escape regex special characters)
         self.error_patterns = [
-            '[ERROR',
+            r'\[ERROR',  # Escaped [ for regex
             'Failed to generate',
             '<!DOCTYPE html>',
             '<html>',
@@ -93,8 +93,21 @@ class DataCleaner:
         return df_clean
 
     def _validate_data_integrity(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Check for null values and required columns."""
-        required_cols = ['prompt', 'response', 'model', 'refusal_label']
+        """
+        Check for null values and required columns.
+
+        WHY: DataCleaner is called both BEFORE and AFTER labeling
+        - Before labeling: ['prompt', 'response', 'model', 'expected_label', 'timestamp']
+        - After labeling: ['prompt', 'response', 'model', 'refusal_label', 'jailbreak_label', ...]
+        """
+        # Base columns that must ALWAYS exist (before and after labeling)
+        required_cols = ['prompt', 'response', 'model']
+
+        # Optional columns (add if they exist)
+        optional_cols = ['refusal_label', 'jailbreak_label', 'expected_label']
+        for col in optional_cols:
+            if col in df.columns:
+                required_cols.append(col)
 
         # Check required columns exist
         missing_cols = [col for col in required_cols if col not in df.columns]
@@ -266,7 +279,7 @@ class DataCleaner:
         """Detect and remove error responses from API failures."""
         before = len(df)
 
-        # Check for error patterns
+        # Check for error patterns (regex enabled, special chars escaped in patterns)
         error_mask = df['response'].str.contains('|'.join(self.error_patterns), case=False, na=False)
         error_count = error_mask.sum()
 
@@ -291,12 +304,23 @@ class DataCleaner:
         return df
 
     def _validate_label_consistency(self, df: pd.DataFrame, strategy: str) -> pd.DataFrame:
-        """Check for label inconsistencies and suspicious patterns."""
+        """
+        Check for label inconsistencies and suspicious patterns.
+
+        WHY: This method is only relevant AFTER labeling
+        Skip validation if 'refusal_label' doesn't exist yet
+        """
+        # Skip if labels don't exist yet (pre-labeling cleaning)
+        if 'refusal_label' not in df.columns:
+            if self.verbose:
+                print(f"\n🔍 Label Consistency Check: Skipped (no labels yet - pre-labeling cleaning)")
+            return df
+
         if self.verbose:
             print(f"\n🔍 Label Consistency Check:")
 
-        # Check for invalid refusal labels
-        valid_refusal_labels = [0, 1, 2]
+        # Check for invalid refusal labels (GENERIC: works with any N-class classifier)
+        valid_refusal_labels = list(range(len(CLASS_NAMES)))
         invalid_refusal = ~df['refusal_label'].isin(valid_refusal_labels)
         invalid_count = invalid_refusal.sum()
 
@@ -310,9 +334,9 @@ class DataCleaner:
                 'reason': 'Invalid refusal label values'
             })
 
-        # Check jailbreak labels if present
+        # Check jailbreak labels if present (GENERIC: works with any N-class classifier)
         if 'jailbreak_label' in df.columns:
-            valid_jailbreak_labels = [0, 1]
+            valid_jailbreak_labels = list(range(len(JAILBREAK_CLASS_NAMES)))
             invalid_jailbreak = ~df['jailbreak_label'].isin(valid_jailbreak_labels)
             invalid_jb_count = invalid_jailbreak.sum()
 
@@ -403,7 +427,12 @@ class DataCleaner:
         }
 
         # Check for nulls
-        null_counts = df[['prompt', 'response', 'refusal_label']].isnull().sum()
+        # WHY: refusal_label may not exist yet if called before labeling
+        null_check_cols = ['prompt', 'response']
+        if 'refusal_label' in df.columns:
+            null_check_cols.append('refusal_label')
+
+        null_counts = df[null_check_cols].isnull().sum()
         if null_counts.sum() > 0:
             report['issues_found'].append({
                 'type': 'null_values',
@@ -457,7 +486,7 @@ class DataCleaner:
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-3-Class Refusal Classifier with RoBERTa
+Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 Created on October 28, 2025
 @author: ramyalsaffar
 """

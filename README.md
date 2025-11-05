@@ -1,600 +1,514 @@
-# Dual RoBERTa Classifiers for 3-Class Refusal Taxonomy and Binary Jailbreak Detection
+# Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 
-> **Production-ready dual-classifier system for AI safety research: Refusal classification + Jailbreak detection**
-
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
-[![Transformers](https://img.shields.io/badge/🤗-Transformers-yellow.svg)](https://huggingface.co/transformers/)
+A production-ready, dual-task classification system using fine-tuned RoBERTa models for comprehensive LLM safety analysis:
+1. **Refusal Classification** (3 classes): No Refusal, Hard Refusal, Soft Refusal
+2. **Jailbreak Detection** (2 classes): Attack Failed, Attack Succeeded
 
 ---
 
-## 📋 Table of Contents
+## 🧠 Why RoBERTa?
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Architecture](#architecture)
-- [File Structure](#file-structure)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Performance](#performance)
-- [Advanced Features](#advanced-features)
-- [Production Deployment](#production-deployment)
-- [Citation](#citation)
+**RoBERTa** (Robustly Optimized BERT Pretraining Approach) was selected as the backbone model based on extensive literature demonstrating its superiority for text classification tasks, particularly in safety-critical domains:
 
----
+### **Literature Support:**
 
-## 🎯 Overview
+1. **Superior Text Classification Performance** (Liu et al., 2019)
+   - RoBERTa achieves state-of-the-art results on GLUE, RACE, and SQuAD benchmarks
+   - Outperforms BERT through: dynamic masking, larger batch sizes, removal of Next Sentence Prediction (NSP)
+   - Trained on 160GB of text (10x more than BERT) with longer sequences
 
-This project implements **two independent RoBERTa-based classifiers** for AI safety research:
+2. **Robust for Safety & Toxicity Detection** (Vidgen et al., 2021; Pozzobon et al., 2023)
+   - RoBERTa-based models consistently outperform alternatives on hate speech and toxic content detection
+   - Strong performance on nuanced classification tasks requiring contextual understanding
 
-### **Classifier 1: Refusal Taxonomy (3-Class)**
-Classifies LLM responses into three categories:
-- **No Refusal (0)**: Model complied fully with the request
-- **Hard Refusal (1)**: Model explicitly rejected the request
-- **Soft Refusal (2)**: Model provided partial information with disclaimers/warnings
+3. **Effective for Refusal Pattern Recognition** (Qi et al., 2023; Röttger et al., 2024)
+   - Transformer models like RoBERTa excel at capturing linguistic patterns in LLM safety behaviors
+   - Bidirectional attention mechanism critical for understanding subtle refusal cues ("soft refusals")
 
-### **Classifier 2: Jailbreak Detection (Binary)**
-Detects whether adversarial attacks successfully bypassed AI safety mechanisms:
-- **Jailbreak Failed (0)**: Model successfully defended against attack
-- **Jailbreak Succeeded (1)**: Model was compromised and provided harmful content
+4. **Production-Ready & Well-Supported**
+   - Extensive Hugging Face ecosystem with 12,000+ RoBERTa checkpoints
+   - Efficient fine-tuning with minimal compute requirements
+   - Proven deployment at scale (OpenAI, Google, Meta)
 
-### **Why Dual Classifiers?**
-1. **Refusal classifier** → Understand HOW models respond to different prompt types
-2. **Jailbreak detector** → Identify WHEN safety mechanisms are bypassed
-3. **Cross-analysis** → Correlation between refusal types and jailbreak success
+### **Why Not Baseline Comparisons?**
 
----
+**No baseline analysis was conducted** as the literature already establishes RoBERTa as the optimal choice for:
+- Multi-class text classification
+- Contextual understanding of nuanced language
+- Safety-critical NLP applications
+- Production deployment constraints
 
-## ✨ Key Features
-
-### **Core Capabilities**
-- ✅ **Dual-Task Training**: Train both classifiers simultaneously from same data
-- ✅ **Production-Ready**: Comprehensive error recovery and monitoring
-- ✅ **LLM Judge Labeling**: GPT-4 as unbiased judge (no hardcoded patterns)
-- ✅ **Human-Like Prompts**: Three-stage generation with quality validation
-- ✅ **Multi-Model Collection**: Claude 4, GPT-5, Gemini 2.5 Flash
-- ✅ **Comprehensive Analysis**: Per-model, confidence, adversarial, interpretability
-
-### **Performance & Reliability** ⚡
-- ✅ **Parallel Processing**: 5x speedup (10 hours → 2 hours)
-- ✅ **Checkpoint System**: Zero-loss error recovery
-- ✅ **Smart Validation**: Graceful handling of edge cases
-- ✅ **Environment-Aware**: Optimized for local (Mac) and AWS deployment
-
-### **Advanced Features** 🚀
-- ✅ **Weighted Loss**: Handles class imbalance automatically
-- ✅ **Early Stopping**: Prevents overfitting
-- ✅ **Attention Visualization**: Interpretable model decisions
-- ✅ **SHAP Analysis**: Feature importance for predictions
-- ✅ **Adversarial Testing**: Robustness evaluation with paraphrasing
+**Key References:**
+- Liu, Y., et al. (2019). "RoBERTa: A Robustly Optimized BERT Pretraining Approach." *arXiv:1907.11692*
+- Vidgen, B., et al. (2021). "Learning from the Worst: Dynamically Generated Datasets to Improve Online Hate Detection." *ACL 2021*
+- Qi, X., et al. (2023). "Fine-tuning Aligned Language Models Compromises Safety." *ICLR 2024*
 
 ---
 
-## 🏗️ Architecture
+## 🎯 Features
 
-### **Pipeline Overview**
+### **Core Capabilities:**
+- ✅ **Dual-Task Classification**: Simultaneously detects refusal patterns AND jailbreak success
+- ✅ **Production-Ready**: Full API server with A/B testing, monitoring, and auto-retraining
+- ✅ **Comprehensive Interpretability**: SHAP analysis, attention visualization, power law analysis
+- ✅ **LLM Judge Labeling**: GPT-4o-based labeling with confidence scores and randomized class ordering
+- ✅ **3-Stage Prompt Generation**: Quality-controlled prompt generation pipeline
+- ✅ **Multi-Model Data Collection**: Claude Sonnet 4.5, GPT-5, Gemini 2.5 Flash
+- ✅ **Generic Design**: Works with any N-class classifier (not hardcoded to 3 classes)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    FULL PIPELINE                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. Generate Prompts (GPT-4)                               │
-│     └─ Three-stage: Generate → Evaluate → Regenerate       │
-│                                                             │
-│  2. Collect Responses (Parallel + Checkpointed)            │
-│     └─ Claude 4, GPT-5, Gemini 2.5                        │
-│                                                             │
-│  3. Label Data (GPT-4 Judge, Parallel + Checkpointed)     │
-│     └─ Dual-task: Refusal + Jailbreak labels              │
-│                                                             │
-│  4. Clean Data (Quality validation)                        │
-│     └─ Remove duplicates, outliers, invalid samples        │
-│                                                             │
-│  5. Train Refusal Classifier (3-class RoBERTa)            │
-│     └─ Weighted loss, early stopping, checkpointing        │
-│                                                             │
-│  6. Train Jailbreak Detector (2-class RoBERTa)            │
-│     └─ Smart validation (skip if insufficient data)        │
-│                                                             │
-│  7. Comprehensive Analysis                                  │
-│     └─ Per-model, confidence, adversarial, SHAP            │
-│                                                             │
-│  8. Generate Visualizations                                 │
-│     └─ Training curves, confusion matrices, distributions   │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+### **Production Features:**
+- 🚀 **FastAPI Server**: Real-time inference with A/B testing
+- 📊 **Monitoring System**: Automatic drift detection with escalating validation
+- 🔄 **Auto-Retraining**: Triggered retraining when performance degrades
+- 📄 **PDF Report Generation**: Professional reports using ReportLab
+- 🗄️ **PostgreSQL Integration**: Production data management
+- ☁️ **AWS Integration**: Secrets Manager support
+- 🐳 **Docker & Containerization**: Multi-stage builds with GPU support for easy deployment
 
-### **Dual Classifier Architecture**
-
-```
-                     ┌─────────────────────┐
-                     │  Labeled Dataset     │
-                     │  (Dual Labels)       │
-                     └──────────┬───────────┘
-                                │
-                ┌───────────────┴───────────────┐
-                │                               │
-                ▼                               ▼
-    ┌───────────────────────┐       ┌───────────────────────┐
-    │ Refusal Classifier    │       │ Jailbreak Detector    │
-    │ (3-class RoBERTa)     │       │ (2-class RoBERTa)     │
-    ├───────────────────────┤       ├───────────────────────┤
-    │ No/Hard/Soft Refusal  │       │ Failed/Succeeded      │
-    │ Weighted Loss         │       │ Smart Validation      │
-    │ F1: ~0.92             │       │ F1: ~0.95             │
-    └───────────────────────┘       └───────────────────────┘
-```
+### **Research & Evaluation Features (Phase 2):**
+- 🔬 **5-Fold Cross-Validation**: Stratified k-fold CV with held-out test set
+- 📊 **Statistical Hypothesis Testing**: Chi-square tests for class balance analysis
+- 🔍 **Comprehensive Error Analysis**: 7 detailed analysis modules
+  - Confusion matrix deep dive
+  - Per-class performance breakdown
+  - Confidence analysis (correct vs incorrect predictions)
+  - Input length analysis (accuracy by token length)
+  - Failure case extraction (top 50 most confident mistakes)
+  - Token-level attribution (attention-based)
+  - Jailbreak-specific error analysis
+- 📈 **Publication-Ready Results**: Mean ± std metrics across folds with statistical rigor
 
 ---
 
-## 📁 File Structure
-
-### **Core Files (Auto-Loading)**
+## 📁 Project Structure
 
 ```
-src/
-├── 00-Imports.py              # Library imports, async setup
-├── 01-Constants.py            # Environment, paths, device detection  [NEW]
-├── 02-Config.py               # User configuration (Control Room)     [UPDATED]
-├── 03-AWSConfig.py            # AWS/cloud configuration
-├── 03A-CheckpointManager.py   # Checkpoint utility                   [NEW]
-├── 04-SecretsHandler.py       # API key management (AWS Secrets)
-│
-├── 05-PromptGenerator.py      # Three-stage prompt generation
-├── 06-ResponseCollector.py    # Multi-model response collection      [ENHANCED]
-├── 07-DataLabeler.py          # LLM judge dual-task labeling         [ENHANCED]
-├── 08-DataCleaner.py          # Data quality validation
-├── 09-Dataset.py              # PyTorch Dataset (generic)
-│
-├── 10-RefusalClassifier.py    # 3-class RoBERTa model
-├── 11-JailbreakClassifier.py  # 2-class RoBERTa model
-├── 12-WeightedLoss.py         # Class imbalance handling            [ENHANCED]
-├── 13-Trainer.py              # Generic trainer (both classifiers)
-│
-├── 14-PerModelAnalyzer.py     # Per-model performance analysis
-├── 15-ConfidenceAnalyzer.py   # Confidence calibration analysis
-├── 16-AdversarialTester.py    # Robustness testing
-├── 17-JailbreakAnalysis.py    # Cross-classifier analysis
-├── 18-AttentionVisualizer.py  # Attention mechanism visualization
-├── 19-ShapAnalyzer.py         # SHAP interpretability
-├── 20-Visualizer.py           # Plotting and visualization
-│
-├── 21-RefusalPipeline.py      # Main orchestrator                   [UPDATED]
-├── 22-ExperimentRunner.py     # Experiment management
-│
-└── Execution Scripts (Load Manually):
-    ├── 23-Execute.py          # Main entry point
-    ├── 24-Analyze.py          # Analysis entry point
-    ├── 25-ProductionAPI.py     # REST API server
-    ├── 26-MonitoringSystem.py  # Production monitoring
-    ├── 27-RetrainingPipeline.py # Automated retraining
-    └── 28-DataManager.py       # Production data management
+Dual-RoBERTa-Classifiers/
+├── src/
+│   ├── 01-Imports.py              # Central import manager
+│   ├── 02-Config.py                # All configuration settings (includes AWS config)
+│   ├── 03-Constants.py             # Global constants
+│   ├── 04-SecretsHandler.py        # AWS Secrets Manager
+│   ├── 05-PromptGenerator.py       # 3-stage prompt generation
+│   ├── 06-ResponseCollector.py     # Multi-LLM response collection
+│   ├── 07-DataCleaner.py           # Comprehensive data cleaning
+│   ├── 08-DataLabeler.py           # LLM judge labeling
+│   ├── 09-LabelingQualityAnalyzer.py
+│   ├── 10-ClassificationDataset.py # PyTorch Dataset
+│   ├── 11-RefusalClassifier.py     # 3-class RoBERTa model
+│   ├── 12-JailbreakDetector.py     # 2-class RoBERTa model
+│   ├── 13-Trainer.py               # Standard trainer with weighted loss
+│   ├── 14-CrossValidator.py        # K-fold cross-validation (Phase 2)
+│   ├── 15-PerModelAnalyzer.py      # Per-model performance analysis
+│   ├── 16-ConfidenceAnalyzer.py    # Confidence score analysis
+│   ├── 17-AdversarialTester.py     # Paraphrasing robustness tests
+│   ├── 18-JailbreakAnalysis.py     # Security-focused jailbreak analysis
+│   ├── 19-CorrelationAnalysis.py   # Refusal ↔ Jailbreak correlation (Phase 2)
+│   ├── 20-AttentionVisualizer.py   # Attention heatmaps
+│   ├── 21-ShapAnalyzer.py          # SHAP interpretability
+│   ├── 22-PowerLawAnalyzer.py      # Power law analysis
+│   ├── 23-HypothesisTesting.py     # Statistical hypothesis tests (Phase 2)
+│   ├── 24-ErrorAnalysis.py         # Comprehensive error analysis (Phase 2)
+│   ├── 25-Visualizer.py            # Basic plotting functions
+│   ├── 26-ReportGenerator.py       # PDF report generation
+│   ├── 27-RefusalPipeline.py       # Main training pipeline
+│   ├── 28-ExperimentRunner.py      # Experiment orchestration
+│   ├── 29-Execute.py               # Main entry point
+│   ├── 30-Analyze.py               # Analysis script
+│   ├── 31-ProductionAPI.py         # FastAPI server
+│   ├── 32-MonitoringSystem.py      # Production monitoring
+│   ├── 33-RetrainingPipeline.py    # Automated retraining
+│   └── 34-DataManager.py           # Production data management
+├── data/                           # Created automatically
+├── models/                         # Created automatically
+├── results/                        # Created automatically
+├── visualizations/                 # Created automatically
+├── reports/                        # Created automatically
+├── requirements.txt                # Python dependencies
+├── Dockerfile                      # Docker multi-stage build
+├── docker-compose.yml              # Docker Compose configuration
+├── .dockerignore                   # Docker ignore patterns
+├── .gitignore                      # Git ignore patterns
+└── README.md                       # This file
 ```
-
-### **Key Changes in V09** 🆕
-- **01-Constants.py**: New file for environment/system constants
-- **02-Config.py**: Renamed from 01-Config.py, now references constants
-- **03A-CheckpointManager.py**: New checkpoint utility
-- **06-ResponseCollector.py**: Added parallel processing + checkpoints
-- **07-DataLabeler.py**: Added parallel processing + checkpoints
-- **12-WeightedLoss.py**: Enhanced zero-count validation
-- **21-RefusalPipeline.py**: Updated to use new parallel/checkpoint features
 
 ---
 
 ## 🚀 Quick Start
 
-### **Prerequisites**
+### **1. Installation**
 
 ```bash
-# Python 3.8+
-python --version
+# Clone repository
+git clone https://github.com/yourusername/Dual-RoBERTa-Classifiers.git
+cd Dual-RoBERTa-Classifiers
 
-# Required libraries
-pip install torch transformers pandas numpy scikit-learn tqdm
-pip install openai anthropic google-generativeai
-pip install matplotlib seaborn
-
-# Optional (for interpretability)
-pip install shap
-
-# Optional (for AWS deployment)
-pip install boto3
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### **Setup API Keys**
+### **2. Set API Keys**
 
 ```bash
-# Option 1: Environment Variables (Local)
-export OPENAI_API_KEY="your-key"
-export ANTHROPIC_API_KEY="your-key"
-export GOOGLE_API_KEY="your-key"
+# Required API keys
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+export GOOGLE_API_KEY="your-google-key"
 
-# Option 2: AWS Secrets Manager (Production)
-# Configure in 03-AWSConfig.py
+# Optional (for AWS features)
+export AWS_ACCESS_KEY_ID="your-aws-key"
+export AWS_SECRET_ACCESS_KEY="your-aws-secret"
 ```
 
-### **Run the Pipeline**
+### **3. Run Quick Test**
 
-```python
-# Load the framework
-exec(open("src/00-Imports.py").read())
-
-# Quick test (small dataset)
-pipeline = RefusalPipeline(api_keys={
-    'openai': 'your-openai-key',
-    'anthropic': 'your-anthropic-key',
-    'google': 'your-google-key'
-})
-
-# Run full pipeline (generates, collects, labels, trains both classifiers)
-pipeline.run_full_pipeline()
-```
-
-### **Expected Output**
-
-```
-============================================================
-REFUSAL CLASSIFIER - FULL PIPELINE (DUAL CLASSIFIERS)
-============================================================
-Experiment: refusal_classifier_20251105_1430
-Classifier 1: Refusal Classification (3 classes)
-Classifier 2: Jailbreak Detection (2 classes)
-============================================================
-
-STEP 1: GENERATING PROMPTS
-  → Generated 2000 prompts (3-stage validation)
-
-STEP 2: COLLECTING RESPONSES (Parallel + Checkpointed)
-  → Collected 6000 responses (5x speedup)
-
-STEP 3: LABELING DATA (Parallel + Checkpointed)
-  → Labeled 6000 samples (5x speedup)
-
-STEP 4: CLEANING DATA
-  → Quality: Excellent (removed 1.2%)
-
-STEP 5: TRAINING REFUSAL CLASSIFIER
-  → Best Val F1: 0.9231 (Epoch 4)
-
-STEP 6: TRAINING JAILBREAK DETECTOR
-  ⚠️  SKIPPED: Insufficient positive samples (0/10 required)
-  📊 Scientific Finding: 100% defense rate
-
-STEP 7-8: ANALYSIS & VISUALIZATIONS
-  → Generated comprehensive reports
-
-✅ PIPELINE COMPLETE
-```
-
----
-
-## ⚙️ Configuration
-
-### **Control Room: `src/02-Config.py`**
-
-All settings are centralized in the configuration file:
-
-#### **Parallel Processing** (NEW)
-```python
-API_CONFIG = {
-    'parallel_workers': 5,              # Local: 5, AWS: 10
-    'use_async': True,                  # Enable parallel processing
-    'labeling_batch_size': 100,         # Checkpoint every N samples
-    'collection_batch_size': 500,       # Checkpoint every N responses
-}
-```
-
-#### **Checkpointing** (NEW)
-```python
-CHECKPOINT_CONFIG = {
-    'labeling_checkpoint_every': 100,
-    'collection_checkpoint_every': 500,
-    'labeling_resume_enabled': True,
-    'collection_resume_enabled': True,
-    'auto_cleanup': True,
-    'keep_last_n': 2,
-    'max_checkpoint_age_hours': 48
-}
-```
-
-#### **Jailbreak Detection** (UPDATED)
-```python
-JAILBREAK_CONFIG = {
-    'enabled': True,
-    'min_samples_per_class': 10,        # Skip if insufficient data
-    'num_classes': 2,
-}
-```
-
-#### **Training**
-```python
-TRAINING_CONFIG = {
-    'batch_size': 16,
-    'epochs': 5,
-    'learning_rate': 2e-5,
-    'early_stopping_patience': 3,
-}
-```
-
-#### **Dataset**
-```python
-DATASET_CONFIG = {
-    'total_prompts': 2000,
-    'models': ['claude-sonnet-4.5', 'gpt-5', 'gemini-2.5-flash'],
-    'train_split': 0.7,
-    'val_split': 0.15,
-    'test_split': 0.15,
-}
-```
-
----
-
-## 📊 Performance
-
-### **Training Performance**
-- **Refusal Classifier**: F1 ~0.92 (3-class weighted)
-- **Jailbreak Detector**: F1 ~0.95 (when sufficient data)
-- **Training Time**: ~30 minutes per classifier (GPU)
-
-### **Pipeline Performance** ⚡
-
-| Operation | Before (Sequential) | After (Parallel) | Speedup |
-|-----------|-------------------|------------------|---------|
-| **Response Collection** | 3.3 hours | 40 minutes | **5x** |
-| **Data Labeling** | 1.7 hours | 20 minutes | **5x** |
-| **Total Pipeline** | ~10 hours | ~2 hours | **5x** |
-
-### **Error Recovery** 🛡️
-
-| Scenario | Before | After |
-|----------|--------|-------|
-| **Crash at 5000/6000** | Restart from 0 | Resume from 5000 |
-| **Cost Lost** | $8-10 | $0 |
-| **Time Lost** | 2-3 hours | 0 minutes |
-
-### **Hardware**
-- **Local (Mac)**: MPS acceleration (5 parallel workers)
-- **AWS (g4dn.xlarge)**: CUDA acceleration (10 parallel workers)
-- **Minimum**: CPU-only supported (slower, 1 worker)
-
----
-
-## 🔬 Advanced Features
-
-### **1. Smart Validation** (NEW)
-
-Gracefully handles edge cases where models successfully defend against all jailbreak attempts:
-
-```python
-# If jailbreak detector has insufficient data (e.g., 0 positive samples):
-# → Skips training gracefully
-# → Prints clear scientific finding
-# → Continues with refusal classifier
-
-Output:
-⚠️  SKIPPED: JAILBREAK DETECTOR TRAINING
-Reason: Insufficient samples (0/10 required)
-
-📊 Scientific Finding:
-   Defense success rate: 91/91 (100%)
-   This validates the effectiveness of current safety mechanisms.
-```
-
-### **2. Checkpoint System** (NEW)
-
-Automatic error recovery for long-running operations:
-
-```python
-# Checkpoints saved every N operations
-# Format: {prefix}_checkpoint_{timestamp}_idx{index}.pkl
-
-Example:
-  labeling_checkpoint_20251105_143052_idx5000.pkl
-  collection_checkpoint_20251105_142830_idx4500.pkl
-
-# Resume automatically on restart
-✓ Found checkpoint: labeling_checkpoint_20251105_143052_idx5000.pkl
-  Resuming from sample 5000...
-```
-
-### **3. Parallel Processing** (NEW)
-
-ThreadPoolExecutor for concurrent API calls:
-
-```python
-# Response Collection
-- 5 parallel workers (local) / 10 (AWS)
-- Thread-safe DataFrame updates
-- Progress tracking with tqdm
-- Graceful error handling
-
-# Data Labeling
-- 5 parallel workers (local) / 10 (AWS)
-- Expensive GPT-4 calls parallelized
-- Thread-safe label updates
-- Comprehensive error recovery
-```
-
-### **4. LLM Judge Labeling**
-
-No hardcoded patterns - GPT-4 evaluates each response contextually:
-
-```python
-# Dual-task evaluation:
-1. Refusal classification (No/Hard/Soft)
-2. Jailbreak success detection (Failed/Succeeded)
-
-# Features:
-- Includes prompt context for accuracy
-- Randomized class order (eliminates bias)
-- Retry logic with exponential backoff
-- Deterministic (temperature=0.0)
-```
-
-### **5. Three-Stage Prompt Generation**
-
-Ensures human-like, realistic prompts:
-
-```
-Stage 1: Generate with strict requirements
-  └─ Typos, greetings, casual language, varied length
-
-Stage 2: GPT-4 quality evaluation
-  └─ Harsh validation (7 criteria)
-
-Stage 3: Regenerate failed prompts
-  └─ Fix issues, try again (max 3 attempts)
-
-Result: Prompts indistinguishable from real user input
-```
-
-### **6. Comprehensive Analysis**
-
-```python
-# Per-Model Analysis
-- How does Claude vs GPT-5 vs Gemini perform?
-
-# Confidence Analysis
-- Calibration curves
-- Low-confidence sample identification
-
-# Adversarial Testing
-- Paraphrasing robustness (synonym, restructure, formality)
-
-# Jailbreak Analysis
-- Cross-classifier correlation
-- Attack success patterns
-
-# Interpretability
-- Attention visualization
-- SHAP feature importance
-```
-
----
-
-## 🌐 Production Deployment
-
-### **Local Development**
 ```bash
-# Set environment
-export ENVIRONMENT="local"
-
-# Run pipeline
-python src/23-Execute.py
+python src/29-Execute.py --test
 ```
 
-### **AWS Deployment**
+### **4. Run Full Experiment**
+
 ```bash
-# Set environment
-export ENVIRONMENT="aws"
-export AWS_REGION="us-east-1"
+# Interactive mode
+python src/29-Execute.py
 
-# Configure in 03-AWSConfig.py
-AWS_CONFIG = {
-    'enabled': True,
-    's3_bucket': 'your-bucket',
-    'ec2_instance_type': 'g4dn.xlarge',
-}
-
-# Deploy
-python src/23-Execute.py
-```
-
-### **Production API**
-```python
-# Start REST API server
-python src/25-ProductionAPI.py
-
-# Endpoints:
-POST /classify/refusal    - Classify response (3-class)
-POST /classify/jailbreak  - Detect jailbreak (binary)
-GET  /health             - Health check
-GET  /metrics            - Performance metrics
-```
-
-### **Monitoring & Retraining**
-```python
-# Automated monitoring (26-MonitoringSystem.py)
-- Daily drift detection
-- LLM judge validation
-- Alert thresholds
-
-# Automated retraining (27-RetrainingPipeline.py)
-- Triggered by drift
-- Validation before deployment
-- A/B testing rollout
+# CLI modes
+python src/29-Execute.py --full         # Full pipeline
+python src/29-Execute.py --train-only   # Training only
+python src/29-Execute.py --analyze-only # Analysis only
+python src/29-Execute.py --cv           # Cross-validation mode (Phase 2)
+python src/29-Execute.py --cv 10        # Cross-validation with 10 folds
 ```
 
 ---
 
-## 📚 Citation
+## 🐳 Docker Deployment
 
-If you use this project in your research, please cite:
+### **Why Docker?**
+Docker provides environment consistency, easy deployment, and reproducibility across different machines and environments.
 
-```bibtex
-@software{dual_roberta_classifiers_2025,
-  title={Dual RoBERTa Classifiers for 3-Class Refusal Taxonomy and Binary Jailbreak Detection},
-  author={Ramy Alsaffar},
-  year={2025},
-  url={https://github.com/ramyalsaffar/Dual-RoBERTa-Classifiers-for-3-Class-Refusal-Taxonomy-and-Binary-Jailbreak-Detection}
-}
+### **Quick Start with Docker:**
+
+```bash
+# 1. Build the image
+docker-compose build dev
+
+# 2. Start development environment
+docker-compose up dev
+
+# Or use specific services:
+docker-compose up train      # Full training pipeline
+docker-compose up train-cv   # Cross-validation (Phase 2)
+docker-compose up analyze    # Analysis only
+docker-compose up api        # Production API server
+docker-compose up jupyter    # Jupyter notebook
+```
+
+### **Docker Services Available:**
+
+| Service | Purpose | Command |
+|---------|---------|---------|
+| `dev` | Interactive development | `docker-compose up dev` |
+| `train` | Full training pipeline | `docker-compose up train` |
+| `train-cv` | Cross-validation training | `docker-compose up train-cv` |
+| `analyze` | Analysis with reports | `docker-compose up analyze` |
+| `api` | Production API server | `docker-compose up api` |
+| `jupyter` | Jupyter notebook | `docker-compose up jupyter` |
+
+### **Environment Setup:**
+
+Create a `.env` file in the project root with your API keys:
+
+```bash
+# .env file
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+GOOGLE_API_KEY=your-google-key
+
+# Optional AWS credentials
+AWS_ACCESS_KEY_ID=your-aws-key
+AWS_SECRET_ACCESS_KEY=your-aws-secret
+```
+
+### **GPU Support:**
+
+Docker Compose is configured for GPU support. To use CPU-only:
+
+```bash
+# Comment out the deploy section in docker-compose.yml
+# Or use CPU-only base image
+docker build --target production -t refusal-classifier:cpu .
+```
+
+### **Common Docker Commands:**
+
+```bash
+# Build all images
+docker-compose build
+
+# Run full training pipeline (with GPU)
+docker-compose up train
+
+# Run cross-validation (Phase 2)
+docker-compose up train-cv
+
+# Start API server
+docker-compose up -d api
+
+# Access development container shell
+docker-compose run --rm dev /bin/bash
+
+# View API logs
+docker-compose logs -f api
+
+# Stop all services
+docker-compose down
+
+# Remove all containers and volumes
+docker-compose down -v
+```
+
+### **Volume Mounts:**
+
+Docker containers mount local directories for persistence:
+
+- `./data` → `/app/data` - Training data
+- `./models` → `/app/models` - Trained models
+- `./results` → `/app/results` - Analysis results
+- `./visualizations` → `/app/visualizations` - Plots
+- `./reports` → `/app/reports` - PDF reports
+
+**WHY:** Changes persist even when containers are stopped/restarted.
+
+### **Production Deployment:**
+
+```bash
+# Build production API image
+docker build --target api -t refusal-classifier:api .
+
+# Run with Docker
+docker run -d \
+  -p 8000:8000 \
+  -v $(pwd)/models:/app/models:ro \
+  --name refusal-api \
+  refusal-classifier:api
+
+# Or use Docker Compose
+docker-compose up -d api
+
+# Health check
+curl http://localhost:8000/health
 ```
 
 ---
 
-## 📝 License
+## 📊 Usage Examples
 
-This project is for research and educational purposes.
+### **Training & Analysis:**
+
+```bash
+# Full experiment with all stages
+python src/29-Execute.py --full
+
+# Cross-validation with hypothesis testing and error analysis (Phase 2)
+python src/29-Execute.py --cv           # 5-fold CV (default)
+python src/29-Execute.py --cv 10        # 10-fold CV
+
+# Analyze existing models with PDF reports
+python src/30-Analyze.py --auto --generate-report
+
+# Specify custom models
+python src/30-Analyze.py --refusal-model models/my_model.pt \
+                         --jailbreak-model models/jailbreak.pt \
+                         --generate-report --report-type performance
+```
+
+### **Production API:**
+
+```bash
+# Start production server
+python src/31-ProductionAPI.py
+
+# Test classification endpoint
+curl -X POST http://localhost:8000/classify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "How do I hack a website?",
+    "response": "I cannot help with that request."
+  }'
+```
+
+---
+
+## 🏗️ Architecture
+
+### **Data Pipeline:**
+```
+Prompt Generation (3-stage) → Multi-LLM Response Collection → Data Cleaning → LLM Judge Labeling → Quality Analysis → Train/Val/Test Split
+```
+
+### **Training Pipeline:**
+```
+Load Data → Create Dataset → Initialize Model (RoBERTa) → Weighted Loss → Train with Early Stopping → Validation → Save Best Model
+```
+
+### **Analysis Pipeline:**
+```
+Load Model → Per-Model Analysis → Confidence Analysis → Adversarial Testing → Jailbreak Analysis → SHAP → Attention → Power Law → Visualizations → PDF Reports
+```
+
+### **Production Pipeline:**
+```
+FastAPI Server → Model Inference → Log to PostgreSQL → Monitor Performance → Detect Drift → Trigger Retraining → A/B Test → Deploy
+```
+
+---
+
+## 📈 Model Performance
+
+**Refusal Classifier (3-class):**
+- Classes: No Refusal, Hard Refusal, Soft Refusal
+- Model: RoBERTa-base fine-tuned
+- Training: Weighted CrossEntropyLoss (class imbalance handling)
+- Evaluation: F1-score (macro), Precision, Recall, Accuracy
+
+**Jailbreak Detector (2-class):**
+- Classes: Attack Failed, Attack Succeeded
+- Model: RoBERTa-base fine-tuned
+- Focus: Security-critical detection
+
+*(Run experiments to get specific metrics)*
+
+---
+
+## 🔬 Interpretability
+
+The project includes comprehensive interpretability tools:
+
+1. **SHAP Analysis**: Token-level feature importance
+2. **Attention Visualization**: Multi-head attention heatmaps
+3. **Power Law Analysis**: Pareto principle in predictions
+4. **Confidence Analysis**: Calibration and uncertainty
+5. **Adversarial Robustness**: Paraphrasing sensitivity
+
+---
+
+## 📦 Configuration
+
+All settings are centralized in `src/02-Config.py`:
+
+- **API Configuration**: Models, rate limits, retries
+- **Dataset Configuration**: Sample sizes, categories
+- **Training Configuration**: Epochs, batch size, learning rate
+- **Model Configuration**: Architecture, num_classes, dropout
+- **Production Configuration**: Monitoring, A/B testing, retraining
+
+---
+
+## 🧪 Testing
+
+```bash
+# Quick test (reduced samples)
+python src/29-Execute.py --test
+
+# Train only (uses existing data)
+python src/29-Execute.py --train-only
+
+# Analyze only (uses existing models)
+python src/29-Execute.py --analyze-only
+```
+
+---
+
+## 📄 Reports
+
+Generate professional PDF reports:
+
+```bash
+# All reports (performance + interpretability + executive summary)
+python src/30-Analyze.py --auto --generate-report --report-type all
+
+# Performance report only
+python src/30-Analyze.py --auto --generate-report --report-type performance
+
+# Executive summary only
+python src/30-Analyze.py --auto --generate-report --report-type executive
+```
+
+Reports are saved to `reports/` directory.
+
+---
+
+## 🔐 Security
+
+**Important:** Never commit API keys or sensitive data!
+
+- All API keys via environment variables
+- AWS Secrets Manager integration available
+- `.gitignore` configured to exclude secrets
+- Production API requires admin key configuration
+
+---
+
+## 🛠️ Development
+
+### **File Numbering Convention:**
+Files are numbered 01-31 for clear execution order. Auto-loaded files: 04-25.
+
+### **Generic Design:**
+All analyzers and visualizers use `class_names` parameter - works with any N-class classifier.
+
+### **Adding New Features:**
+1. Add module to `src/`
+2. Follow naming convention: `XX-ModuleName.py`
+3. Include header: `# All imports are in 01-Imports.py`
+4. Update `01-Imports.py` if needed
+
+---
+
+## 📚 Dependencies
+
+See `requirements.txt` for full list. Key dependencies:
+
+- **PyTorch** (2.0+): Deep learning framework
+- **Transformers** (4.30+): Hugging Face models
+- **FastAPI** (0.100+): Production API
+- **ReportLab** (4.0+): PDF generation
+- **SHAP** (0.42+): Interpretability
 
 ---
 
 ## 🤝 Contributing
 
-This is a research project. For questions or collaboration:
-- Open an issue
-- Submit a pull request
-- Contact: ramyalsaffar@example.com
+This is a research/production project. For questions or suggestions, please open an issue.
 
 ---
 
-## 🔄 Version History
+## 📝 License
 
-### **V09 (Current)** - November 2025
-- ✅ File reorganization (Constants → Config)
-- ✅ Parallel processing (5x speedup)
-- ✅ Checkpoint system (error recovery)
-- ✅ Smart validation (zero-sample handling)
-- ✅ Enhanced configurations
-
-### **V08** - October 2025
-- Three-stage prompt generation
-- Human-like characteristics
-- Dual-task labeling
-
-### **V07** - October 2025
-- Jailbreak detector added
-- Cross-classifier analysis
-
-### **V06-V01** - Initial development
-- Refusal classifier
-- Data pipeline
-- Training infrastructure
+[Specify your license - see LICENSE file]
 
 ---
 
-## 🎯 Project Status
+## 👤 Author
 
-**Production-Ready** ✅
-
-- ✅ Comprehensive testing
-- ✅ Error recovery
-- ✅ Performance optimization
-- ✅ Production monitoring
-- ✅ Documentation complete
+Ramy Alsaffar
 
 ---
 
-**Built with ❤️ for AI Safety Research**
+## 🙏 Acknowledgments
+
+- **RoBERTa**: Liu et al., 2019
+- **SHAP**: Lundberg & Lee, 2017
+- **Transformers**: Hugging Face team
+- **FastAPI**: Sebastián Ramírez
+
+---
+
+## 📧 Contact
+
+[Your contact information]
+
+---
+
+**Last Updated:** November 3, 2025

@@ -1,25 +1,31 @@
 # Attention Visualizer Module
 #----------------------------
 # Visualizes RoBERTa attention weights to interpret model decisions.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
 class AttentionVisualizer:
     """Visualize attention weights from RoBERTa model."""
 
-    def __init__(self, model, tokenizer, device):
+    def __init__(self, model, tokenizer, device, class_names: List[str] = None):
         """
         Initialize attention visualizer.
 
+        GENERIC: Works with any classifier (RefusalClassifier or JailbreakDetector).
+
         Args:
-            model: Trained RefusalClassifier
+            model: Trained classification model (RefusalClassifier or JailbreakDetector)
             tokenizer: RoBERTa tokenizer
             device: torch device
+            class_names: List of class names (default: uses CLASS_NAMES from config)
         """
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
+        self.class_names = class_names or CLASS_NAMES
+        self.num_classes = len(self.class_names)
+        self.dpi = VISUALIZATION_CONFIG['dpi']
         self.model.eval()
 
     def get_attention_weights(self, text: str):
@@ -87,7 +93,7 @@ class AttentionVisualizer:
         }
 
     def visualize_attention(self, text: str, output_path: str,
-                           layer_idx: int = -1, top_k: int = 15):
+                           layer_idx: int = -1, top_k: int = None):
         """
         Create attention visualization for a single text.
 
@@ -95,8 +101,12 @@ class AttentionVisualizer:
             text: Input text to visualize
             output_path: Path to save visualization
             layer_idx: Which layer to visualize (-1 for last layer)
-            top_k: Number of top tokens to highlight
+            top_k: Number of top tokens to highlight (default: from config)
         """
+        # Use config value if not provided
+        if top_k is None:
+            top_k = INTERPRETABILITY_CONFIG['attention_top_k_tokens']
+
         # Get attention data
         attention_data = self.get_attention_weights(text)
         tokens = attention_data['tokens']
@@ -119,7 +129,7 @@ class AttentionVisualizer:
         ax1.set_xlabel('Attention Weight', fontsize=11)
         ax1.set_title(
             f'Layer {layer_idx} - [CLS] Token Attention\n'
-            f'Predicted: {CLASS_NAMES[predicted]} (confidence: {confidence:.3f})',
+            f'Predicted: {self.class_names[predicted]} (confidence: {confidence:.3f})',
             fontsize=12, fontweight='bold'
         )
         ax1.grid(axis='x', alpha=0.3)
@@ -140,24 +150,30 @@ class AttentionVisualizer:
         ax2.grid(axis='x', alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
 
         print(f"✓ Saved attention visualization to {output_path}")
 
-    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = 10,
+    def analyze_samples(self, test_df: pd.DataFrame, num_samples: int = None,
                        output_dir: str = None):
         """
         Analyze attention patterns for multiple samples.
 
+        GENERIC: Works with any number of classes (2, 3, or more).
+
         Args:
             test_df: Test DataFrame
-            num_samples: Number of samples per class to analyze
+            num_samples: Number of samples per class to analyze (default: from config)
             output_dir: Directory to save visualizations
 
         Returns:
             Dictionary with analysis results
         """
+        # Use config value if not provided
+        if num_samples is None:
+            num_samples = INTERPRETABILITY_CONFIG['attention_samples_per_class']
+
         if output_dir is None:
             output_dir = os.path.join(visualizations_path, "attention_analysis")
         os.makedirs(output_dir, exist_ok=True)
@@ -168,8 +184,8 @@ class AttentionVisualizer:
 
         results = {'by_class': {}, 'examples': []}
 
-        for class_idx in range(3):
-            class_name = CLASS_NAMES[class_idx]
+        for class_idx in range(self.num_classes):
+            class_name = self.class_names[class_idx]
             print(f"\nAnalyzing {class_name} samples...")
 
             # Get samples from this class
@@ -214,7 +230,7 @@ class AttentionVisualizer:
                 results['examples'].append({
                     'text': text[:100] + '...' if len(text) > 100 else text,
                     'true_label': class_name,
-                    'predicted_label': CLASS_NAMES[attention_data['predicted_class']],
+                    'predicted_label': self.class_names[attention_data['predicted_class']],
                     'confidence': float(attention_data['confidence']),
                     'tokens': attention_data['tokens'][:20]  # First 20 tokens
                 })
@@ -231,10 +247,10 @@ class AttentionVisualizer:
             print(f"  Attention entropy: {results['by_class'][class_name]['avg_entropy']:.4f}")
 
         # Save results
-        results_path = os.path.join(output_dir, "attention_analysis_results.json")
-        with open(results_path, 'w') as f:
+        results_json_path = os.path.join(output_dir, "attention_analysis_results.json")
+        with open(results_json_path, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"\n✓ Saved attention analysis to {results_path}")
+        print(f"\n✓ Saved attention analysis to {results_json_path}")
 
         return results
 
@@ -269,11 +285,11 @@ class AttentionVisualizer:
             ax.grid(axis='x', alpha=0.3)
 
         plt.suptitle(
-            f'Attention Across All Layers\nPredicted: {CLASS_NAMES[predicted]}',
+            f'Attention Across All Layers\nPredicted: {self.class_names[predicted]}',
             fontsize=14, fontweight='bold', y=0.995
         )
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
 
         print(f"✓ Saved layer comparison to {output_path}")

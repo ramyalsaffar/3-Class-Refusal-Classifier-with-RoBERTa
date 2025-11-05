@@ -2,65 +2,50 @@
 #---------------------------
 # This file contains all configuration settings.
 # This is your CONTROL ROOM - modify parameters here.
-#
-# NOTE: This is 02-Config.py (renamed from 01-Config.py)
-# It loads AFTER 01-Constants.py so it can reference DEVICE and other constants.
 ###############################################################################
 
 
 # =============================================================================
-# CONTROL ROOM - All Configuration Settings
+# PART 01: CORE STUDY DESIGN CONFIGURATION
 # =============================================================================
+# This section contains all critical experimental design parameters
 
 
-# API Configuration
-#------------------
+# API Configuration (Centralized LLM Settings)
+#-----------------------------------------------
 API_CONFIG = {
-    # Prompt Generation (GPT-4 generates diverse prompts)
-    'prompt_model': 'gpt-4',
+    # Model Selection
+    'prompt_model': 'gpt-4o',                   # Model for prompt generation
+    'judge_model': 'gpt-4o',                    # Model for response labeling/judging
+    'paraphrase_model': 'gpt-4o',               # Model for adversarial paraphrasing
 
-    # Response Collection (3 models: Claude, GPT-5, Gemini)
+    # Response Collection Models (3 models to test)
     'response_models': {
-        'claude': 'claude-sonnet-4-20250514',
+        'claude': 'claude-sonnet-4-5',  # Alias (auto-updates to latest snapshot)
         'gpt5': 'gpt-5',
         'gemini': 'gemini-2.5-flash'
     },
 
-    # Adversarial Testing (GPT-4 for paraphrasing)
-    'paraphrase_model': 'gpt-4',
-
-    # Rate Limiting & Retries
-    'rate_limit_delay': 0.5,                    # Seconds between API calls
-    'max_retries': 5,                           # Max retries for failed API calls
-
     # Temperature Settings
-    'temperature_generate': 0.9,                # High = diverse prompts
-    'temperature_response': 0.7,                # Medium = varied responses
+    'temperature_generate': 1.0,                # Default = diverse prompts (max randomness)
+    'temperature_judge': 0.0,                   # Deterministic judging
     'temperature_paraphrase': 0.7,              # Medium = natural paraphrases
+    'temperature_response': 1.0,                # Default = 1.0 for all models (Claude, GPT-5, Gemini)
 
     # Token Limits
-    'max_tokens_generate': 4000,                # For prompt generation
-    'max_tokens_response': 1024,                # For LLM responses
-    'max_tokens_paraphrase': 500,               # For paraphrasing
+    'max_tokens_generate': 2000,                # For prompt generation (reduced for speed)
+    'max_tokens_regenerate': 500,               # For regenerating failed prompts
+    'max_tokens_judge': 50,                     # Small JSON response for judging
+    'max_tokens_paraphrase': 200,               # For paraphrasing
+    'max_tokens_response': 4096,                # For LLM responses (increased for GPT-5 reasoning tokens)
 
-    # LLM Judge Settings (for data labeling)
-    'judge_temperature': 0.0,                   # Deterministic for consistency
-    'judge_max_tokens': 50,                     # Small JSON response
+    # Rate Limiting & Retries
+    'rate_limit_delay': 0.2,                    # Seconds between API calls (reduced for speed)
+    'max_retries': 5,                           # Max retries for failed API calls
 
     # Batch Sizes
-    'prompt_generation_batch_size': 50,         # Batch size for generating prompts
-    'inference_batch_size': 16,                 # Batch size for model inference/analysis
-
-    # Parallel Processing (NEW - for performance optimization)
-    'parallel_workers': 5 if not IS_AWS else 10,  # Concurrent API calls (5 local, 10 AWS)
-    'use_async': True,                          # Use async I/O for API calls
-    'labeling_batch_size': 100,                 # Checkpoint labeling every N samples
-    'collection_batch_size': 500,               # Checkpoint response collection every N samples
-
-    # AWS-Specific Batch Processing (only used when IS_AWS=True)
-    'aws_batch_size': 1000,                     # Larger batches for cloud processing
-    'use_sqs_queue': False,                     # Enable SQS for distributed processing (future)
-    'lambda_workers': 10                        # Lambda functions for parallel work (future)
+    'prompt_generation_batch_size': 10,         # Batch size for generating prompts (smaller = more progress updates)
+    'inference_batch_size': 16                  # Batch size for model inference/analysis
 }
 
 
@@ -83,7 +68,9 @@ JAILBREAK_CONFIG = {
     'dropout': 0.1,                             # Dropout probability
     'freeze_layers': 6,                         # Freeze bottom 6 layers
     'enabled': True,                            # Enable jailbreak detection training
-    'min_samples_per_class': 10                 # Minimum samples per class to train (skip if insufficient)
+
+    # Performance Thresholds
+    'min_recall_succeeded': 0.95                # Minimum recall threshold for jailbreak detection (95%)
 }
 
 
@@ -100,7 +87,7 @@ TRAINING_CONFIG = {
     'save_best_only': True,                     # Only save best model checkpoint
     'num_workers': 0,                           # DataLoader workers (0 for Mac, 4 for AWS)
     'pin_memory': True,                         # Pin memory for faster GPU transfer
-    'device': DEVICE                            # Auto-detected in 00-Imports.py
+    'device': DEVICE                            # Auto-detected in 01-Imports.py
 }
 
 
@@ -110,7 +97,8 @@ DATASET_CONFIG = {
     'total_prompts': 2000,                      # Total prompts to generate
 
     # Models to collect responses from (3 models × 2000 prompts = 6000 responses)
-    'models': ['claude-sonnet-4.5', 'gpt-5', 'gemini-2.5-flash'],
+    # WHY: Derived from API_CONFIG['response_models'] - single source of truth
+    # Access via: list(API_CONFIG['response_models'].values())
 
     # Train/Val/Test splits
     'train_split': 0.7,                         # 70% training
@@ -118,45 +106,46 @@ DATASET_CONFIG = {
     'test_split': 0.15,                         # 15% test
     'random_seed': 42,                          # For reproducibility
 
-    # Category distribution (must sum to total_prompts = 2000)
-    # Hard Refusal: 795 prompts across 5 categories
-    # Soft Refusal: 205 prompts across 4 categories
-    # No Refusal: 1000 prompts across 4 categories
+    # Category distribution (percentages - will scale with total_prompts)
+    # WHY: Using percentages allows automatic scaling for any total_prompts value
+    # Hard Refusal: 39.75% across 5 categories
+    # Soft Refusal: 10.25% across 4 categories
+    # No Refusal: 50% across 4 categories
     'categories': {
-        # HARD REFUSAL CATEGORIES (795 total)
+        # HARD REFUSAL CATEGORIES (39.75% total)
         'violence_illegal': {
-            'hard': 285,        # Weapons, violence, illegal activities
-            'soft': 15          # Edge cases (self-defense, security)
+            'hard': 14.25,      # Weapons, violence, illegal activities
+            'soft': 0.75        # Edge cases (self-defense, security)
         },
         'hate_speech': {
-            'hard': 150,        # Explicit hate speech
+            'hard': 7.5,        # Explicit hate speech
             'soft': 0
         },
         'jailbreaks': {
-            'hard': 225,        # Role-play, DAN-style, adversarial
-            'soft': 25          # Borderline hypotheticals
+            'hard': 11.25,      # Role-play, DAN-style, adversarial
+            'soft': 1.25        # Borderline hypotheticals
         },
         'privacy_misinfo': {
-            'hard': 90,         # PII requests, doxxing, fake news
-            'soft': 60          # Privacy tips, misinfo education
+            'hard': 4.5,        # PII requests, doxxing, fake news
+            'soft': 3.0         # Privacy tips, misinfo education
         },
         'regulated_content': {
-            'hard': 45,         # Medical diagnosis, legal strategy
-            'soft': 105         # General health/legal info with disclaimers
+            'hard': 2.25,       # Medical diagnosis, legal strategy
+            'soft': 5.25        # General health/legal info with disclaimers
         },
 
-        # NO REFUSAL CATEGORIES (1000 total)
+        # NO REFUSAL CATEGORIES (50% total)
         'technical_educational': {
-            'no_refusal': 350   # Programming, math, science
+            'no_refusal': 17.5  # Programming, math, science
         },
         'creative_professional': {
-            'no_refusal': 300   # Writing, business, career
+            'no_refusal': 15.0  # Writing, business, career
         },
         'general_assistance': {
-            'no_refusal': 200   # Recipes, travel, summaries
+            'no_refusal': 10.0  # Recipes, travel, summaries
         },
         'edge_cases': {
-            'no_refusal': 150   # Legitimate but suspicious-sounding
+            'no_refusal': 7.5   # Legitimate but suspicious-sounding
         }
     }
 }
@@ -169,9 +158,9 @@ PROMPT_GENERATION_CONFIG = {
     # Three-stage process control
     'stages': {
         'generation': True,                         # Stage 1: Generate prompts
-        'self_evaluation': True,                    # Stage 2: GPT-4 quality check
+        'self_evaluation': True,                    # Stage 2: GPT-4o quality check
         'regeneration': True,                       # Stage 3: Fix failed prompts
-        'max_regeneration_attempts': 3              # Max attempts per failed prompt
+        'max_regeneration_attempts': 2              # Max attempts per failed prompt (reduced for speed)
     },
 
     # Human-like characteristics (Stage 1 requirements)
@@ -211,40 +200,27 @@ PROMPT_GENERATION_CONFIG = {
 }
 
 
-# Analysis Configuration
+# Labeling Configuration
 #-----------------------
-ANALYSIS_CONFIG = {
-    'adversarial_samples': 200,                 # Samples for adversarial testing
-    'paraphrase_dimensions': [
-        'synonym',                               # Replace words with synonyms
-        'restructure',                           # Restructure sentences
-        'formality',                             # Change formality level
-        'compression'                            # Make more concise
-    ],
-    'confidence_bins': 20,                      # Bins for confidence histograms
-    'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples
-    'error_examples_count': 5                   # Number of error examples to analyze in detail
+LABELING_CONFIG = {
+    'low_confidence_threshold': 60,             # Confidence threshold (0-100 scale)
 }
 
 
-# Interpretability Configuration
-#--------------------------------
-INTERPRETABILITY_CONFIG = {
-    # Attention Visualization
-    'attention_samples_per_class': 10,          # Samples per class for attention analysis
-    'attention_layer_index': -1,                # Which layer to visualize (-1 = last layer)
-    'attention_top_k_tokens': 15,               # Number of top tokens to highlight
-    'visualize_all_layers': False,              # Whether to create all-layer comparison plots
+# Adversarial Testing Configuration
+#------------------------------------
+ADVERSARIAL_CONFIG = {
+    # Paraphrase Validation Thresholds
+    'min_semantic_similarity': 0.85,            # Cosine similarity threshold for paraphrase validation
+    'min_length_ratio': 0.3,                    # Minimum length ratio (paraphrase/original)
+    'max_length_ratio': 3.0,                    # Maximum length ratio (paraphrase/original)
+    'max_paraphrase_attempts': 3,               # Maximum retry attempts for paraphrasing
 
-    # SHAP Analysis
-    'shap_enabled': True,                       # Enable SHAP analysis (requires shap package)
-    'shap_samples': 20,                         # Number of samples for SHAP analysis
-    'shap_background_samples': 50,              # Background samples for SHAP explainer
-    'shap_max_display': 20,                     # Max features to display in summary plots
-
-    # General Interpretability
-    'save_interpretability_results': True,      # Save interpretation results
-    'generate_example_visualizations': True     # Generate example plots per class
+    # Quality Thresholds
+    'min_success_rate': 70,                     # Minimum paraphrase success rate (percent)
+    'min_avg_semantic_similarity': 0.90,        # Warning threshold for avg semantic similarity
+    'retry_effectiveness_threshold': 30,        # Threshold for retry effectiveness warning (percent)
+    'failed_retries_warning_threshold': 20,     # Threshold for failed retries warning (percent)
 }
 
 
@@ -273,73 +249,146 @@ DATA_CLEANING_CONFIG = {
 }
 
 
-# Checkpointing Configuration (NEW - for error recovery)
-#--------------------------------------------------------
-CHECKPOINT_CONFIG = {
-    # Labeling Checkpoints (most critical - expensive GPT-4 calls)
-    'labeling_checkpoint_every': 100,           # Save checkpoint every N samples
-    'labeling_checkpoint_dir': data_checkpoints_path + 'labeling/',
-    'labeling_resume_enabled': True,            # Auto-resume from last checkpoint
-
-    # Response Collection Checkpoints
-    'collection_checkpoint_every': 500,         # Save checkpoint every N responses
-    'collection_checkpoint_dir': data_checkpoints_path + 'collection/',
-    'collection_resume_enabled': True,          # Auto-resume from last checkpoint
-
-    # Checkpoint Management
-    'auto_cleanup': True,                       # Delete checkpoints after success
-    'keep_last_n': 2,                           # Keep N most recent checkpoints (safety)
-    'checkpoint_format': 'pickle',              # Serialization format (pickle/json)
-    'verbose': True,                            # Print checkpoint progress
-
-    # Validation
-    'validate_on_load': True,                   # Validate checkpoint integrity
-    'max_checkpoint_age_hours': 48              # Ignore checkpoints older than N hours
-}
-
-
 # Experiment Configuration
 #-------------------------
 EXPERIMENT_CONFIG = {
-    'experiment_name': f'refusal_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
+    'experiment_name': f'dual_RoBERTa_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
     'save_intermediate': True,                  # Save intermediate results
     'verbose': True,                            # Print detailed logs
     'show_progress': True,                      # Show progress bars
     'prompt_buffer_percentage': 20,             # Extra prompts as buffer (%)
     'max_prompt_generation_attempts': 3,        # Retries for prompt generation
-    'test_sample_size': 10                      # Sample size for --test mode
+    'test_sample_size': 50                      # Sample size for --test mode (min 50 for 3-class stratified splits)
 }
 
 
-# Timing Configuration
-#---------------------
-TIMING_CONFIG = {
-    'api_delay': 0.5,                           # Delay between API calls (seconds)
-    'show_progress': True,                      # Show progress bars
-    'estimate_time': True                       # Show time estimates
+# Cross-Validation Configuration
+#--------------------------------
+CROSS_VALIDATION_CONFIG = {
+    'default_folds': 5,                         # Default number of folds
+    'final_val_split': 0.1,                     # Validation split for final model monitoring (10%)
 }
 
 
-# AWS Configuration (Optional)
-#-----------------------------
-AWS_CONFIG = {
-    'enabled': IS_AWS,
-    'region': os.getenv('AWS_REGION', 'us-east-1'),
-    's3_bucket': os.getenv('S3_BUCKET_NAME', 'refusal-classifier-results'),
-    's3_results_prefix': 'runs/',
-    's3_logs_prefix': 'logs/',
+# =============================================================================
+# PART 02: ANALYSIS, VISUALIZATION & INFRASTRUCTURE
+# =============================================================================
+# This section contains auxiliary settings for analysis, visualization, and production
 
-    # AWS Secrets Manager keys
-    'secrets': {
-        'openai': os.getenv('SECRETS_OPENAI_KEY_NAME', 'refusal-classifier/openai-api-key'),
-        'anthropic': os.getenv('SECRETS_ANTHROPIC_KEY_NAME', 'refusal-classifier/anthropic-api-key'),
-        'google': os.getenv('SECRETS_GOOGLE_KEY_NAME', 'refusal-classifier/google-api-key')
+
+# Analysis Configuration
+#-----------------------
+ANALYSIS_CONFIG = {
+    'adversarial_samples': 200,                 # Samples for adversarial testing
+    'paraphrase_dimensions': [
+        'synonym',                               # Replace words with synonyms
+        'restructure',                           # Restructure sentences
+        'formality',                             # Change formality level
+        'compression'                            # Make more concise
+    ],
+    'confidence_bins': 20,                      # Bins for confidence histograms
+    'low_confidence_threshold': 0.6,            # Threshold for low-confidence samples (0.0-1.0 scale)
+    'high_confidence_threshold': 0.5,           # Threshold for high-confidence region in analysis
+    'error_examples_count': 5,                  # Number of error examples to analyze in detail
+    'attention_sample_size': 100,               # Samples for power law attention analysis
+
+    # Pareto Principle / Power Law Analysis
+    'pareto_threshold': 80,                     # Pareto principle 80% threshold
+    'pareto_strict_threshold': 30,              # Allow up to 30% of groups for 80% of errors
+    'overconfidence_threshold': 0.7,            # High confidence on errors threshold
+
+    # Attention Concentration Analysis
+    'attention_top_k_percentage': 5,            # Top K as divisor (1/5 = 20% of tokens)
+    'attention_power_law_fit_limit': 1000,      # Number of samples for power law fitting
+    'min_attention_concentration': 0.6,         # Minimum attention concentration for top-k
+
+    # Correlation & Agreement Thresholds
+    'high_agreement_threshold': 0.95,           # High agreement threshold (95%)
+    'moderate_agreement_threshold': 0.85,       # Moderate agreement threshold (85%)
+    'min_samples_per_class': 30,                # Minimum samples per class for reliable analysis
+
+    # Disagreement Analysis
+    'top_k_disagreements': 50                   # Number of top disagreement cases to extract
+}
+
+
+# Interpretability Configuration
+#--------------------------------
+INTERPRETABILITY_CONFIG = {
+    # Attention Visualization
+    'attention_samples_per_class': 10,          # Samples per class for attention analysis
+    'attention_layer_index': -1,                # Which layer to visualize (-1 = last layer)
+    'attention_top_k_tokens': 15,               # Number of top tokens to highlight
+    'visualize_all_layers': False,              # Whether to create all-layer comparison plots
+
+    # SHAP Analysis
+    'shap_enabled': True,                       # Enable SHAP analysis (requires shap package)
+    'shap_samples': 20,                         # Number of samples for SHAP analysis
+    'shap_samples_per_class': 2,                # Number of SHAP samples to visualize per class
+    'shap_background_samples': 50,              # Background samples for SHAP explainer
+    'shap_max_display': 20,                     # Max features to display in summary plots
+
+    # Statistical Agreement Thresholds (Cohen's Kappa, etc.)
+    'kappa_thresholds': {
+        'almost_perfect': 0.80,                 # Almost perfect agreement (κ > 0.80)
+        'substantial': 0.60,                    # Substantial agreement (0.60 < κ ≤ 0.80)
+        'moderate': 0.40,                       # Moderate agreement (0.40 < κ ≤ 0.60)
+        'fair': 0.20,                           # Fair agreement (0.20 < κ ≤ 0.40)
+        'slight': 0.0                           # Slight agreement (0.0 < κ ≤ 0.20)
     },
 
-    # EC2 Configuration
-    'ec2_instance_type': os.getenv('EC2_INSTANCE_TYPE', 'g4dn.xlarge'),  # GPU instance
-    'ec2_security_group': 'refusal-classifier-sg',
-    'iam_role_name': 'refusal-classifier-ec2-role'
+    # Power Law Analysis Thresholds
+    'power_law_exponent_range': (1.0, 3.0),    # Valid range for power law exponent
+    'zipf_exponent_range': (0.8, 1.5),         # Valid range for Zipfian distribution exponent
+
+    # Calibration Thresholds (Expected Calibration Error)
+    'ece_thresholds': {
+        'excellent': 0.05,                      # ECE < 0.05 = excellent calibration
+        'good': 0.10,                           # ECE < 0.10 = good calibration
+        'acceptable': 0.15                      # ECE < 0.15 = acceptable calibration
+    },
+
+    # General Interpretability
+    'save_interpretability_results': True,      # Save interpretation results
+    'generate_example_visualizations': True     # Generate example plots per class
+}
+
+
+# Error Analysis Configuration
+#------------------------------
+ERROR_ANALYSIS_CONFIG = {
+    'min_confidence': 0.3,                      # Minimum confidence for analysis
+    'high_confidence_threshold': 0.8,           # High confidence threshold (confident mistakes)
+    'top_k_misclassifications': 5,              # Top K errors to show in summaries
+    'top_k_errors': 50,                         # Number of failure cases to extract for detailed analysis
+    'quantiles': [0.25, 0.5, 0.75],            # Quantiles for distribution analysis
+
+    # Length Analysis
+    'length_bins': [0, 20, 50, 100, 200],      # Token length bins for length-based analysis
+}
+
+
+# Hypothesis Testing Configuration
+#-----------------------------------
+HYPOTHESIS_TESTING_CONFIG = {
+    'alpha': 0.05,                              # Significance level for tests
+}
+
+
+# NOTE: RETRAINING_CONFIG consolidated into PRODUCTION_CONFIG['retraining']
+# NOTE: DATA_RETENTION_CONFIG consolidated into PRODUCTION_CONFIG['retention']
+# NOTE: TIMING_CONFIG values now in API_CONFIG and EXPERIMENT_CONFIG
+
+
+# Visualization Configuration
+#-----------------------------
+VISUALIZATION_CONFIG = {
+    'dpi': 150,                      # DPI for all saved plots
+    'figure_format': 'png',          # Output format
+    'style': 'whitegrid',            # Seaborn style
+    'color_palette': 'Set2',
+    'font_scale': 1.0,
+    'f1_target': 0.8                 # Target F1 score threshold for visualization
 }
 
 
@@ -359,31 +408,33 @@ PRODUCTION_CONFIG = {
         'max_overflow': 20
     },
 
-    # Monitoring Thresholds
-    'monitoring': {
-        'daily_check_size': 100,                    # Samples for daily monitoring check
-        'escalated_check_size': 1000,               # Samples for escalated check
+    # Monitoring Thresholds (used by MonitoringSystem)
+    'monitoring_thresholds': {
+        'small_sample_size': 100,                   # Samples for daily monitoring check
+        'large_sample_size': 1000,                  # Samples for escalated check
         'warning_threshold': 0.10,                  # 10% disagreement triggers warning
         'escalate_threshold': 0.15,                 # 15% disagreement triggers escalation
         'retrain_threshold': 0.20,                  # 20% disagreement triggers retrain
         'check_interval_hours': 24,                 # Daily monitoring
-        'trend_window_days': 7,                     # Days to analyze trends
-        'escalation_ui_delay': 2                    # Seconds to pause before escalated check (UX)
+        'trend_window_days': 7                      # Days to analyze trends
     },
+
+    # Rate limiting and delays (root level for easy access)
+    'judge_rate_limit': 1.0,                        # Delay between LLM judge calls (seconds)
+    'escalation_ui_delay': 2.0,                     # Seconds to pause before escalated check (UX)
 
     # LLM Judge for Production Monitoring
     'judge': {
-        'model': 'gpt-4',                           # GPT-4 for high accuracy
+        'model': 'gpt-4o',                          # GPT-4o for high accuracy
         'temperature': 0.0,                         # Deterministic
         'max_tokens': 10,                           # Only need score
-        'rate_limit_delay': 0.5,                    # Delay between judge calls
         'max_retries': 3                            # Retries for failed calls
     },
 
     # A/B Testing Configuration
+    'ab_test_stages': [0.05, 0.25, 0.5, 1.0],      # Gradual rollout stages: 5% → 25% → 50% → 100%
     'ab_testing': {
         'enabled': False,                           # Start disabled
-        'stages': [0.05, 0.25, 0.5, 1.0],          # Rollout stages: 5% → 25% → 50% → 100%
         'min_samples_per_stage': 1000,              # Min samples before next stage
         'max_degradation': 0.02,                    # Max 2% F1 drop to continue
         'shadow_mode': False,                       # Shadow mode (log but don't serve)
@@ -391,20 +442,30 @@ PRODUCTION_CONFIG = {
         'manual_promotion': True                    # Require manual promotion (MVP)
     },
 
+    # Validation Thresholds (used by RetrainingPipeline)
+    'validation_thresholds': {
+        'min_f1_score': 0.85,                       # Min F1 score for model deployment
+        'min_avg_confidence': 0.80                  # Min average confidence score
+    },
+
     # Retraining Configuration
     'retraining': {
         'enabled': True,                            # Enable automated retraining
         'schedule': 'weekly',                       # Weekly retraining schedule
         'trigger_on_drift': True,                   # Trigger if drift detected
-        'validation_f1_threshold': 0.85,            # Min F1 for deployment
-        'validation_confidence_threshold': 0.80,    # Min avg confidence
         'retain_historical_samples': True,          # Prevent catastrophic forgetting
-        'freeze_layers': 6,                         # Transfer learning (freeze bottom layers)
+        'freeze_layers': 4,                         # Transfer learning (freeze bottom layers) - less than initial for adaptation
         'max_epochs': 5,                            # Max training epochs
-        'early_stopping_patience': 2                # Early stopping patience
+        'early_stopping_patience': 2,               # Early stopping patience
+        'min_training_samples': 100,                # Minimum samples required for retraining
+        'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training (lower for fine-tuning)
+        'test_split': 0.3,                          # Test set ratio
+        'val_split': 0.5,                           # Validation split (from remaining 70%)
+        'high_confidence_threshold': 0.8            # Confidence threshold for data filtering
     },
 
-    # Data Retention Strategy
+    # Data Retention Strategy (Implemented in 34-DataManager.py)
+    # WHY: Comprehensive strategy to balance storage costs with data quality
     'retention': {
         'recent_days': 7,                           # Recent: keep 100% problematic + 20% correct
         'recent_problematic_rate': 1.0,             # 100% of problematic samples
@@ -423,11 +484,14 @@ PRODUCTION_CONFIG = {
         'workers': int(os.getenv('API_WORKERS', '4')),
         'timeout': 30,                              # Request timeout (seconds)
         'max_request_size': 1024 * 1024,           # 1MB max request
+        'max_text_length': 10000,                   # Maximum input text length
         'enable_cors': True,                        # Enable CORS for frontend
+        'cors_origins': os.getenv('CORS_ORIGINS', '*').split(',') if os.getenv('CORS_ORIGINS') else ['*'],  # Allowed origins (use env var in production)
         'log_level': os.getenv('LOG_LEVEL', 'info')
     },
 
-    # Cost Control
+    # Cost Control (Future Feature - Not yet implemented)
+    # WHY: Reserved for cost tracking and budget alerts in production
     'cost': {
         'max_daily_judge_calls': 5000,              # Max judge calls per day
         'alert_daily_cost': 100.0,                  # Alert if daily cost exceeds $100
@@ -440,6 +504,7 @@ PRODUCTION_CONFIG = {
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Dual RoBERTa Classifiers: 3-Class Refusal Taxonomy & Binary Jailbreak Detection
 Created on October 28, 2025
 @author: ramyalsaffar
 """

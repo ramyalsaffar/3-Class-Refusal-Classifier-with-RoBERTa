@@ -1,18 +1,32 @@
 # Confidence Analysis Module
 #---------------------------
 # Analyze prediction confidence scores.
-# All imports are in 00-Imports.py
+# All imports are in 01-Imports.py
 ###############################################################################
 
 
 class ConfidenceAnalyzer:
-    """Analyze prediction confidence scores."""
+    """
+    Analyze prediction confidence scores.
 
-    def __init__(self, model, tokenizer, device):
+    Generic analyzer that works for any classification model.
+    """
+
+    def __init__(self, model, tokenizer, device, class_names: List[str] = None):
+        """
+        Initialize confidence analyzer.
+
+        Args:
+            model: Classification model (RefusalClassifier or JailbreakDetector)
+            tokenizer: RoBERTa tokenizer
+            device: torch device
+            class_names: List of class names (default: uses CLASS_NAMES from config)
+        """
         self.model = model.to(device)
         self.tokenizer = tokenizer
         self.device = device
-        self.class_names = CLASS_NAMES
+        self.class_names = class_names or CLASS_NAMES
+        self.num_classes = len(self.class_names)
 
     def analyze(self, test_df: pd.DataFrame) -> Dict:
         """
@@ -29,7 +43,7 @@ class ConfidenceAnalyzer:
         print("="*50)
 
         # Create dataset
-        dataset = RefusalDataset(
+        dataset = ClassificationDataset(
             test_df['response'].tolist(),
             test_df['label'].tolist(),
             self.tokenizer
@@ -42,18 +56,22 @@ class ConfidenceAnalyzer:
         # Calculate metrics
         correct = np.array(preds) == np.array(labels)
 
+        # Calculate Cohen's Kappa (agreement beyond chance)
+        kappa = cohen_kappa_score(labels, preds)
+
         results = {
             'overall': {
                 'mean_confidence': float(np.mean(confidences)),
                 'std_confidence': float(np.std(confidences)),
                 'mean_confidence_correct': float(np.mean([c for c, cor in zip(confidences, correct) if cor])),
-                'mean_confidence_incorrect': float(np.mean([c for c, cor in zip(confidences, correct) if not cor]))
+                'mean_confidence_incorrect': float(np.mean([c for c, cor in zip(confidences, correct) if not cor])),
+                'cohen_kappa': float(kappa)
             },
             'per_class': {}
         }
 
-        # Per-class analysis
-        for class_idx in range(3):
+        # Per-class analysis (works for any number of classes)
+        for class_idx in range(self.num_classes):
             class_mask = np.array(labels) == class_idx
             class_confidences = [c for c, m in zip(confidences, class_mask) if m]
 
@@ -68,6 +86,19 @@ class ConfidenceAnalyzer:
         print(f"\nOverall Mean Confidence: {results['overall']['mean_confidence']:.3f}")
         print(f"Correct Predictions: {results['overall']['mean_confidence_correct']:.3f}")
         print(f"Incorrect Predictions: {results['overall']['mean_confidence_incorrect']:.3f}")
+
+        print(f"\n📊 Cohen's Kappa: {results['overall']['cohen_kappa']:.4f}")
+        kappa_thresh = INTERPRETABILITY_CONFIG['kappa_thresholds']
+        if kappa > kappa_thresh['almost_perfect']:
+            print(f"   ✅ Almost perfect agreement (κ > {kappa_thresh['almost_perfect']})")
+        elif kappa > kappa_thresh['substantial']:
+            print(f"   ✅ Substantial agreement (κ > {kappa_thresh['substantial']})")
+        elif kappa > kappa_thresh['moderate']:
+            print(f"   ⚠️  Moderate agreement (κ > {kappa_thresh['moderate']})")
+        elif kappa > kappa_thresh['fair']:
+            print(f"   ⚠️  Fair agreement (κ > {kappa_thresh['fair']})")
+        else:
+            print(f"   🚨 Poor agreement (κ ≤ {kappa_thresh['fair']})")
 
         print("\nPer-Class Mean Confidence:")
         for class_name, metrics in results['per_class'].items():
