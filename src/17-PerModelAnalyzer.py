@@ -61,9 +61,11 @@ class PerModelAnalyzer:
             preds, labels = self._evaluate(loader)
 
             # Calculate metrics
-            f1_macro = f1_score(labels, preds, average='macro')
-            f1_per_class = f1_score(labels, preds, average=None)
-            report = classification_report(labels, preds, target_names=self.class_names, output_dict=True)
+            # Explicitly specify labels to handle cases where not all classes are present
+            label_indices = list(range(self.num_classes))
+            f1_macro = f1_score(labels, preds, average='macro', labels=label_indices, zero_division=0)
+            f1_per_class = f1_score(labels, preds, average=None, labels=label_indices, zero_division=0)
+            report = classification_report(labels, preds, labels=label_indices, target_names=self.class_names, output_dict=True, zero_division=0)
 
             results[model_name] = {
                 'f1_macro': float(f1_macro),
