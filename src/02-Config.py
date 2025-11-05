@@ -403,11 +403,6 @@ HYPOTHESIS_TESTING_CONFIG = {
 }
 
 
-# NOTE: RETRAINING_CONFIG consolidated into PRODUCTION_CONFIG['retraining']
-# NOTE: DATA_RETENTION_CONFIG consolidated into PRODUCTION_CONFIG['retention']
-# NOTE: TIMING_CONFIG values now in API_CONFIG and EXPERIMENT_CONFIG
-
-
 # Visualization Configuration
 #-----------------------------
 VISUALIZATION_CONFIG = {
