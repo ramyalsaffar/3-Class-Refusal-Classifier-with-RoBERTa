@@ -123,7 +123,7 @@ exec(open(CodeFilePath+"03-Config.py").read())
 code_files_ls = os.listdir(CodeFilePath)
 code_files_ls.sort()
 code_files_ls = [x for x in code_files_ls if "py" in x]
-code_files_ls = code_files_ls[3:29]  # Load files 04-29 (skip 01-03 already loaded, skip execution/production files 30-36)
+code_files_ls = code_files_ls[2:32]  # skip production files.
 
 
 # Loop over cde files
