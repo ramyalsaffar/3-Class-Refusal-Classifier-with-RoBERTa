@@ -56,9 +56,6 @@ reports_path = glob.glob(base_results_path + "/*Reports/")[0]
 # API Keys (local file storage)
 api_keys_file_path = glob.glob(project_path + "/*API Keys/API Keys.txt")[0]
 
-# Create checkpoint directory if it doesn't exist
-os.makedirs(data_checkpoints_path, exist_ok=True)
-
 
 #------------------------------------------------------------------------------
 
