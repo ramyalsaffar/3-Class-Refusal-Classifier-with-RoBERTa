@@ -83,55 +83,6 @@ JAILBREAK_CONFIG = {
 }
 
 
-# WildJailbreak Supplementation Configuration
-#--------------------------------------------
-# Supplements jailbreak training data when modern LLMs successfully defend against all attacks
-WILDJAILBREAK_CONFIG = {
-    # Enable/Disable Supplementation
-    'enabled': True,                            # Enable WildJailbreak supplementation
-
-    # Dataset Source
-    'dataset_name': 'allenai/wildjailbreak',    # HuggingFace dataset ID
-    'dataset_url': 'https://huggingface.co/datasets/allenai/wildjailbreak',
-
-    # Supplementation Thresholds
-    'min_threshold_percentage': 50,             # Minimum % of total_prompts needed for training
-                                                # Example: 2000 prompts → need 1000 jailbreak samples
-                                                # If real samples < 1000 → supplement from WildJailbreak
-
-    'max_supplement_percentage': 80,            # Maximum % of training data from WildJailbreak
-                                                # Ensures real data remains primary source when available
-
-    # Sampling Strategy
-    'random_seed': DATASET_CONFIG['random_seed'],  # Use same seed for reproducibility
-    'diversity_sampling': True,                 # Sample diverse jailbreak tactics/categories
-    'diversity_fields': ['tactics'],            # Fields to use for stratification
-
-    # Quality Filters (applied to WildJailbreak samples)
-    'min_prompt_length': 10,                    # Minimum prompt length (characters)
-    'max_prompt_length': 2000,                  # Maximum prompt length (characters)
-    'min_response_length': 5,                   # Minimum response length (characters)
-    'max_response_length': 10000,               # Maximum response length (characters)
-
-    # Dataset Loading Parameters
-    'dataset_split': 'train',                   # Dataset split to load (train/test/validation)
-    'data_type_filter': 'adversarial_harmful',  # WildJailbreak data type to filter for
-                                                # Options: adversarial_harmful, adversarial_benign,
-                                                #          vanilla_harmful, vanilla_benign
-
-    # Model Attribution (NEW - V09)
-    'synthetic_model_label': 'WildJailbreak',   # Label for 'model' column in synthetic data
-                                                # Used to distinguish from real model responses
-                                                # Enables filtering synthetic data from per-model analysis
-
-    # Transparency & Reporting
-    'warn_threshold': 30,                       # Warn if >30% of data from WildJailbreak
-    'track_source': True,                       # Add 'data_source' column to track provenance
-    'log_composition': True,                    # Print real vs WildJailbreak breakdown during training
-    'exclude_from_model_analysis': True         # Exclude WildJailbreak from per-model vulnerability analysis
-}
-
-
 # Training Configuration
 #-----------------------
 TRAINING_CONFIG = {
@@ -344,6 +295,55 @@ EXPERIMENT_CONFIG = {
 CROSS_VALIDATION_CONFIG = {
     'default_folds': 5,                         # Default number of folds
     'final_val_split': 0.1,                     # Validation split for final model monitoring (10%)
+}
+
+
+# WildJailbreak Supplementation Configuration
+#--------------------------------------------
+# Supplements jailbreak training data when modern LLMs successfully defend against all attacks
+WILDJAILBREAK_CONFIG = {
+    # Enable/Disable Supplementation
+    'enabled': True,                            # Enable WildJailbreak supplementation
+
+    # Dataset Source
+    'dataset_name': 'allenai/wildjailbreak',    # HuggingFace dataset ID
+    'dataset_url': 'https://huggingface.co/datasets/allenai/wildjailbreak',
+
+    # Supplementation Thresholds
+    'min_threshold_percentage': 50,             # Minimum % of total_prompts needed for training
+                                                # Example: 2000 prompts → need 1000 jailbreak samples
+                                                # If real samples < 1000 → supplement from WildJailbreak
+
+    'max_supplement_percentage': 80,            # Maximum % of training data from WildJailbreak
+                                                # Ensures real data remains primary source when available
+
+    # Sampling Strategy
+    'random_seed': DATASET_CONFIG['random_seed'],  # Use same seed for reproducibility
+    'diversity_sampling': True,                 # Sample diverse jailbreak tactics/categories
+    'diversity_fields': ['tactics'],            # Fields to use for stratification
+
+    # Quality Filters (applied to WildJailbreak samples)
+    'min_prompt_length': 10,                    # Minimum prompt length (characters)
+    'max_prompt_length': 2000,                  # Maximum prompt length (characters)
+    'min_response_length': 5,                   # Minimum response length (characters)
+    'max_response_length': 10000,               # Maximum response length (characters)
+
+    # Dataset Loading Parameters
+    'dataset_split': 'train',                   # Dataset split to load (train/test/validation)
+    'data_type_filter': 'adversarial_harmful',  # WildJailbreak data type to filter for
+                                                # Options: adversarial_harmful, adversarial_benign,
+                                                #          vanilla_harmful, vanilla_benign
+
+    # Model Attribution (NEW - V09)
+    'synthetic_model_label': 'WildJailbreak',   # Label for 'model' column in synthetic data
+                                                # Used to distinguish from real model responses
+                                                # Enables filtering synthetic data from per-model analysis
+
+    # Transparency & Reporting
+    'warn_threshold': 30,                       # Warn if >30% of data from WildJailbreak
+    'track_source': True,                       # Add 'data_source' column to track provenance
+    'log_composition': True,                    # Print real vs WildJailbreak breakdown during training
+    'exclude_from_model_analysis': True         # Exclude WildJailbreak from per-model vulnerability analysis
 }
 
 
