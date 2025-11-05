@@ -52,6 +52,7 @@ class WildJailbreakLoader:
             print(f"📦 LOADING WILDJAILBREAK DATASET")
             print(f"{'='*60}")
             print(f"  Source: {WILDJAILBREAK_CONFIG['dataset_name']}")
+            print(f"  Config: {WILDJAILBREAK_CONFIG['dataset_config']}")
             print(f"  Split: {WILDJAILBREAK_CONFIG['dataset_split']}")
             print(f"  Loading...")
 
@@ -68,6 +69,7 @@ class WildJailbreakLoader:
             try:
                 self.dataset = load_dataset(
                     WILDJAILBREAK_CONFIG['dataset_name'],
+                    WILDJAILBREAK_CONFIG['dataset_config'],  # Config name required by WildJailbreak
                     split=WILDJAILBREAK_CONFIG['dataset_split'],
                     token=True  # Use HuggingFace token if available
                 )
