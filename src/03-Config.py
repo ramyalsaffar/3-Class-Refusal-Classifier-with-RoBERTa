@@ -331,7 +331,7 @@ WILDJAILBREAK_CONFIG = {
 
     # Dataset Loading Parameters
     'dataset_config': 'train',                  # Dataset config name (options: 'train', 'eval')
-    'dataset_split': 'train',                   # Dataset split to load (train/test/validation)
+                                                # NOTE: These ARE the configs, NOT splits!
     'data_type_filter': 'adversarial_harmful',  # WildJailbreak data type to filter for
                                                 # Options: adversarial_harmful, adversarial_benign,
                                                 #          vanilla_harmful, vanilla_benign

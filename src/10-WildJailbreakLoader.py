@@ -53,8 +53,7 @@ class WildJailbreakLoader:
             print(f"{'='*60}")
             print(f"  Source: {WILDJAILBREAK_CONFIG['dataset_name']}")
             print(f"  Config: {WILDJAILBREAK_CONFIG['dataset_config']}")
-            print(f"  Split: {WILDJAILBREAK_CONFIG['dataset_split']}")
-            print(f"  Loading...")
+            print(f"  Loading with TSV parameters (delimiter=\\t, keep_default_na=False)...")
 
             # Import datasets library
             try:
@@ -67,21 +66,17 @@ class WildJailbreakLoader:
             # Load dataset from config (no hardcoded values)
             # Try loading with authentication token if available
             try:
-                # Check if dataset requires config parameter
-                if WILDJAILBREAK_CONFIG['dataset_config'] is not None:
-                    self.dataset = load_dataset(
-                        WILDJAILBREAK_CONFIG['dataset_name'],
-                        WILDJAILBREAK_CONFIG['dataset_config'],
-                        split=WILDJAILBREAK_CONFIG['dataset_split'],
-                        token=True  # Use HuggingFace token if available
-                    )
-                else:
-                    # No config needed (WildJailbreak case)
-                    self.dataset = load_dataset(
-                        WILDJAILBREAK_CONFIG['dataset_name'],
-                        split=WILDJAILBREAK_CONFIG['dataset_split'],
-                        token=True  # Use HuggingFace token if available
-                    )
+                # WildJailbreak requires specific parameters per official HuggingFace docs:
+                # - Config name ('train' or 'eval') - these ARE the configs, not splits!
+                # - delimiter="\t" for TSV format
+                # - keep_default_na=False to preserve data integrity
+                self.dataset = load_dataset(
+                    WILDJAILBREAK_CONFIG['dataset_name'],
+                    WILDJAILBREAK_CONFIG['dataset_config'],
+                    delimiter="\t",           # Required: TSV format
+                    keep_default_na=False,    # Required: Preserve data integrity
+                    token=True                # Use HuggingFace token if available
+                )
             except Exception as auth_error:
                 # If authentication fails, provide helpful instructions
                 error_msg = str(auth_error).lower()
