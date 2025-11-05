@@ -371,7 +371,7 @@ class MonitoringSystem:
         plt.tight_layout()
 
         if output_path:
-            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.savefig(output_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
             print(f"✓ Saved monitoring trends to {output_path}")
         else:
             plt.show()

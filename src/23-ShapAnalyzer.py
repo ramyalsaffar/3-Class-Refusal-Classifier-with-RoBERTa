@@ -151,7 +151,7 @@ class ShapAnalyzer:
             fontsize=12, fontweight='bold'
         )
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
 
         print(f"✓ Saved SHAP visualization to {output_path}")
@@ -252,7 +252,7 @@ class ShapAnalyzer:
                     f"shap_summary_{class_name.replace(' ', '_').lower()}.png"
                 )
                 plt.tight_layout()
-                plt.savefig(summary_path, dpi=300, bbox_inches='tight')
+                plt.savefig(summary_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
                 plt.close()
 
                 print(f"✓ Saved summary for {class_name}")

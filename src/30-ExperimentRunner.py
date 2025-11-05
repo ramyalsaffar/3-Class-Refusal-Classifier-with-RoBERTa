@@ -572,7 +572,7 @@ class ExperimentRunner:
         cm_fig = plt.figure(figsize=(10, 8))
         visualizer.plot_confusion_matrix(cm, None)  # Plot but don't save yet
         plt.savefig(os.path.join(visualizations_path, "confusion_matrix_for_report.png"),
-                   dpi=150, bbox_inches='tight')
+                   dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
 
         print("\n✅ Analysis complete (BOTH classifiers analyzed)")

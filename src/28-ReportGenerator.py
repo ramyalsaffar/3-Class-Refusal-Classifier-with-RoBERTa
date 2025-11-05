@@ -97,7 +97,7 @@ class ReportGenerator:
             ReportLab Image object
         """
         buf = BytesIO()
-        fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        fig.savefig(buf, format='png', dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         buf.seek(0)
         img = Image(buf, width=width)
         plt.close(fig)

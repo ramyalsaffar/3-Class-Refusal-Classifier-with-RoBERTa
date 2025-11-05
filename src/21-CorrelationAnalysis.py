@@ -208,7 +208,7 @@ class RefusalJailbreakCorrelationAnalyzer:
     # MODULE 3: DISAGREEMENT CASE EXTRACTION
     # =========================================================================
 
-    def extract_disagreement_cases(self, top_k: int = 50) -> pd.DataFrame:
+    def extract_disagreement_cases(self, top_k: int = None) -> pd.DataFrame:
         """
         Extract cases where refusal-derived jailbreak disagrees with actual jailbreak.
 
@@ -218,11 +218,15 @@ class RefusalJailbreakCorrelationAnalyzer:
         3. Soft Refusal BUT Jailbreak Succeeded (partial jailbreak success)
 
         Args:
-            top_k: Number of disagreement cases to extract
+            top_k: Number of disagreement cases to extract (default: from ANALYSIS_CONFIG)
 
         Returns:
             DataFrame with disagreement cases
         """
+        # Use config value if not provided
+        if top_k is None:
+            top_k = ANALYSIS_CONFIG['top_k_disagreements']
+
         print(f"\n{'='*60}")
         print(f"MODULE 3: DISAGREEMENT CASE EXTRACTION (Top {top_k})")
         print(f"{'='*60}\n")
@@ -456,7 +460,7 @@ class RefusalJailbreakCorrelationAnalyzer:
 
         plt.tight_layout()
         heatmap_path = os.path.join(visualizations_path, "correlation_contingency_heatmap.png")
-        plt.savefig(heatmap_path, dpi=300, bbox_inches='tight')
+        plt.savefig(heatmap_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
         viz_paths['heatmap'] = heatmap_path
         print(f"✓ Saved heatmap: {heatmap_path}")
@@ -485,7 +489,7 @@ class RefusalJailbreakCorrelationAnalyzer:
         ax.set_title('Refusal-Derived vs Actual Jailbreak Agreement', fontsize=14, fontweight='bold')
 
         pie_path = os.path.join(visualizations_path, "correlation_agreement_pie.png")
-        plt.savefig(pie_path, dpi=300, bbox_inches='tight')
+        plt.savefig(pie_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
         viz_paths['pie'] = pie_path
         print(f"✓ Saved pie chart: {pie_path}")
@@ -526,7 +530,7 @@ class RefusalJailbreakCorrelationAnalyzer:
 
         plt.tight_layout()
         bar_path = os.path.join(visualizations_path, "correlation_stacked_bar.png")
-        plt.savefig(bar_path, dpi=300, bbox_inches='tight')
+        plt.savefig(bar_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
         viz_paths['stacked_bar'] = bar_path
         print(f"✓ Saved stacked bar: {bar_path}")

@@ -215,7 +215,7 @@ class ErrorAnalyzer:
 
             plt.tight_layout()
             save_path = os.path.join(visualizations_path, f"{self.task_type}_error_confusion_matrix.png")
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
             plt.close()
             print(f"✓ Confusion matrix visualization saved: {save_path}\n")
 
@@ -308,7 +308,7 @@ class ErrorAnalyzer:
 
             plt.tight_layout()
             save_path = os.path.join(visualizations_path, f"{self.task_type}_error_per_class_metrics.png")
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
             plt.close()
             print(f"✓ Per-class metrics visualization saved: {save_path}\n")
 
@@ -401,7 +401,7 @@ class ErrorAnalyzer:
 
             plt.tight_layout()
             save_path = os.path.join(visualizations_path, f"{self.task_type}_error_confidence.png")
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
             plt.close()
             print(f"✓ Confidence visualization saved: {save_path}\n")
 
@@ -522,7 +522,7 @@ class ErrorAnalyzer:
 
             plt.tight_layout()
             save_path = os.path.join(visualizations_path, f"{self.task_type}_error_length_analysis.png")
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.savefig(save_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
             plt.close()
             print(f"✓ Length analysis visualization saved: {save_path}\n")
 
@@ -791,7 +791,8 @@ def run_error_analysis(model, dataset, tokenizer, device, class_names, task_type
         task_type=task_type
     )
 
-    results = analyzer.run_full_analysis(save_visualizations=True, top_k_failures=50)
+    # Use config value for top_k_failures
+    results = analyzer.run_full_analysis(save_visualizations=True, top_k_failures=ERROR_ANALYSIS_CONFIG['top_k_errors'])
 
     return results
 

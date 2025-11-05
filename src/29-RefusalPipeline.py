@@ -208,7 +208,7 @@ class RefusalPipeline:
         # Export low-confidence samples for review
         if quality_results['low_confidence']['low_both_count'] > 0:
             flagged_samples_path = os.path.join(results_path, "flagged_samples_for_review.csv")
-            quality_analyzer.export_flagged_samples(responses_df, flagged_samples_path, threshold=60)
+            quality_analyzer.export_flagged_samples(responses_df, flagged_samples_path, threshold=LABELING_CONFIG['low_confidence_threshold'])
 
         # Save labeled data
         labeled_path = os.path.join(data_processed_path, "labeled_responses.pkl")

@@ -442,7 +442,7 @@ class PowerLawAnalyzer:
 
         plt.title(title)
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
 
         print(f"   Saved Pareto chart: {output_path}")
@@ -475,7 +475,7 @@ class PowerLawAnalyzer:
         axes[1].grid(alpha=0.3, which='both')
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
 
         print(f"   Saved confidence distribution: {output_path}")
@@ -497,7 +497,7 @@ class PowerLawAnalyzer:
         plt.ylim([0, 1])
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
 
         print(f"   Saved calibration curve: {output_path}")
@@ -524,7 +524,7 @@ class PowerLawAnalyzer:
         axes[1].grid(alpha=0.3, which='both')
 
         plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.savefig(output_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
 
         print(f"   Saved attention distribution: {output_path}")
