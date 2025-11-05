@@ -45,7 +45,7 @@ data_raw_path = glob.glob(data_path + "*Raw/")[0]
 data_responses_path = glob.glob(data_path + "*Responses/")[0]
 data_processed_path = glob.glob(data_path + "*Processed/")[0]
 data_splits_path = glob.glob(data_path + "*Splits/")[0]
-data_checkpoints_path = data_processed_path + "checkpoints/"  # NEW - Phase 2
+data_checkpoints_path = glob.glob(data_processed_path + "*Checkpoints/")[0]
 
 models_path = glob.glob(base_results_path + "/*Models/")[0]
 results_path = base_results_path
