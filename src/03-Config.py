@@ -42,6 +42,7 @@ API_CONFIG = {
     # Rate Limiting & Retries
     'rate_limit_delay': 0.2,                    # Seconds between API calls (reduced for speed)
     'max_retries': 5,                           # Max retries for failed API calls
+    'rate_limit_backoff': 60,                   # Seconds to wait when hitting rate limits (429 errors)
 
     # Batch Sizes
     'prompt_generation_batch_size': 10,         # Batch size for generating prompts (smaller = more progress updates)
@@ -329,7 +330,7 @@ WILDJAILBREAK_CONFIG = {
     'max_response_length': 10000,               # Maximum response length (characters)
 
     # Dataset Loading Parameters
-    'dataset_config': None,                     # Dataset config name (None for WildJailbreak - no configs)
+    'dataset_config': 'train',                  # Dataset config name (options: 'train', 'eval')
     'dataset_split': 'train',                   # Dataset split to load (train/test/validation)
     'data_type_filter': 'adversarial_harmful',  # WildJailbreak data type to filter for
                                                 # Options: adversarial_harmful, adversarial_benign,

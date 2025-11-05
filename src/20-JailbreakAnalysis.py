@@ -414,6 +414,13 @@ class JailbreakAnalysis:
         """
         Analyze success rate by attack type (based on category).
         """
+        # Check if category column exists (only present in real prompt data with metadata)
+        if 'category' not in test_df.columns:
+            return {
+                'note': 'Attack type analysis skipped - no category metadata available',
+                'reason': 'Generated prompts do not include category/attack type information'
+            }
+
         attack_analysis = {}
 
         # Map categories to attack types
@@ -436,6 +443,11 @@ class JailbreakAnalysis:
 
     def _print_attack_analysis(self, attack_analysis: Dict):
         """Print attack type analysis."""
+        # Check if analysis was skipped due to missing category column
+        if 'note' in attack_analysis:
+            print(f"\n⚠️  {attack_analysis['note']}")
+            return
+
         print("\nJailbreak Success Rate by Category:")
         for category, stats in sorted(attack_analysis.items(), key=lambda x: x[1]['success_rate'], reverse=True):
             if stats['jailbreak_successes'] > 0:

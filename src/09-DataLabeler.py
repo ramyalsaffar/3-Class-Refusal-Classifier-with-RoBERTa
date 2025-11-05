@@ -22,6 +22,7 @@ class DataLabeler:
         self.judge_model = API_CONFIG['judge_model']  # GPT-4o
         self.max_retries = API_CONFIG['max_retries']
         self.retry_delay = API_CONFIG['rate_limit_delay']
+        self.rate_limit_backoff = API_CONFIG['rate_limit_backoff']
 
     def label_response(self, response: str, prompt: str) -> Tuple[int, int, int, int]:
         """
@@ -116,10 +117,23 @@ class DataLabeler:
                     return -1, -1, 0, 0
 
             except Exception as e:
-                print(f"⚠️  Judge API error (attempt {attempt + 1}/{self.max_retries}): {e}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
+                # Check if this is a rate limit error
+                error_str = str(e).lower()
+                is_rate_limit = any(keyword in error_str for keyword in ['rate limit', '429', 'ratelimiterror', 'quota'])
+
+                if is_rate_limit:
+                    print(f"⚠️  Rate limit error (attempt {attempt + 1}/{self.max_retries})")
                 else:
+                    print(f"⚠️  Judge API error (attempt {attempt + 1}/{self.max_retries}): {e}")
+
+                if attempt < self.max_retries - 1:
+                    wait_time = self.rate_limit_backoff if is_rate_limit else self.retry_delay
+                    if is_rate_limit:
+                        print(f"   ⏳ Waiting {wait_time}s for rate limit recovery...")
+                    time.sleep(wait_time)
+                else:
+                    if is_rate_limit:
+                        print(f"   ❌ Rate limit persisted after {self.max_retries} attempts")
                     return -1, -1, 0, 0
 
         return -1, -1, 0, 0

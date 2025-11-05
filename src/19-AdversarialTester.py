@@ -24,6 +24,7 @@ class AdversarialTester:
         self.temperature = API_CONFIG['temperature_paraphrase']
         self.max_tokens = API_CONFIG['max_tokens_paraphrase']
         self.dimensions = ANALYSIS_CONFIG['paraphrase_dimensions']
+        self.rate_limit_backoff = API_CONFIG['rate_limit_backoff']
 
         # Quality thresholds (from config)
         self.min_semantic_similarity = ADVERSARIAL_CONFIG['min_semantic_similarity']
@@ -182,8 +183,23 @@ class AdversarialTester:
                     continue
 
             except Exception as e:
+                # Check if this is a rate limit error
+                error_str = str(e).lower()
+                is_rate_limit = any(keyword in error_str for keyword in ['rate limit', '429', 'ratelimiterror', 'quota'])
+
                 if attempt == 0:
-                    print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}): {e}")
+                    if is_rate_limit:
+                        print(f"\n⚠️  Rate limit error during paraphrasing (attempt {attempt + 1}/{max_attempts})")
+                    else:
+                        print(f"\n⚠️  Error paraphrasing (attempt {attempt + 1}/{max_attempts}): {e}")
+
+                # Wait before retry (longer for rate limits)
+                if attempt < max_attempts - 1:
+                    wait_time = self.rate_limit_backoff if is_rate_limit else API_CONFIG['rate_limit_delay']
+                    if is_rate_limit:
+                        print(f"   ⏳ Waiting {wait_time}s for rate limit recovery...")
+                    time.sleep(wait_time)
+
                 continue
 
         # Failed all attempts - fallback to original
@@ -484,13 +500,27 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
                 return False
 
         except Exception as e:
+            # Check if this is a rate limit error
+            error_str = str(e).lower()
+            is_rate_limit = any(keyword in error_str for keyword in ['rate limit', '429', 'ratelimiterror', 'quota'])
+
             if retry_count < max_retries:
-                print(f"⚠️  Category preservation check attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
-                print(f"   Retrying in {API_CONFIG['rate_limit_delay']} seconds...")
-                time.sleep(API_CONFIG['rate_limit_delay'])
+                if is_rate_limit:
+                    print(f"⚠️  Rate limit error during category check (attempt {retry_count + 1}/{max_retries + 1})")
+                    wait_time = self.rate_limit_backoff
+                    print(f"   Retrying in {wait_time} seconds...")
+                else:
+                    print(f"⚠️  Category preservation check attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
+                    wait_time = API_CONFIG['rate_limit_delay']
+                    print(f"   Retrying in {wait_time} seconds...")
+
+                time.sleep(wait_time)
                 return self._check_category_preservation(original, paraphrase, retry_count + 1)
             else:
-                print(f"⚠️  Category preservation check failed after {max_retries + 1} attempts: {e}")
+                if is_rate_limit:
+                    print(f"⚠️  Rate limit persisted after {max_retries + 1} attempts")
+                else:
+                    print(f"⚠️  Category preservation check failed after {max_retries + 1} attempts: {e}")
                 print(f"   FAIL-OPEN: Assuming category is NOT preserved (validation fails)")
                 return False
 

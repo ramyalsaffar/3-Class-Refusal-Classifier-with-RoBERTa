@@ -27,6 +27,7 @@ class ResponseCollector:
         self.max_tokens = API_CONFIG['max_tokens_response']
         self.rate_delay = API_CONFIG['rate_limit_delay']
         self.max_retries = API_CONFIG['max_retries']
+        self.rate_limit_backoff = API_CONFIG['rate_limit_backoff']
 
         # Token counter for API usage tracking
         # WHY: cl100k_base is used by GPT-4/GPT-5 and provides good approximation for Claude/Gemini
@@ -331,10 +332,23 @@ class ResponseCollector:
                     raise ValueError(f"Unknown model: {model_name}")
 
             except Exception as e:
+                # Check if this is a rate limit error
+                error_str = str(e).lower()
+                is_rate_limit = any(keyword in error_str for keyword in ['rate limit', '429', 'ratelimiterror', 'quota'])
+
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # Exponential backoff
+                    if is_rate_limit:
+                        # Use longer backoff for rate limits
+                        wait_time = self.rate_limit_backoff
+                        print(f"   ⏳ Rate limit detected - waiting {wait_time}s before retry {attempt + 2}/{self.max_retries}")
+                    else:
+                        # Standard exponential backoff for other errors
+                        wait_time = 2 ** attempt
+                        print(f"   ⏳ Error (attempt {attempt + 1}/{self.max_retries}) - retrying in {wait_time}s")
                     time.sleep(wait_time)
                 else:
+                    if is_rate_limit:
+                        print(f"   ❌ Rate limit error persisted after {self.max_retries} attempts")
                     raise e
 
     def _count_tokens(self, text: str) -> int:
