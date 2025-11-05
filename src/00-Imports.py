@@ -110,8 +110,8 @@ exec(open(CodeFilePath+"02-Config.py").read())
 print("✓ Loaded 02-Config.py")
 
 
-# Load remaining code files (03-28, excluding execution scripts)
-#-----------------------------------------------------------------
+# Load remaining code files (03-28, excluding 23-28)
+#--------------------------------------------------------
 # Files are numbered 00-28:
 #   00-Imports.py (this file)
 #   01-Constants.py (loaded above - environment, paths, device, class labels)
