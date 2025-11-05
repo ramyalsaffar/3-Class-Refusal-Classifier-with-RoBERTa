@@ -25,13 +25,17 @@ class WildJailbreakLoader:
         https://arxiv.org/abs/2406.18510
     """
 
-    def __init__(self, random_seed: int = 42):
+    def __init__(self, random_seed: int = None):
         """
         Initialize WildJailbreak loader.
 
         Args:
-            random_seed: Random seed for reproducible sampling
+            random_seed: Random seed for reproducible sampling (default: from WILDJAILBREAK_CONFIG)
         """
+        # Use config value if not provided - NO HARDCODED VALUES
+        if random_seed is None:
+            random_seed = WILDJAILBREAK_CONFIG['random_seed']
+
         self.random_seed = random_seed
         self.dataset = None
         self.filtered_data = None
