@@ -10,15 +10,20 @@
 # WEIGHTED LOSS FUNCTIONS (for class imbalance)
 # =============================================================================
 
-def calculate_class_weights(class_counts: List[int], device: torch.device) -> torch.Tensor:
+def calculate_class_weights(class_counts: List[int], device: torch.device,
+                           allow_zero: bool = False, zero_weight: float = 1.0) -> torch.Tensor:
     """
     Calculate class weights for imbalanced dataset.
 
     Formula: weight_i = total_samples / (num_classes * count_i)
 
+    ENHANCED (Phase 2/3): Supports zero-sample classes for jailbreak detection edge cases.
+
     Args:
         class_counts: List of sample counts per class [count_class0, count_class1, count_class2]
         device: torch device
+        allow_zero: If True, allows zero counts (assigns zero_weight). Default: False
+        zero_weight: Weight to assign to classes with zero samples. Default: 1.0
 
     Returns:
         torch.Tensor of class weights
@@ -28,48 +33,68 @@ def calculate_class_weights(class_counts: List[int], device: torch.device) -> to
         weights = calculate_class_weights(class_counts, device)
         # Result: [0.67, 0.84, 3.25]
 
+        # With zero jailbreak samples
+        class_counts = [91, 0]  # [jailbreak_failed, jailbreak_succeeded]
+        weights = calculate_class_weights(class_counts, device, allow_zero=True)
+        # Result: [1.0, 1.0] (assigns default weight to zero class)
+
     Raises:
-        ValueError: If any class has zero samples
+        ValueError: If any class has zero samples and allow_zero=False
     """
     # Check for zero counts (would cause division by zero)
-    if any(count == 0 for count in class_counts):
+    zero_indices = [i for i, count in enumerate(class_counts) if count == 0]
+
+    if zero_indices and not allow_zero:
         raise ValueError(
             f"Class counts contain zeros: {class_counts}. "
-            f"All classes must have at least one sample for weighted loss calculation."
+            f"Zero counts found at indices: {zero_indices}. "
+            f"All classes must have at least one sample for weighted loss calculation. "
+            f"Set allow_zero=True if you want to handle zero-sample classes."
         )
 
     total_samples = sum(class_counts)
     num_classes = len(class_counts)
 
-    # Safe division - all counts verified to be > 0
-    weights = [total_samples / (num_classes * count) for count in class_counts]
+    # Calculate weights with zero handling
+    weights = []
+    for count in class_counts:
+        if count == 0:
+            weights.append(zero_weight)  # Assign default weight to zero classes
+        else:
+            weights.append(total_samples / (num_classes * count))
 
     return torch.FloatTensor(weights).to(device)
 
 
 def get_weighted_criterion(class_counts: List[int], device: torch.device,
-                          class_names: List[str] = None) -> nn.CrossEntropyLoss:
+                          class_names: List[str] = None,
+                          allow_zero: bool = False, zero_weight: float = 1.0) -> nn.CrossEntropyLoss:
     """
     Get weighted CrossEntropyLoss criterion.
 
     Generic function that works for any number of classes (binary, 3-class, multi-class).
 
+    ENHANCED (Phase 2/3): Supports zero-sample classes for jailbreak detection edge cases.
+
     Args:
         class_counts: List of sample counts per class
         device: torch device
         class_names: Optional list of class names for display (default: Class 0, Class 1, ...)
+        allow_zero: If True, allows zero counts (assigns zero_weight). Default: False
+        zero_weight: Weight to assign to classes with zero samples. Default: 1.0
 
     Returns:
         nn.CrossEntropyLoss with class weights
     """
-    class_weights = calculate_class_weights(class_counts, device)
+    class_weights = calculate_class_weights(class_counts, device, allow_zero, zero_weight)
 
     print(f"Class weights: {class_weights.cpu().numpy()}")
 
     # Generic printing for any number of classes
     for i, weight in enumerate(class_weights):
         class_label = class_names[i] if class_names and i < len(class_names) else f"Class {i}"
-        print(f"  {class_label}: {weight:.3f}")
+        count = class_counts[i] if i < len(class_counts) else 0
+        print(f"  {class_label}: {weight:.3f} (count: {count})")
 
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 

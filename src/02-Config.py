@@ -76,7 +76,10 @@ JAILBREAK_CONFIG = {
     'enabled': True,                            # Enable jailbreak detection training
 
     # Performance Thresholds
-    'min_recall_succeeded': 0.95                # Minimum recall threshold for jailbreak detection (95%)
+    'min_recall_succeeded': 0.95,               # Minimum recall threshold for jailbreak detection (95%)
+
+    # Smart Validation (NEW - Phase 2/3)
+    'min_samples_per_class': 10                 # Skip training if insufficient samples (modern LLMs defend well)
 }
 
 

@@ -485,7 +485,40 @@ class RefusalPipeline:
         print(f"  Class 0 (Jailbreak Failed): {class_counts[0]}")
         print(f"  Class 1 (Jailbreak Succeeded): {class_counts[1]}")
 
-        criterion = get_weighted_criterion(class_counts, DEVICE)
+        # SMART VALIDATION (NEW - Phase 2/3): Check minimum samples per class
+        min_samples = JAILBREAK_CONFIG['min_samples_per_class']
+        insufficient_classes = [i for i, count in enumerate(class_counts) if count < min_samples]
+
+        if insufficient_classes:
+            print(f"\n{'='*60}")
+            print(f"⚠️  JAILBREAK DETECTOR TRAINING SKIPPED")
+            print(f"{'='*60}")
+            print(f"\nREASON: Insufficient samples in one or more classes")
+            print(f"  Minimum required per class: {min_samples} samples")
+            print(f"  Actual class counts:")
+            for i, count in enumerate(class_counts):
+                status = "❌ INSUFFICIENT" if i in insufficient_classes else "✓ Sufficient"
+                print(f"    Class {i} ({JAILBREAK_CLASS_NAMES[i]}): {count} samples - {status}")
+
+            print(f"\nWHY THIS HAPPENS:")
+            print(f"  Modern LLMs (Claude Sonnet 4.5, GPT-5, Gemini 2.5) have strong safety")
+            print(f"  guardrails that successfully defend against most jailbreak attempts.")
+            print(f"  This results in very few 'Jailbreak Succeeded' samples.")
+
+            print(f"\nRECOMMENDATION:")
+            print(f"  1. Use the 3-class Refusal Classifier for safety analysis")
+            print(f"  2. If jailbreak detection is critical, generate more aggressive prompts")
+            print(f"  3. Consider using adversarial prompt engineering techniques")
+            print(f"  4. Lower min_samples_per_class in JAILBREAK_CONFIG (not recommended)")
+
+            print(f"\n{'='*60}")
+            print(f"✓ Skipping jailbreak detector - continuing with refusal classifier only")
+            print(f"{'='*60}\n")
+
+            # Return empty history to indicate skipped training
+            return {'status': 'skipped', 'reason': 'insufficient_samples', 'class_counts': class_counts}
+
+        criterion = get_weighted_criterion(class_counts, DEVICE, class_names=JAILBREAK_CLASS_NAMES)
 
         # Optimizer and scheduler
         optimizer = AdamW(
