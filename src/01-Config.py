@@ -68,7 +68,8 @@ JAILBREAK_CONFIG = {
     'max_length': 512,                          # Max sequence length (tokens)
     'dropout': 0.1,                             # Dropout probability
     'freeze_layers': 6,                         # Freeze bottom 6 layers
-    'enabled': True                             # Enable jailbreak detection training
+    'enabled': True,                            # Enable jailbreak detection training
+    'min_samples_per_class': 10                 # Minimum samples per class to train (skip if insufficient)
 }
 
 
