@@ -10,7 +10,7 @@
 # CLASS BALANCE HYPOTHESIS TESTING
 # =============================================================================
 
-class HypothesisTester:
+class DatasetValidator:
     """
     Statistical hypothesis testing for classification datasets.
 
@@ -20,24 +20,23 @@ class HypothesisTester:
     - Statistical documentation for reproducibility
     """
 
-    def __init__(self, class_names: List[str] = None, alpha: float = 0.05):
+    def __init__(self, class_names: List[str] = None, alpha: float = None):
         """
         Initialize hypothesis tester.
 
         Args:
             class_names: List of class names for display
-            alpha: Significance level (default: 0.05 for 95% confidence)
+            alpha: Significance level (default: from STATISTICAL_CONFIG)
         """
         self.class_names = class_names
-        self.alpha = alpha
+        # Use config value if not provided - NO HARDCODING!
+        self.alpha = alpha if alpha is not None else STATISTICAL_CONFIG['alpha']
         self.test_results = {}
 
-        print(f"\n{'='*60}")
-        print("HYPOTHESIS TESTING SETUP")
-        print(f"{'='*60}")
+        print_banner("HYPOTHESIS TESTING SETUP", width=60)
         print(f"Significance level (α): {self.alpha}")
         print(f"Confidence level: {(1-self.alpha)*100:.0f}%")
-        print(f"{'='*60}\n")
+        print_banner("", width=60, char="=")
 
 
     def test_class_balance(self,
@@ -58,18 +57,29 @@ class HypothesisTester:
         Returns:
             Dictionary with test results
         """
+        # Input Validation
+        if not class_counts or len(class_counts) == 0:
+            print("❌ ERROR: class_counts is empty")
+            return {'error': 'Empty class_counts'}
+        
+        if any(count < 0 for count in class_counts):
+            print("❌ ERROR: class_counts contains negative values")
+            return {'error': 'Negative counts not allowed'}
+        
+        if sum(class_counts) == 0:
+            print("❌ ERROR: Total samples is zero")
+            return {'error': 'No samples'}
+        
         from scipy.stats import chisquare
 
         num_classes = len(class_counts)
         total_samples = sum(class_counts)
 
-        print(f"\n{'='*60}")
-        print("CHI-SQUARE GOODNESS-OF-FIT TEST: CLASS BALANCE")
-        print(f"{'='*60}\n")
+        print_banner("CHI-SQUARE GOODNESS-OF-FIT TEST: CLASS BALANCE", width=60)
 
-        # Calculate expected counts
+        # Calculate expected counts using safe_divide for proportions
         if expected_distribution == 'uniform':
-            expected_counts = [total_samples / num_classes] * num_classes
+            expected_counts = [safe_divide(total_samples, num_classes, default=0.0) for _ in range(num_classes)]
             print(f"Expected distribution: Uniform (equal classes)")
         elif expected_distribution == 'custom':
             if expected_proportions is None or len(expected_proportions) != num_classes:
@@ -90,6 +100,11 @@ class HypothesisTester:
             print(f"{class_name:<25} {class_counts[i]:<12} {expected_counts[i]:<12.1f} {diff:+12.1f}")
 
         # Perform chi-square test
+        # Check if any expected count is too small (< 1)
+        if any(e < 1 for e in expected_counts):
+            print(f"\n⚠️  Warning: Some expected counts are < 1")
+            print(f"   Chi-square test may be unreliable")
+        
         chi2_statistic, p_value = chisquare(f_obs=class_counts, f_exp=expected_counts)
 
         # Interpret results
@@ -119,13 +134,15 @@ class HypothesisTester:
             recommendation = "RECOMMENDATION: Use class weights in loss function to handle imbalance."
 
         print(f"\n{recommendation}")
-        print(f"{'='*60}\n")
+        print_banner("", width=60, char="=")
 
-        # Calculate class proportions
-        proportions = [count / total_samples for count in class_counts]
+        # Calculate class proportions using safe_divide
+        proportions = [safe_divide(count, total_samples, default=0.0) for count in class_counts]
 
-        # Calculate imbalance ratio (max / min)
-        imbalance_ratio = max(class_counts) / min(class_counts)
+        # Calculate imbalance ratio (max / min) using safe_divide
+        max_count = max(class_counts)
+        min_count = min(class_counts)
+        imbalance_ratio = safe_divide(max_count, min_count, default=1.0)
 
         # Store results
         result = {
@@ -165,11 +182,56 @@ class HypothesisTester:
         Returns:
             Dictionary with test results
         """
+        # Input Validation
+        if data is None or len(data) == 0:
+            print("❌ ERROR: data is empty")
+            return {
+                'test_name': 'shapiro_wilk_normality',
+                'error': 'Empty data',
+                'statistic': np.nan,
+                'p_value': np.nan,
+                'alpha': self.alpha,
+                'is_normal': False,
+                'reject_null': True,
+                'sample_size': 0
+            }
+        
+        # Convert to numpy array if needed
+        data = np.asarray(data).flatten()
+        
+        # Check for non-finite values
+        if not np.all(np.isfinite(data)):
+            print("❌ ERROR: data contains NaN or infinite values")
+            return {
+                'test_name': 'shapiro_wilk_normality',
+                'error': 'Non-finite values in data',
+                'statistic': np.nan,
+                'p_value': np.nan,
+                'alpha': self.alpha,
+                'is_normal': False,
+                'reject_null': True,
+                'sample_size': len(data)
+            }
+        
         from scipy.stats import shapiro
 
-        print(f"\n{'='*60}")
-        print(f"SHAPIRO-WILK NORMALITY TEST: {data_name}")
-        print(f"{'='*60}\n")
+        print_banner(f"SHAPIRO-WILK NORMALITY TEST: {data_name}", width=60)
+        
+        # Check minimum sample size
+        if len(data) < 3:
+            print(f"⚠️  Insufficient samples for Shapiro-Wilk test")
+            print(f"   Need at least 3 samples, have {len(data)}")
+            print_banner("", width=60, char="=")
+            return {
+                'test_name': 'shapiro_wilk_normality',
+                'statistic': np.nan,
+                'p_value': np.nan,
+                'alpha': self.alpha,
+                'is_normal': False,
+                'reject_null': True,
+                'sample_size': len(data),
+                'error': 'Insufficient samples (need >= 3)'
+            }
 
         # Basic statistics
         print(f"Sample size: {len(data)}")
@@ -204,7 +266,7 @@ class HypothesisTester:
             print(f"  → Data is NOT NORMALLY DISTRIBUTED")
             print(f"  → Consider non-parametric tests (Mann-Whitney, Kruskal-Wallis)")
 
-        print(f"{'='*60}\n")
+        print_banner("", width=60, char="=")
 
         # Store results
         result = {
@@ -243,13 +305,30 @@ class HypothesisTester:
         Returns:
             Dictionary with complete statistical analysis
         """
+        # Input Validation
+        if dataset is None:
+            print("❌ ERROR: dataset is None")
+            return {'error': 'Dataset is None'}
+        
+        if len(dataset) == 0:
+            print("❌ ERROR: dataset is empty")
+            return {'error': 'Empty dataset'}
+        
         print(f"\n{'#'*60}")
         print(f"COMPREHENSIVE DATASET STATISTICAL ANALYSIS: {task_type.upper()}")
         print(f"{'#'*60}\n")
 
         # Extract labels
-        all_labels = dataset.labels if hasattr(dataset, 'labels') else [dataset[i]['label'] for i in range(len(dataset))]
-        all_labels = np.array(all_labels)
+        try:
+            all_labels = dataset.labels if hasattr(dataset, 'labels') else [dataset[i]['label'] for i in range(len(dataset))]
+            all_labels = np.array(all_labels)
+        except Exception as e:
+            print(f"❌ ERROR: Failed to extract labels from dataset: {e}")
+            return {'error': f'Label extraction failed: {e}'}
+        
+        if len(all_labels) == 0:
+            print("❌ ERROR: No labels found in dataset")
+            return {'error': 'No labels in dataset'}
 
         # Determine class names
         if task_type == 'refusal':
@@ -267,19 +346,19 @@ class HypothesisTester:
         total_samples = len(all_labels)
 
         # Print dataset overview
-        print(f"{'='*60}")
-        print("DATASET OVERVIEW")
-        print(f"{'='*60}")
+        print_banner("DATASET OVERVIEW", width=60)
         print(f"Total samples: {total_samples}")
         print(f"Number of classes: {num_classes}")
         print(f"Task type: {task_type}")
         print(f"\nClass distribution:")
         for i, (name, count) in enumerate(zip(class_names, class_counts)):
-            percentage = count / total_samples * 100
+            percentage = safe_divide(count, total_samples, default=0.0) * 100
             print(f"  {name:<25}: {count:>6} ({percentage:>5.2f}%)")
 
-        # Calculate imbalance ratio
-        imbalance_ratio = max(class_counts) / min(class_counts)
+        # Calculate imbalance ratio using safe_divide
+        max_count = max(class_counts) if class_counts else 0
+        min_count = min(class_counts) if class_counts else 0
+        imbalance_ratio = safe_divide(max_count, min_count, default=1.0)
         print(f"\nImbalance ratio (max/min): {imbalance_ratio:.2f}")
 
         if imbalance_ratio < 1.5:
@@ -290,7 +369,7 @@ class HypothesisTester:
             balance_assessment = "Severely imbalanced"
 
         print(f"Balance assessment: {balance_assessment}")
-        print(f"{'='*60}\n")
+        print_banner("", width=60, char="=")
 
         # TEST 1: Class balance (chi-square)
         balance_result = self.test_class_balance(
@@ -299,9 +378,7 @@ class HypothesisTester:
         )
 
         # TEST 2: Sample size adequacy
-        print(f"{'='*60}")
-        print("SAMPLE SIZE ADEQUACY")
-        print(f"{'='*60}\n")
+        print_banner("SAMPLE SIZE ADEQUACY", width=60)
 
         # Rule of thumb: Use config minimum for meaningful statistics
         min_samples_per_class = ANALYSIS_CONFIG['min_samples_per_class']
@@ -318,21 +395,21 @@ class HypothesisTester:
                 if count < min_samples_per_class:
                     print(f"  - {name}: {count} samples (need {min_samples_per_class - count} more)")
 
-        print(f"{'='*60}\n")
+        print_banner("", width=60, char="=")
 
-        # Compile results
+        # Compile results with safe_divide for proportions
         results = {
             'task_type': task_type,
             'total_samples': total_samples,
             'num_classes': num_classes,
             'class_names': class_names,
             'class_counts': class_counts,
-            'class_proportions': [c/total_samples for c in class_counts],
+            'class_proportions': [safe_divide(c, total_samples, default=0.0) for c in class_counts],
             'imbalance_ratio': imbalance_ratio,
             'balance_assessment': balance_assessment,
             'class_balance_test': balance_result,
             'sample_size_adequate': adequate_sample_size,
-            'min_samples_per_class': min(class_counts)
+            'min_samples_per_class': min(class_counts) if class_counts else 0
         }
 
         # Store in test results
@@ -357,13 +434,15 @@ class HypothesisTester:
                 f"{EXPERIMENT_CONFIG['experiment_name']}_hypothesis_tests.txt"
             )
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        # Use ensure_dir_exists from Utils instead of os.makedirs
+        ensure_dir_exists(os.path.dirname(output_path))
 
         with open(output_path, 'w') as f:
             f.write("="*80 + "\n")
             f.write("STATISTICAL HYPOTHESIS TESTING REPORT\n")
             f.write("="*80 + "\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            # Use get_timestamp from Utils for consistent formatting
+            f.write(f"Generated: {get_timestamp('display')}\n")
             f.write(f"Experiment: {EXPERIMENT_CONFIG['experiment_name']}\n")
             f.write(f"Significance Level (α): {self.alpha}\n")
             f.write(f"Confidence Level: {(1-self.alpha)*100:.0f}%\n")
@@ -432,7 +511,8 @@ class HypothesisTester:
                 f"{EXPERIMENT_CONFIG['experiment_name']}_hypothesis_results.pkl"
             )
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        # Use ensure_dir_exists from Utils instead of os.makedirs
+        ensure_dir_exists(os.path.dirname(output_path))
 
         with open(output_path, 'wb') as f:
             pickle.dump(self.test_results, f)
@@ -446,19 +526,23 @@ class HypothesisTester:
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-def analyze_class_balance(dataset, task_type: str = 'refusal', alpha: float = 0.05) -> Dict:
+def analyze_class_balance(dataset, task_type: str = 'refusal', alpha: float = None) -> Dict:
     """
     Quick function to analyze class balance with hypothesis testing.
 
     Args:
         dataset: Dataset with labels
         task_type: 'refusal' or 'jailbreak'
-        alpha: Significance level
+        alpha: Significance level (default: from STATISTICAL_CONFIG)
 
     Returns:
         Statistical analysis results
     """
-    tester = HypothesisTester(alpha=alpha)
+    # Use config value if not provided - NO HARDCODING!
+    if alpha is None:
+        alpha = STATISTICAL_CONFIG['alpha']
+    
+    tester = DatasetValidator(alpha=alpha)
     results = tester.analyze_dataset_statistics(dataset, task_type=task_type)
 
     # Save results
