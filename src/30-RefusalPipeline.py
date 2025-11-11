@@ -777,6 +777,14 @@ class RefusalPipeline:
             print(f"  ✓ Sufficient real data - no supplementation needed")
             print(f"  Real data: 100%")
             print(f"{'='*60}\n")
+
+            # Save labeled data with data_source column (even without WildJailbreak)
+            # This ensures labeled_responses file always reflects the data used in Step 5
+            timestamp = self.run_timestamp
+            labeled_path = os.path.join(data_processed_path, f"labeled_responses_{timestamp}.pkl")
+            labeled_df_copy.to_pickle(labeled_path)
+            print(f"✓ Saved labeled data to {labeled_path}\n")
+
             return labeled_df_copy
 
         # Need supplementation
@@ -853,6 +861,12 @@ class RefusalPipeline:
                 print(f"    3. Lowering min_threshold_percentage (currently {WILDJAILBREAK_CONFIG['min_threshold_percentage']}%)")
 
             print(f"{'='*60}\n")
+
+            # Save augmented labeled data (with WildJailbreak samples)
+            timestamp = self.run_timestamp
+            labeled_augmented_path = os.path.join(data_processed_path, f"labeled_responses_{timestamp}.pkl")
+            combined_df.to_pickle(labeled_augmented_path)
+            print(f"✓ Saved augmented labeled data to {labeled_augmented_path}\n")
 
             return combined_df
 
