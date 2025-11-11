@@ -53,6 +53,194 @@ class RefusalPipeline:
         self.jailbreak_model = None
         self.tokenizer = None
 
+    def detect_available_data(self) -> Dict[str, Dict]:
+        """
+        Detect available intermediate data files and checkpoints.
+
+        Returns:
+            Dictionary mapping step names to available data/checkpoint info
+        """
+        available = {}
+
+        # Step 2: Response collection
+        response_files = glob.glob(os.path.join(data_responses_path, "responses_*.pkl"))
+        if response_files:
+            latest = max(response_files, key=os.path.getmtime)
+            available['responses'] = {
+                'path': latest,
+                'basename': os.path.basename(latest),
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 2
+            }
+
+        # Step 3: Cleaned data
+        cleaned_files = glob.glob(os.path.join(data_processed_path, "cleaned_responses_*.pkl"))
+        if cleaned_files:
+            latest = max(cleaned_files, key=os.path.getmtime)
+            available['cleaned'] = {
+                'path': latest,
+                'basename': os.path.basename(latest),
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 3
+            }
+
+        # Step 4: Labeled data
+        labeled_files = glob.glob(os.path.join(data_processed_path, "labeled_responses_*.pkl"))
+        if labeled_files:
+            latest = max(labeled_files, key=os.path.getmtime)
+            available['labeled'] = {
+                'path': latest,
+                'basename': os.path.basename(latest),
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 4
+            }
+
+        # Step 5: Train/val/test splits
+        train_files = glob.glob(os.path.join(data_splits_path, "train_*.pkl"))
+        val_files = glob.glob(os.path.join(data_splits_path, "val_*.pkl"))
+        test_files = glob.glob(os.path.join(data_splits_path, "test_*.pkl"))
+        if train_files and val_files and test_files:
+            latest_train = max(train_files, key=os.path.getmtime)
+            available['splits'] = {
+                'path': latest_train,  # Use train file as reference
+                'basename': f"{len(train_files)} split files",
+                'age_hours': (time.time() - os.path.getmtime(latest_train)) / 3600,
+                'step': 5
+            }
+
+        return available
+
+    def load_data_for_step(self, step: int) -> pd.DataFrame:
+        """
+        Load appropriate data for starting from a specific step.
+
+        Args:
+            step: Step number to start from (1-9)
+
+        Returns:
+            DataFrame with data needed for that step
+        """
+        if step <= 1:
+            return None  # Start fresh
+
+        available = self.detect_available_data()
+
+        # For step 2 (collect responses), we need prompts - start fresh
+        if step == 2:
+            return None
+
+        # For step 3 (clean data), load responses
+        if step == 3:
+            if 'responses' in available:
+                print(f"📂 Loading responses from: {available['responses']['basename']}")
+                return pd.read_pickle(available['responses']['path'])
+            else:
+                raise FileNotFoundError("No response data found. Please start from Step 2 (Collect Responses)")
+
+        # For step 4 (label data), load cleaned responses
+        if step == 4:
+            if 'cleaned' in available:
+                print(f"📂 Loading cleaned data from: {available['cleaned']['basename']}")
+                return pd.read_pickle(available['cleaned']['path'])
+            elif 'responses' in available:
+                print(f"📂 No cleaned data found, loading responses from: {available['responses']['basename']}")
+                print("   Will clean data before labeling...")
+                return pd.read_pickle(available['responses']['path'])
+            else:
+                raise FileNotFoundError("No response or cleaned data found. Please start from Step 2")
+
+        # For step 5+ (prepare datasets, training), load labeled data
+        if step >= 5:
+            if 'labeled' in available:
+                print(f"📂 Loading labeled data from: {available['labeled']['basename']}")
+                return pd.read_pickle(available['labeled']['path'])
+            else:
+                raise FileNotFoundError("No labeled data found. Please start from Step 4 (Label Data)")
+
+        return None
+
+    def run_partial_pipeline(self, start_step: int = 1):
+        """
+        Execute pipeline starting from a specific step.
+
+        Args:
+            start_step: Step number to start from (1-9)
+                1: Generate Prompts
+                2: Collect Responses
+                3: Clean Data
+                4: Label Data
+                5: Prepare Datasets
+                6: Train Refusal Classifier
+                7: Train Jailbreak Detector
+                8: Run Analyses
+                9: Generate Visualizations
+        """
+        # Generate single timestamp for this run
+        self.run_timestamp = get_timestamp('file')
+
+        print_banner(f"REFUSAL CLASSIFIER - PARTIAL PIPELINE (START: STEP {start_step})", width=60)
+        print(f"Experiment: {EXPERIMENT_CONFIG['experiment_name']}")
+        print(f"Run Timestamp: {self.run_timestamp}")
+        print(f"Classifier 1: Refusal Classification (3 classes)")
+        print(f"Classifier 2: Jailbreak Detection (2 classes)")
+        print("="*60 + "\n")
+
+        # Load data if starting from later step
+        prompts = None
+        responses_df = None
+        cleaned_df = None
+        labeled_df = None
+        datasets = None
+
+        # Execute pipeline from specified step
+        if start_step <= 1:
+            prompts = self.generate_prompts()
+
+        if start_step <= 2:
+            if start_step == 2:
+                prompts = self.generate_prompts()  # Need prompts for collection
+            responses_df = self.collect_responses(prompts)
+        elif start_step >= 3:
+            responses_df = self.load_data_for_step(3)
+
+        if start_step <= 3:
+            cleaned_df = self.clean_data(responses_df)
+        elif start_step >= 4:
+            cleaned_df = self.load_data_for_step(4)
+
+        if start_step <= 4:
+            labeled_df = self.label_data(cleaned_df)
+            labeled_df_augmented = self.prepare_jailbreak_training_data(labeled_df)
+        elif start_step >= 5:
+            labeled_df = self.load_data_for_step(5)
+            labeled_df_augmented = self.prepare_jailbreak_training_data(labeled_df)
+
+        if start_step <= 5:
+            datasets = self.prepare_datasets(labeled_df_augmented)
+
+        # Training and analysis always run if we reach this point
+        if start_step <= 6:
+            refusal_history = self.train_refusal_classifier(
+                datasets['refusal']['train_loader'],
+                datasets['refusal']['val_loader']
+            )
+
+        if start_step <= 7:
+            jailbreak_history = self.train_jailbreak_detector(
+                datasets['jailbreak']['train_loader'],
+                datasets['jailbreak']['val_loader']
+            )
+
+        if start_step <= 8:
+            analysis_results = self.run_analyses(datasets['refusal']['test_df'])
+
+        if start_step <= 9:
+            self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
+
+        print("\n" + "="*60)
+        print(f"✅ PARTIAL PIPELINE COMPLETE (Started from Step {start_step})")
+        print("="*60)
+
     def run_full_pipeline(self):
         """Execute complete pipeline from start to finish."""
         # Generate single timestamp for this entire run

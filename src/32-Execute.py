@@ -32,17 +32,20 @@ if __name__ == "__main__":
             # Quick test with Phase 2 methodology
             print()
             print_banner("QUICK TEST MODE (PHASE 2)", width=60)
-            
-            resume_from_checkpoint = runner._check_and_prompt_for_resume()
+
+            resume_from_checkpoint, start_step = runner._check_and_prompt_for_resume()
             api_keys = runner._get_api_keys()
             runner.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
-            
+
             original_total_prompts = DATASET_CONFIG['total_prompts']
             DATASET_CONFIG['total_prompts'] = EXPERIMENT_CONFIG['test_sample_size']
-            
+
             try:
                 with KeepAwake():
-                    runner.pipeline.run_full_pipeline()
+                    if start_step == 1:
+                        runner.pipeline.run_full_pipeline()
+                    else:
+                        runner.pipeline.run_partial_pipeline(start_step=start_step)
                 DATASET_CONFIG['total_prompts'] = original_total_prompts
                 runner.train_with_cross_validation()
             finally:
@@ -52,13 +55,16 @@ if __name__ == "__main__":
             # Full experiment with Phase 2 methodology
             print()
             print_banner("FULL EXPERIMENT MODE (PHASE 2)", width=60)
-            
-            resume_from_checkpoint = runner._check_and_prompt_for_resume()
+
+            resume_from_checkpoint, start_step = runner._check_and_prompt_for_resume()
             api_keys = runner._get_api_keys()
             runner.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
-            
+
             with KeepAwake():
-                runner.pipeline.run_full_pipeline()
+                if start_step == 1:
+                    runner.pipeline.run_full_pipeline()
+                else:
+                    runner.pipeline.run_partial_pipeline(start_step=start_step)
             runner.train_with_cross_validation()
 
         elif sys.argv[1] == '--analyze-only':
@@ -109,24 +115,27 @@ if __name__ == "__main__":
             print(f"  ✓ Statistical hypothesis testing")
             print(f"  ✓ Comprehensive error analysis")
             print_banner("", width=60)
-            
+
             # Check for existing checkpoints and prompt user
-            resume_from_checkpoint = runner._check_and_prompt_for_resume()
-            
+            resume_from_checkpoint, start_step = runner._check_and_prompt_for_resume()
+
             # Get API keys
             api_keys = runner._get_api_keys()
-            
+
             # Initialize pipeline with quick test mode
             runner.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
-            
+
             # Temporarily override dataset config for quick testing
             original_total_prompts = DATASET_CONFIG['total_prompts']
             DATASET_CONFIG['total_prompts'] = EXPERIMENT_CONFIG['test_sample_size']
-            
+
             try:
                 with KeepAwake():
                     # Run data collection pipeline
-                    runner.pipeline.run_full_pipeline()
+                    if start_step == 1:
+                        runner.pipeline.run_full_pipeline()
+                    else:
+                        runner.pipeline.run_partial_pipeline(start_step=start_step)
                     
                 # Restore original config before CV
                 DATASET_CONFIG['total_prompts'] = original_total_prompts
@@ -158,19 +167,22 @@ if __name__ == "__main__":
             print(f"  ✓ Statistical hypothesis testing")
             print(f"  ✓ Comprehensive error analysis")
             print_banner("", width=60)
-            
+
             # Check for existing checkpoints and prompt user
-            resume_from_checkpoint = runner._check_and_prompt_for_resume()
-            
+            resume_from_checkpoint, start_step = runner._check_and_prompt_for_resume()
+
             # Get API keys
             api_keys = runner._get_api_keys()
-            
+
             # Run pipeline with Phase 2 methodology
             runner.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
-            
+
             with KeepAwake():
                 # Run data collection pipeline
-                runner.pipeline.run_full_pipeline()
+                if start_step == 1:
+                    runner.pipeline.run_full_pipeline()
+                else:
+                    runner.pipeline.run_partial_pipeline(start_step=start_step)
             
             # Run Phase 2 cross-validation with hypothesis testing
             print()

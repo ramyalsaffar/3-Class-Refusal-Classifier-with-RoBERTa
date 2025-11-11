@@ -471,20 +471,20 @@ class CheckpointManager:
     def delete_all_checkpoints(self, confirm: bool = False) -> int:
         """
         Delete all checkpoints for this operation.
-        
+
         Args:
             confirm: Must be True to actually delete (safety check)
-            
+
         Returns:
             Number of checkpoints deleted
         """
         if not confirm:
             print("⚠️  Set confirm=True to delete all checkpoints")
             return 0
-        
+
         pattern = f"checkpoint_{self.operation_name}_*.pkl"
         checkpoints = glob.glob(os.path.join(self.checkpoint_dir, pattern))
-        
+
         deleted = 0
         for cp in checkpoints:
             try:
@@ -492,10 +492,148 @@ class CheckpointManager:
                 deleted += 1
             except Exception as e:
                 print(f"⚠️  Could not delete {os.path.basename(cp)}: {e}")
-        
+
         if deleted > 0:
             print(f"🗑️  Deleted {deleted} checkpoint(s) for {self.operation_name}")
-        
+
+        return deleted
+
+    def get_checkpoint_info(self, checkpoint_path: str) -> Optional[Dict]:
+        """
+        Get detailed information about a specific checkpoint without loading full data.
+
+        Args:
+            checkpoint_path: Path to checkpoint file
+
+        Returns:
+            Dictionary with checkpoint metadata or None if error
+        """
+        try:
+            with open(checkpoint_path, 'rb') as f:
+                checkpoint_data = pickle.load(f)
+
+            info = {
+                'path': checkpoint_path,
+                'basename': os.path.basename(checkpoint_path),
+                'size_mb': os.path.getsize(checkpoint_path) / (1024 * 1024),
+                'age_seconds': time.time() - os.path.getmtime(checkpoint_path),
+                'age_hours': (time.time() - os.path.getmtime(checkpoint_path)) / 3600,
+                'last_index': checkpoint_data.get('last_index', 0),
+                'data_shape': checkpoint_data['data'].shape if 'data' in checkpoint_data else (0, 0),
+                'timestamp': checkpoint_data.get('timestamp', 'unknown'),
+                'created_at': checkpoint_data.get('created_at', 'unknown'),
+                'version': checkpoint_data.get('version', 'unknown'),
+                'experiment': checkpoint_data.get('experiment', 'unknown'),
+                'operation': checkpoint_data.get('operation', self.operation_name),
+                'metadata': checkpoint_data.get('metadata', {}),
+                'is_recovery': checkpoint_data.get('recovery', False)
+            }
+
+            return info
+
+        except Exception as e:
+            print(f"⚠️  Error reading checkpoint info: {e}")
+            return None
+
+    def list_all_checkpoints_with_info(self) -> List[Dict]:
+        """
+        Get detailed information about all checkpoints for this operation.
+
+        Returns:
+            List of dictionaries with checkpoint information
+        """
+        pattern = f"checkpoint_{self.operation_name}_*.pkl"
+        checkpoints = glob.glob(os.path.join(self.checkpoint_dir, pattern))
+
+        if not checkpoints:
+            return []
+
+        # Sort by modification time (most recent first)
+        checkpoints.sort(key=os.path.getmtime, reverse=True)
+
+        checkpoint_info_list = []
+        for cp in checkpoints:
+            info = self.get_checkpoint_info(cp)
+            if info:
+                checkpoint_info_list.append(info)
+
+        return checkpoint_info_list
+
+    def load_checkpoint_by_name(self, checkpoint_name: str) -> Optional[Dict]:
+        """
+        Load a specific checkpoint by its filename.
+
+        Args:
+            checkpoint_name: Checkpoint filename (e.g., 'checkpoint_labeling_20250111_143022.pkl')
+
+        Returns:
+            Checkpoint data dictionary or None if not found
+        """
+        checkpoint_path = os.path.join(self.checkpoint_dir, checkpoint_name)
+
+        if not os.path.exists(checkpoint_path):
+            print(f"❌ Checkpoint not found: {checkpoint_name}")
+            return None
+
+        try:
+            with open(checkpoint_path, 'rb') as f:
+                checkpoint_data = pickle.load(f)
+
+            # Validate checkpoint
+            if not self._validate_checkpoint(checkpoint_data):
+                print(f"⚠️  Checkpoint validation failed: {checkpoint_name}")
+                return None
+
+            if EXPERIMENT_CONFIG.get('verbose', True):
+                print_banner("CHECKPOINT LOADED", width=60, char="=")
+                print(f"✅ File: {checkpoint_name}")
+                print(f"   Resuming from index: {checkpoint_data['last_index']:,}")
+                print(f"   Data shape: {checkpoint_data['data'].shape}")
+                if 'experiment' in checkpoint_data:
+                    print(f"   Original experiment: {checkpoint_data['experiment']}")
+                print("=" * 60)
+
+            return checkpoint_data
+
+        except Exception as e:
+            print(f"❌ Error loading checkpoint: {e}")
+            return None
+
+    def delete_checkpoints_after_timestamp(self, timestamp: str) -> int:
+        """
+        Delete all checkpoints created after a specific timestamp.
+        Useful for removing checkpoints from later steps when restarting from earlier step.
+
+        Args:
+            timestamp: Timestamp string (format: YYYYMMDD_HHMMSS)
+
+        Returns:
+            Number of checkpoints deleted
+        """
+        pattern = f"checkpoint_{self.operation_name}_*.pkl"
+        checkpoints = glob.glob(os.path.join(self.checkpoint_dir, pattern))
+
+        deleted = 0
+        for cp in checkpoints:
+            basename = os.path.basename(cp)
+            # Extract timestamp from filename: checkpoint_operation_TIMESTAMP.pkl
+            parts = basename.replace('.pkl', '').split('_')
+            if len(parts) >= 3:
+                cp_timestamp = '_'.join(parts[2:])  # Get everything after operation name
+
+                # Compare timestamps as strings (works for YYYYMMDD_HHMMSS format)
+                if cp_timestamp > timestamp:
+                    try:
+                        os.remove(cp)
+                        deleted += 1
+                        if EXPERIMENT_CONFIG.get('verbose', True):
+                            print(f"🗑️  Deleted checkpoint: {basename} (timestamp: {cp_timestamp})")
+                    except Exception as e:
+                        print(f"⚠️  Could not delete {basename}: {e}")
+
+        if deleted > 0:
+            print(f"✓ Deleted {deleted} checkpoint(s) created after {timestamp}")
+
         return deleted
 
 

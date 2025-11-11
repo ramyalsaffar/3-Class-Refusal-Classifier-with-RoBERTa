@@ -151,17 +151,20 @@ class ExperimentRunner:
             'google': google_key
         }
 
-    def _check_and_prompt_for_resume(self) -> bool:
+    def _check_and_prompt_for_resume(self) -> tuple:
         """
-        Check for existing checkpoints and prompt user to resume or start fresh.
+        Check for existing checkpoints/data and prompt user for execution strategy.
 
         Returns:
-            True if user wants to resume, False if starting fresh
+            Tuple of (resume_from_checkpoint: bool, start_step: int)
+            - resume_from_checkpoint: Whether to resume from checkpoints (for Steps 2 & 4)
+            - start_step: Which step to start from (1-9, where 1 = start from beginning)
         """
-        # Check for both operation types
+        # Check for checkpoints
         checkpoint_patterns = [
             'checkpoint_response_collection_*.pkl',
-            'checkpoint_labeling_*.pkl'
+            'checkpoint_labeling_*.pkl',
+            'checkpoint_wildjailbreak_loading_*.pkl'
         ]
 
         found_checkpoints = {}
@@ -180,40 +183,125 @@ class ExperimentRunner:
                     'age_hours': age_hours
                 }
 
-        if not found_checkpoints:
-            return False  # No checkpoints, start fresh
+        # Check for intermediate data files
+        temp_pipeline = RefusalPipeline(api_keys={'openai': '', 'anthropic': '', 'google': ''})
+        available_data = temp_pipeline.detect_available_data()
 
-        # Display checkpoint information
-        print("\n" + "="*60)
-        print("⚠️  EXISTING CHECKPOINTS FOUND")
-        print("="*60)
+        # If no checkpoints or data, start fresh
+        if not found_checkpoints and not available_data:
+            return (False, 1)
 
-        for operation, info in found_checkpoints.items():
-            print(f"\n{operation.title()}:")
-            print(f"  Timestamp: {info['timestamp']}")
-            print(f"  Age: {info['age_hours']:.1f} hours")
+        # Display what's available
+        print("\n" + "="*70)
+        print("📋 EXISTING PIPELINE DATA DETECTED")
+        print("="*70)
 
-        print("\n" + "="*60)
+        # Show checkpoints
+        if found_checkpoints:
+            print("\n✓ Available Checkpoints (for in-progress operations):")
+            for operation, info in found_checkpoints.items():
+                print(f"  • {operation.title().replace('_', ' ')}: {info['age_hours']:.1f} hours old")
 
-        # Prompt user
+        # Show completed step data
+        if available_data:
+            print("\n✓ Completed Step Data:")
+            step_names = {
+                'responses': 'Step 2: Response Collection',
+                'cleaned': 'Step 3: Data Cleaning',
+                'labeled': 'Step 4: Data Labeling',
+                'splits': 'Step 5: Dataset Preparation'
+            }
+            for key, data_info in available_data.items():
+                step_name = step_names.get(key, key)
+                print(f"  • {step_name}: {data_info['basename']} ({data_info['age_hours']:.1f} hours old)")
+
+        print("\n" + "="*70)
+        print("\n🎯 EXECUTION OPTIONS:")
+        print("─"*70)
+        print("1. Resume from latest checkpoints (continue in-progress operations)")
+        print("   → Resumes Step 2 (responses) or Step 4 (labeling) if interrupted")
+        print("\n2. Start from specific step (skip completed steps)")
+        print("   → Load completed data and start from a later step")
+        print("\n3. Start fresh (delete all checkpoints and ignore saved data)")
+        print("   → Start pipeline from Step 1, delete all existing checkpoints")
+        print("─"*70)
+
+        # Get user choice
         while True:
-            response = input("\nResume from checkpoint? (y/n): ").strip().lower()
-            if response in ['y', 'yes']:
-                print("✓ Will resume from existing checkpoints")
-                return True
-            elif response in ['n', 'no']:
-                print("✓ Will start fresh (checkpoints will be deleted)")
-                # Cleanup old checkpoints
-                for operation in found_checkpoints:
-                    checkpoint_manager = CheckpointManager(
-                        checkpoint_dir=data_checkpoints_path,
-                        operation_name=operation,
-                        auto_cleanup=False
-                    )
-                    checkpoint_manager.cleanup_checkpoints(keep_last_n=0)
-                return False
+            choice = input("\nSelect option (1/2/3): ").strip()
+
+            if choice == '1':
+                # Resume from checkpoints
+                print("\n✓ Will resume from latest checkpoints")
+                return (True, 1)
+
+            elif choice == '2':
+                # Start from specific step
+                print("\n" + "─"*70)
+                print("📍 SELECT STARTING STEP:")
+                print("─"*70)
+
+                # Build step list with availability indicators
+                steps = [
+                    ("1", "Generate Prompts", None),
+                    ("2", "Collect Responses", 'responses' in available_data),
+                    ("3", "Clean Data", 'cleaned' in available_data),
+                    ("4", "Label Data", 'labeled' in available_data),
+                    ("5", "Prepare Datasets", 'splits' in available_data),
+                    ("6", "Train Refusal Classifier", False),
+                    ("7", "Train Jailbreak Detector", False),
+                    ("8", "Run Analyses", False),
+                    ("9", "Generate Visualizations", False)
+                ]
+
+                for num, name, has_data in steps:
+                    indicator = "✓" if has_data else " "
+                    print(f"  {num}. {name:30} [{indicator}]")
+
+                print("\n  Legend: [✓] = Can skip (data available)")
+                print("─"*70)
+
+                while True:
+                    step_input = input("\nStart from step (1-9): ").strip()
+                    try:
+                        start_step = int(step_input)
+                        if 1 <= start_step <= 9:
+                            # Validate that required data exists
+                            try:
+                                if start_step >= 3:
+                                    temp_pipeline.load_data_for_step(start_step)
+                                print(f"\n✓ Will start from Step {start_step}: {steps[start_step-1][1]}")
+                                return (False, start_step)
+                            except FileNotFoundError as e:
+                                print(f"\n❌ Cannot start from Step {start_step}: {e}")
+                                print("   Please select an earlier step or choose option 3 to start fresh.")
+                                continue
+                        else:
+                            print("⚠️  Please enter a number between 1-9")
+                    except ValueError:
+                        print("⚠️  Please enter a valid number")
+
+            elif choice == '3':
+                # Start fresh
+                print("\n⚠️  This will DELETE all checkpoints. Continue? (y/n): ", end='')
+                confirm = input().strip().lower()
+                if confirm in ['y', 'yes']:
+                    print("\n✓ Starting fresh (deleting checkpoints...)")
+                    # Cleanup all checkpoints
+                    for operation in ['response_collection', 'labeling', 'wildjailbreak_loading']:
+                        checkpoint_manager = CheckpointManager(
+                            checkpoint_dir=data_checkpoints_path,
+                            operation_name=operation,
+                            auto_cleanup=False
+                        )
+                        deleted = checkpoint_manager.delete_all_checkpoints(confirm=True)
+                    return (False, 1)
+                else:
+                    print("   Cancelled. Please select another option.")
+                    continue
+
             else:
-                print("⚠️  Please enter 'y' or 'n'")
+                print("⚠️  Please enter 1, 2, or 3")
 
     def _print_experiment_header(self, mode_name: str, description: str = ""):
         """Print formatted experiment header."""
@@ -237,7 +325,7 @@ class ExperimentRunner:
         )
 
         # Check for existing checkpoints and prompt user
-        resume_from_checkpoint = self._check_and_prompt_for_resume()
+        resume_from_checkpoint, start_step = self._check_and_prompt_for_resume()
 
         # Get API keys
         api_keys = self._get_api_keys()
@@ -258,7 +346,10 @@ class ExperimentRunner:
         try:
             # Prevent Mac from sleeping during execution
             with KeepAwake():
-                self.pipeline.run_full_pipeline()
+                if start_step == 1:
+                    self.pipeline.run_full_pipeline()
+                else:
+                    self.pipeline.run_partial_pipeline(start_step=start_step)
         finally:
             # Restore original config
             # WHY: Prevent config pollution affecting other modes
@@ -272,7 +363,7 @@ class ExperimentRunner:
         )
 
         # Check for existing checkpoints and prompt user
-        resume_from_checkpoint = self._check_and_prompt_for_resume()
+        resume_from_checkpoint, start_step = self._check_and_prompt_for_resume()
 
         # Get API keys
         api_keys = self._get_api_keys()
@@ -280,7 +371,10 @@ class ExperimentRunner:
         # Run pipeline with sleep prevention and resume flag
         self.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
         with KeepAwake():
-            self.pipeline.run_full_pipeline()
+            if start_step == 1:
+                self.pipeline.run_full_pipeline()
+            else:
+                self.pipeline.run_partial_pipeline(start_step=start_step)
 
     def train_only(self):
         """Train only (assumes data already collected)."""
