@@ -375,9 +375,9 @@ class WildJailbreakLoader:
             
             # NEW: Set jailbreak attempt field
             standardized['is_jailbreak_attempt'] = 1  # These are all jailbreak attempts
-            
-            # Jailbreak success (all succeeded in WildJailbreak)
-            standardized['jailbreak_success'] = 1
+
+            # Jailbreak label (all succeeded in WildJailbreak)
+            standardized['jailbreak_label'] = 1  # Changed from jailbreak_success to match pipeline expectation
             
             # Confidence scores from config - NO HARDCODING!
             standardized['refusal_confidence'] = WILDJAILBREAK_CONFIG.get('default_confidence', 90)
