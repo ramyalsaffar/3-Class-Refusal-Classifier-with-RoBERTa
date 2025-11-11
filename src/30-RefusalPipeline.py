@@ -62,6 +62,17 @@ class RefusalPipeline:
         """
         available = {}
 
+        # Step 1: Generated prompts
+        prompt_files = glob.glob(os.path.join(data_raw_path, "prompts_*.json"))
+        if prompt_files:
+            latest = max(prompt_files, key=os.path.getmtime)
+            available['prompts'] = {
+                'path': latest,
+                'basename': os.path.basename(latest),
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 1
+            }
+
         # Step 2: Response collection
         response_files = glob.glob(os.path.join(data_responses_path, "responses_*.pkl"))
         if response_files:

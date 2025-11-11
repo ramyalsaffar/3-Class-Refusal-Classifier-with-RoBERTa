@@ -243,7 +243,7 @@ class ExperimentRunner:
 
                 # Build step list with availability indicators
                 steps = [
-                    ("1", "Generate Prompts", None),
+                    ("1", "Generate Prompts", 'prompts' in available_data),
                     ("2", "Collect Responses", 'responses' in available_data),
                     ("3", "Clean Data", 'cleaned' in available_data),
                     ("4", "Label Data", 'labeled' in available_data),
