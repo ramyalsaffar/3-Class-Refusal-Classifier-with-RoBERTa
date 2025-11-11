@@ -1,8 +1,7 @@
 # Imports
 #--------
 #
-# This file has all of the libraries needed for the project.
-# It also imports configuration and constants.
+# This file has most of the libraries needed for the project.
 # Paths to load from or to.
 #
 ###############################################################################
@@ -10,49 +9,31 @@
 
 #------------------------------------------------------------------------------
 
-
-# Libraries
-#----------
+# Standard library imports
 import os
 import sys
 import json
 import time
 import re
-import glob
 import warnings
-warnings.filterwarnings('ignore')
 import subprocess
 import signal
-
-from pathlib import Path
-from datetime import datetime
-from typing import List, Dict, Tuple, Optional
-from io import BytesIO
+import pickle
 import getpass
 import atexit
-
-# Async and Parallel Processing (NEW - for Phase 2)
 import asyncio
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+#from pathlib import Path
+from datetime import datetime
+from typing import List, Dict, Tuple, Optional, Any, Union
+from io import BytesIO
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Data Science
-import pandas as pd
+# Third-party imports
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
-
-# PyTorch & Transformers
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-from torch.optim import AdamW  # Moved from transformers to torch.optim in newer versions
-from transformers import (
-    RobertaModel,
-    RobertaTokenizer,
-    RobertaConfig,
-    get_linear_schedule_with_warmup
-)
+import glob
 
 # ML Tools
 from sklearn.model_selection import train_test_split, StratifiedKFold
@@ -71,8 +52,29 @@ from sklearn.metrics import (
 )
 
 # Statistical Testing
-from scipy.stats import chisquare, shapiro
-import pickle
+from scipy.stats import chisquare, chi2_contingency, shapiro
+
+# Deep Learning
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from torch.optim import AdamW
+
+# Transformers
+from transformers import (
+    RobertaModel,
+    RobertaTokenizer,
+    RobertaConfig,
+    get_linear_schedule_with_warmup
+)
+
+
+#warnings.filterwarnings('ignore')
+#warnings.filterwarnings('ignore', category=FutureWarning)  # Only suppress specific warnings
+
+# WildJailBreak dataset
+from datasets import load_dataset
 
 # Visualization
 import matplotlib.pyplot as plt
@@ -145,11 +147,11 @@ else:
     folder = "3-Class Refusal Classifier with RoBERTa"
     project_path = glob.glob(main_path + "*" + folder)[0]
     base_results_path = glob.glob(project_path + "/*Code/*Results")[0]
-    CodeFilePath = project_path + "/src/"
 
 
 # Specific Subdirectories
 #------------------------
+# Data Subdirectories
 data_path = glob.glob(base_results_path + "/*Data/")[0]
 data_raw_path = glob.glob(data_path + "*Raw/")[0]
 data_responses_path = glob.glob(data_path + "*Responses/")[0]
@@ -157,14 +159,32 @@ data_processed_path = glob.glob(data_path + "*Processed/")[0]
 data_splits_path = glob.glob(data_path + "*Splits/")[0]
 data_checkpoints_path = glob.glob(data_processed_path + "*Checkpoints/")[0]
 
+# Models Directory
 models_path = glob.glob(base_results_path + "/*Models/")[0]
-results_path = base_results_path
 
+# Results Subdirectories
+results_path = base_results_path
+analysis_results_path = os.path.join(results_path, "Analysis")
+quality_review_path = os.path.join(results_path, "Quality Review")
+
+# Visualization Subdirectories
 visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
+attention_analysis_path = os.path.join(visualizations_path, "Attention Analysis")
+shap_analysis_path = os.path.join(visualizations_path, "SHAP Analysis")
+correlation_viz_path = os.path.join(visualizations_path, "Correlation Analysis")
+error_analysis_path = os.path.join(visualizations_path, "Error Analysis")
+power_law_viz_path = os.path.join(visualizations_path, "Power Law Analysis")
+
+# Reports Directory
 reports_path = glob.glob(base_results_path + "/*Reports/")[0]
 
 # API Keys (local file storage)
 api_keys_file_path = glob.glob(project_path + "/*API Keys/API Keys.txt")[0]
+
+# Create subdirectories if they don't exist
+for path in [analysis_results_path, quality_review_path, attention_analysis_path, 
+             shap_analysis_path, correlation_viz_path, error_analysis_path, power_law_viz_path]:
+    os.makedirs(path, exist_ok=True)
 
 
 #------------------------------------------------------------------------------
@@ -176,7 +196,7 @@ CodeFilePath = glob.glob(project_path + "/*Code/*Python/")[0]
 code_files_ls = os.listdir(CodeFilePath)
 code_files_ls.sort()
 code_files_ls = [x for x in code_files_ls if "py" in x]
-code_files_ls = code_files_ls[1:32]
+code_files_ls = code_files_ls[1:33]
 
 # Loop over cde files
 #--------------------
