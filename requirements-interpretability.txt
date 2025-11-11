@@ -1,0 +1,10 @@
+# Interpretability Dependencies
+# -----------------------------
+# Additional packages for SHAP analysis and advanced interpretability features
+
+# Include core requirements
+-r requirements.txt
+
+# SHAP for model interpretability
+# WARNING: Large package (~500MB with dependencies)
+shap>=0.42.0

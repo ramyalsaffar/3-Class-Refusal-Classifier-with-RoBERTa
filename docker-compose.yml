@@ -1,0 +1,246 @@
+# Docker Compose for Dual RoBERTa Classifiers
+# Supports development, training, and production API deployment
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # DEVELOPMENT ENVIRONMENT
+  # ===========================================================================
+  # WHY: Interactive development with Jupyter, volume mounts for live code changes
+  dev:
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    image: refusal-classifier:dev
+    container_name: refusal-classifier-dev
+
+    # GPU support (comment out if CPU-only)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    volumes:
+      # Mount source code for live editing
+      # WHY: Changes to src/ files are immediately reflected in container
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./results:/app/results
+      - ./visualizations:/app/visualizations
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+
+    ports:
+      - "8888:8888"  # Jupyter
+      - "8000:8000"  # API (if testing)
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+
+    # Load API keys from .env file
+    # WHY: Keep secrets out of docker-compose.yml
+    env_file:
+      - .env
+
+    stdin_open: true
+    tty: true
+
+    command: /bin/bash
+
+  # ===========================================================================
+  # TRAINING (FULL PIPELINE)
+  # ===========================================================================
+  # WHY: Run complete training pipeline with GPU support
+  train:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+    image: refusal-classifier:train
+    container_name: refusal-classifier-train
+
+    # GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./results:/app/results
+      - ./visualizations:/app/visualizations
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+
+    env_file:
+      - .env
+
+    command: ["python", "src/32-Execute.py", "--mode", "full"]
+
+  # ===========================================================================
+  # TRAINING (CROSS-VALIDATION)
+  # ===========================================================================
+  # WHY: Run Phase 2 cross-validation experiment
+  train-cv:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+    image: refusal-classifier:train
+    container_name: refusal-classifier-train-cv
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./results:/app/results
+      - ./visualizations:/app/visualizations
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+
+    env_file:
+      - .env
+
+    command: ["python", "src/32-Execute.py", "--mode", "cv", "--k-folds", "5"]
+
+  # ===========================================================================
+  # ANALYSIS ONLY
+  # ===========================================================================
+  # WHY: Run analysis on pre-trained models without retraining
+  analyze:
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+    image: refusal-classifier:train
+    container_name: refusal-classifier-analyze
+
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./results:/app/results
+      - ./visualizations:/app/visualizations
+      - ./reports:/app/reports
+
+    env_file:
+      - .env
+
+    command: ["python", "src/33-Analyze.py", "--auto", "--generate-report"]
+
+  # ===========================================================================
+  # PRODUCTION API
+  # ===========================================================================
+  # WHY: Lightweight API server for production inference
+  api:
+    build:
+      context: .
+      target: api
+      dockerfile: Dockerfile
+    image: refusal-classifier:api
+    container_name: refusal-classifier-api
+
+    # Optional GPU support for faster inference
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+    volumes:
+      # Mount trained models
+      # WHY: Models can be updated without rebuilding image
+      - ./models:/app/models:ro
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      - MODEL_PATH=/app/models
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===========================================================================
+  # JUPYTER NOTEBOOK
+  # ===========================================================================
+  # WHY: Interactive analysis and visualization in Jupyter
+  jupyter:
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    image: refusal-classifier:dev
+    container_name: refusal-classifier-jupyter
+
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./results:/app/results
+      - ./visualizations:/app/visualizations
+      - ./notebooks:/app/notebooks
+
+    ports:
+      - "8888:8888"
+
+    env_file:
+      - .env
+
+    command: >
+      jupyter notebook
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --NotebookApp.token=''
+      --NotebookApp.password=''
+
+# =============================================================================
+# VOLUMES (Optional: for persistent data)
+# =============================================================================
+# WHY: Named volumes for data persistence across container restarts
+volumes:
+  models-data:
+  results-data:
+  visualizations-data:
+
+# =============================================================================
+# NETWORKS (Optional: for multi-service deployments)
+# =============================================================================
+networks:
+  default:
+    name: refusal-classifier-network
