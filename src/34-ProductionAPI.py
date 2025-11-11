@@ -7,7 +7,7 @@
 ###############################################################################
 
 # Import core dependencies from 01-Imports.py (sys and os imported there)
-_import_file_path = __file__.replace("31-ProductionAPI.py", "01-Imports.py")
+_import_file_path = __file__.replace("34-ProductionAPI.py", "01-Imports.py")
 with open(_import_file_path) as f:
     exec(f.read())
 
@@ -98,9 +98,9 @@ state = APIState()
 @app.on_event("startup")
 async def startup_event():
     """Initialize models and database connection on startup."""
-    print("\n" + "="*60)
-    print("STARTING PRODUCTION API")
-    print("="*60)
+    print()
+    print_banner("STARTING PRODUCTION API", width=60)
+    print()
 
     # Initialize database
     state.data_manager = DataManager()
@@ -116,7 +116,7 @@ async def startup_event():
     if os.path.exists(model_path):
         # GENERIC: Determine number of classes from checkpoint or config
         checkpoint = torch.load(model_path, map_location=DEVICE)
-        num_classes = checkpoint.get('num_classes', len(CLASS_NAMES))
+        num_classes = checkpoint.get('num_classes', MODEL_CONFIG['num_classes'])
 
         state.active_model = RefusalClassifier(num_classes=num_classes).to(DEVICE)
         state.active_model.load_state_dict(checkpoint['model_state_dict'])
@@ -149,7 +149,7 @@ async def startup_event():
         if os.path.exists(challenger_path):
             # GENERIC: Determine number of classes from checkpoint
             checkpoint = torch.load(challenger_path, map_location=DEVICE)
-            num_classes = checkpoint.get('num_classes', len(CLASS_NAMES))
+            num_classes = checkpoint.get('num_classes', MODEL_CONFIG['num_classes'])
 
             state.challenger_model = RefusalClassifier(num_classes=num_classes).to(DEVICE)
             state.challenger_model.load_state_dict(checkpoint['model_state_dict'])
@@ -164,7 +164,8 @@ async def startup_event():
             print(f"⚠️  Challenger model file not found: {challenger_path}")
 
     print(f"\n✓ API Ready - {DEVICE}")
-    print("="*60 + "\n")
+    print_banner("", width=60)
+    print()
 
 
 @app.on_event("shutdown")
@@ -520,13 +521,13 @@ async def rollback(api_key: str):
         )
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000):
+def run_server(host: str = None, port: int = None):
     """
     Run the FastAPI server.
 
     Args:
-        host: Host to bind to
-        port: Port to listen on
+        host: Host to bind to (default: from PRODUCTION_CONFIG)
+        port: Port to listen on (default: from PRODUCTION_CONFIG)
 
     Usage Examples:
         # Start server
@@ -549,6 +550,12 @@ def run_server(host: str = "0.0.0.0", port: int = 8000):
         - All predictions logged to database in background
         - Supports A/B testing with automatic traffic splitting
     """
+    # Use config values if not provided
+    if host is None:
+        host = PRODUCTION_CONFIG['api']['host']
+    if port is None:
+        port = PRODUCTION_CONFIG['api']['port']
+    
     logger.info(f"Starting server on {host}:{port}")
     uvicorn.run(app, host=host, port=port)
 
