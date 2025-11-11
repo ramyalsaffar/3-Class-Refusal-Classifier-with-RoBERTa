@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Analyze Pipeline
 #-----------------
 # Standalone analysis script for 3-Class Refusal Classifier.
@@ -130,8 +129,8 @@ def _generate_reports(analysis_results: Dict, report_type: str):
         analysis_results: Analysis results from ExperimentRunner
         report_type: Type of report ('performance', 'interpretability', 'executive', 'all')
     """
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    report_generator = ReportGenerator(class_names=analysis_results['metadata']['refusal_class_names'])
+    timestamp = get_timestamp('file')
+    report_generator = ReportGenerator(class_names=CLASS_NAMES)
 
     # Load visualization figures
     import matplotlib.pyplot as plt
@@ -229,17 +228,16 @@ def _generate_reports(analysis_results: Dict, report_type: str):
 
 def interactive_mode():
     """Run analysis in interactive mode with user prompts."""
-    print("\n" + "="*60)
-    print("📊 REFUSAL CLASSIFIER - INTERACTIVE ANALYSIS")
-    print("="*60)
+    print()
+    print_banner("📊 REFUSAL CLASSIFIER - INTERACTIVE ANALYSIS", width=60)
+    print()
 
-    print("\nThis will analyze BOTH classifiers:")
+    print("This will analyze BOTH classifiers:")
     print("  1. Refusal Classifier (3 classes)")
     print("  2. Jailbreak Detector (2 classes)")
 
-    print("\n" + "-"*60)
-    print("Model Configuration")
-    print("-"*60)
+    print()
+    print_banner("Model Configuration", width=60, char="-")
 
     # Get refusal model path
     print("\nRefusal Classifier Model:")
@@ -314,13 +312,17 @@ def interactive_mode():
     if test_data_path:
         print(f"\n✓ Using custom test data: {test_data_path}")
 
-    analysis_results = runner.analyze_only(refusal_path, jailbreak_path, test_data_path)
+    try:
+        analysis_results = runner.analyze_only(refusal_path, jailbreak_path, test_data_path)
+    except Exception as e:
+        print(f"\n❌ Analysis failed: {e}")
+        print("   Please check model paths and test data")
+        return
 
     # Generate report if requested
     if generate_report and analysis_results:
-        print("\n" + "="*60)
-        print("📄 GENERATING PDF REPORT")
-        print("="*60)
+        print()
+        print_banner("📄 GENERATING PDF REPORT", width=60)
         print(f"\nReport type: {report_type}")
         print(f"Output location: {reports_path}")
 
@@ -342,9 +344,9 @@ if __name__ == "__main__":
 
     # If --auto flag or any arguments provided, use command-line mode
     if args.auto or args.refusal_model or args.jailbreak_model or args.test_data:
-        print("\n" + "="*60)
-        print("📊 REFUSAL CLASSIFIER - ANALYSIS MODE")
-        print("="*60)
+        print()
+        print_banner("📊 REFUSAL CLASSIFIER - ANALYSIS MODE", width=60)
+        print()
 
         # Validate file paths
         if not validate_file_exists(args.refusal_model, "Refusal model"):
@@ -367,13 +369,18 @@ if __name__ == "__main__":
 
         # Run analysis
         runner = ExperimentRunner()
-        analysis_results = runner.analyze_only(args.refusal_model, args.jailbreak_model, args.test_data)
+        
+        try:
+            analysis_results = runner.analyze_only(args.refusal_model, args.jailbreak_model, args.test_data)
+        except Exception as e:
+            print(f"\n❌ Analysis failed: {e}")
+            print("   Please check model paths and test data")
+            sys.exit(1)
 
         # Generate report if requested
         if args.generate_report and analysis_results:
-            print("\n" + "="*60)
-            print("📄 GENERATING PDF REPORT")
-            print("="*60)
+            print()
+            print_banner("📄 GENERATING PDF REPORT", width=60)
             print(f"\nReport type: {args.report_type}")
             print(f"Output location: {reports_path}")
 
