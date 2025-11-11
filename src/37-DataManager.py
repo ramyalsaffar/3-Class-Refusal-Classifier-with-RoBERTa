@@ -136,19 +136,23 @@ class DataManager:
         finally:
             cursor.close()
 
-    def get_recent_predictions(self, hours: int = 24, limit: int = None,
+    def get_recent_predictions(self, hours: int = None, limit: int = None,
                               model_version: str = None) -> pd.DataFrame:
         """
         Get recent predictions from database.
 
         Args:
-            hours: Number of hours to look back
+            hours: Number of hours to look back (default: from PRODUCTION_CONFIG)
             limit: Maximum number of samples to return
             model_version: Filter by specific model version
 
         Returns:
             DataFrame with predictions
         """
+        # Use config value if not provided - NO HARDCODING!
+        if hours is None:
+            hours = PRODUCTION_CONFIG['monitoring_thresholds']['check_interval_hours']
+        
         cursor = self.conn.cursor()
         try:
             query = """
@@ -179,19 +183,25 @@ class DataManager:
         finally:
             cursor.close()
 
-    def sample_for_monitoring(self, sample_size: int = 100,
-                            hours: int = 24) -> pd.DataFrame:
+    def sample_for_monitoring(self, sample_size: int = None,
+                            hours: int = None) -> pd.DataFrame:
         """
         GENERIC: Sample predictions for monitoring (stratified by prediction class).
         Works with any number of classes.
 
         Args:
-            sample_size: Number of samples to return
-            hours: Look back period
+            sample_size: Number of samples to return (default: from PRODUCTION_CONFIG)
+            hours: Look back period (default: from PRODUCTION_CONFIG)
 
         Returns:
             DataFrame with sampled predictions
         """
+        # Use config values if not provided - NO HARDCODING!
+        if sample_size is None:
+            sample_size = PRODUCTION_CONFIG['monitoring_thresholds']['small_sample_size']
+        if hours is None:
+            hours = PRODUCTION_CONFIG['monitoring_thresholds']['check_interval_hours']
+        
         cursor = self.conn.cursor()
         try:
             # GENERIC: Get stratified sample (balanced across all classes)
@@ -256,29 +266,41 @@ class DataManager:
         """
         Get data for retraining using smart retention strategy.
 
-        Strategy:
-        - Recent (0-7 days): 100% of problematic samples + 20% of correct samples
-        - Medium-term (8-30 days): 50% stratified sample
-        - Long-term (31-180 days): 10% representative sample
+        Strategy (configurable in PRODUCTION_CONFIG['retention']):
+        - Recent: 100% of problematic samples + configured % of correct samples
+        - Medium-term: Configured % stratified sample
+        - Long-term: Configured % representative sample
 
         Returns:
             DataFrame ready for retraining
         """
-        print("\n" + "="*60)
-        print("COLLECTING RETRAINING DATA")
-        print("="*60)
+        from scipy.stats import chi2_contingency
+        
+        # Get retention config - NO HARDCODING!
+        retention = PRODUCTION_CONFIG['retention']
+        recent_days = retention['recent_days']
+        recent_correct_rate = retention['recent_correct_rate']
+        medium_days = retention['medium_days']
+        medium_rate = retention['medium_rate']
+        longterm_days = retention['longterm_days']
+        longterm_rate = retention['longterm_rate']
+        high_conf_threshold = PRODUCTION_CONFIG['retraining']['high_confidence_threshold']
+        
+        # Use Utils print_banner for consistent formatting
+        print_banner("COLLECTING RETRAINING DATA")
 
         cursor = self.conn.cursor()
         try:
             all_samples = []
+            num_classes = len(CLASS_NAMES)
 
-            # Recent: 0-7 days
-            print("\n1. Recent data (0-7 days):")
+            # Recent: 0-recent_days
+            print(f"\n1. Recent data (0-{recent_days} days):")
             print("   - 100% of problematic samples (disagreements)")
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT prompt, response, judge_label as label
                 FROM predictions_log
-                WHERE timestamp > NOW() - INTERVAL '7 days'
+                WHERE timestamp > NOW() - INTERVAL '{recent_days} days'
                 AND judge_label IS NOT NULL
                 AND judge_label != prediction
             """)
@@ -286,76 +308,146 @@ class DataManager:
             all_samples.extend(problematic)
             print(f"   - Collected {len(problematic)} problematic samples")
 
-            print("   - 20% of correct high-confidence samples")
-            high_conf_threshold = PRODUCTION_CONFIG['retraining']['high_confidence_threshold']
+            # Calculate denominator from rate (e.g., 0.2 → 1/5)
+            recent_correct_denominator = int(1 / recent_correct_rate) if recent_correct_rate > 0 else 1
+            print(f"   - {int(recent_correct_rate * 100)}% of correct high-confidence samples")
             cursor.execute(f"""
                 SELECT prompt, response, judge_label as label
                 FROM predictions_log
-                WHERE timestamp > NOW() - INTERVAL '7 days'
+                WHERE timestamp > NOW() - INTERVAL '{recent_days} days'
                 AND judge_label IS NOT NULL
                 AND judge_label = prediction
                 AND confidence > {high_conf_threshold}
                 ORDER BY RANDOM()
                 LIMIT (SELECT COUNT(*) FROM predictions_log
-                       WHERE timestamp > NOW() - INTERVAL '7 days'
-                       AND judge_label = prediction) / 5
+                       WHERE timestamp > NOW() - INTERVAL '{recent_days} days'
+                       AND judge_label = prediction) / {recent_correct_denominator}
             """)
             recent_correct = cursor.fetchall()
             all_samples.extend(recent_correct)
             print(f"   - Collected {len(recent_correct)} correct samples")
+            
+            # Hypothesis test: Verify recent data maintains class distribution
+            if len(all_samples) > 0:
+                recent_df = pd.DataFrame(all_samples, columns=['prompt', 'response', 'label'])
+                recent_counts = [sum(recent_df['label'] == i) for i in range(num_classes)]
+                
+                # Chi-square test: H0 = Recent data follows expected class distribution
+                # We expect higher representation of problematic classes (those with disagreements)
+                # This is intentional, so we test if distribution is NOT uniform (which would be bad)
+                if sum(recent_counts) >= num_classes and min(recent_counts) > 0:
+                    # Test against uniform distribution (null hypothesis)
+                    expected_uniform = [len(recent_df) / num_classes] * num_classes
+                    chi2_stat, p_value = chi2_contingency([recent_counts, expected_uniform])[:2]
+                    
+                    if p_value < 0.05:
+                        logger.info(f"✓ Recent data distribution differs from uniform (p={p_value:.4f}) - Expected for problematic sampling")
+                    else:
+                        logger.warning(f"⚠️  Recent data looks too uniform (p={p_value:.4f}) - Check if problematic samples exist")
 
-            # Medium-term: 8-30 days (50% sample, stratified)
-            # GENERIC: Dynamic class count
-            num_classes = len(CLASS_NAMES)
-            print("\n2. Medium-term data (8-30 days): 50% stratified sample")
+
+            # Medium-term: (recent_days+1)-medium_days (stratified sample at configured rate)
+            medium_rate_denominator = int(1 / medium_rate) if medium_rate > 0 else 1
+            print(f"\n2. Medium-term data ({recent_days+1}-{medium_days} days): {int(medium_rate * 100)}% stratified sample")
+            medium_start_count = len(all_samples)
             for label in range(num_classes):
-                cursor.execute("""
+                cursor.execute(f"""
                     SELECT prompt, response, judge_label as label
                     FROM predictions_log
-                    WHERE timestamp BETWEEN NOW() - INTERVAL '30 days' AND NOW() - INTERVAL '7 days'
+                    WHERE timestamp BETWEEN NOW() - INTERVAL '{medium_days} days' AND NOW() - INTERVAL '{recent_days} days'
                     AND judge_label = %s
                     ORDER BY RANDOM()
                     LIMIT (SELECT COUNT(*) FROM predictions_log
-                           WHERE timestamp BETWEEN NOW() - INTERVAL '30 days' AND NOW() - INTERVAL '7 days'
-                           AND judge_label = %s) / 2
+                           WHERE timestamp BETWEEN NOW() - INTERVAL '{medium_days} days' AND NOW() - INTERVAL '{recent_days} days'
+                           AND judge_label = %s) / {medium_rate_denominator}
                 """, (label, label))
                 medium_samples = cursor.fetchall()
                 all_samples.extend(medium_samples)
-            print(f"   - Collected {len(all_samples) - len(problematic) - len(recent_correct)} samples")
+            medium_collected = len(all_samples) - medium_start_count
+            print(f"   - Collected {medium_collected} samples")
+            
+            # Hypothesis test: Verify medium-term maintains stratified sampling
+            if medium_collected > 0:
+                medium_df = pd.DataFrame(all_samples[medium_start_count:], columns=['prompt', 'response', 'label'])
+                medium_counts = [sum(medium_df['label'] == i) for i in range(num_classes)]
+                
+                # Chi-square test: H0 = Medium data follows stratified (balanced) distribution
+                if sum(medium_counts) >= num_classes and min(medium_counts) > 0:
+                    expected_balanced = [len(medium_df) / num_classes] * num_classes
+                    chi2_stat, p_value = chi2_contingency([medium_counts, expected_balanced])[:2]
+                    
+                    if p_value >= 0.05:
+                        logger.info(f"✓ Medium-term data properly stratified (p={p_value:.4f})")
+                    else:
+                        logger.warning(f"⚠️  Medium-term data imbalance detected (p={p_value:.4f})")
 
-            # Long-term: 31-180 days (10% sample, stratified)
-            print("\n3. Long-term data (31-180 days): 10% representative sample")
+
+            # Long-term: (medium_days+1)-longterm_days (representative sample at configured rate)
+            longterm_rate_denominator = int(1 / longterm_rate) if longterm_rate > 0 else 1
+            print(f"\n3. Long-term data ({medium_days+1}-{longterm_days} days): {int(longterm_rate * 100)}% representative sample")
+            longterm_start_count = len(all_samples)
             for label in range(num_classes):
-                cursor.execute("""
+                cursor.execute(f"""
                     SELECT prompt, response, judge_label as label
                     FROM predictions_log
-                    WHERE timestamp BETWEEN NOW() - INTERVAL '180 days' AND NOW() - INTERVAL '30 days'
+                    WHERE timestamp BETWEEN NOW() - INTERVAL '{longterm_days} days' AND NOW() - INTERVAL '{medium_days} days'
                     AND judge_label = %s
                     ORDER BY RANDOM()
                     LIMIT (SELECT COUNT(*) FROM predictions_log
-                           WHERE timestamp BETWEEN NOW() - INTERVAL '180 days' AND NOW() - INTERVAL '30 days'
-                           AND judge_label = %s) / 10
+                           WHERE timestamp BETWEEN NOW() - INTERVAL '{longterm_days} days' AND NOW() - INTERVAL '{medium_days} days'
+                           AND judge_label = %s) / {longterm_rate_denominator}
                 """, (label, label))
                 long_samples = cursor.fetchall()
                 all_samples.extend(long_samples)
-
-            total_longterm = len(all_samples) - len(problematic) - len(recent_correct) - \
-                            (len(all_samples) - len(problematic) - len(recent_correct))
-            print(f"   - Collected {total_longterm} samples")
+            
+            longterm_collected = len(all_samples) - longterm_start_count
+            print(f"   - Collected {longterm_collected} samples")
+            
+            # Hypothesis test: Verify long-term maintains representative sampling
+            if longterm_collected > 0:
+                longterm_df = pd.DataFrame(all_samples[longterm_start_count:], columns=['prompt', 'response', 'label'])
+                longterm_counts = [sum(longterm_df['label'] == i) for i in range(num_classes)]
+                
+                # Chi-square test: H0 = Long-term data follows representative (balanced) distribution
+                if sum(longterm_counts) >= num_classes and min(longterm_counts) > 0:
+                    expected_balanced = [len(longterm_df) / num_classes] * num_classes
+                    chi2_stat, p_value = chi2_contingency([longterm_counts, expected_balanced])[:2]
+                    
+                    if p_value >= 0.05:
+                        logger.info(f"✓ Long-term data properly representative (p={p_value:.4f})")
+                    else:
+                        logger.warning(f"⚠️  Long-term data imbalance detected (p={p_value:.4f})")
 
             # Convert to DataFrame
             df = pd.DataFrame(all_samples, columns=['prompt', 'response', 'label'])
 
-            print(f"\n{'='*60}")
-            print(f"RETRAINING DATA SUMMARY")
-            print(f"{'='*60}")
+            # Summary with Utils print_banner
+            print_banner("RETRAINING DATA SUMMARY")
             print(f"Total samples: {len(df)}")
             logger.info(f"Collected {len(df)} samples for retraining")
-            # GENERIC: Dynamic class count
+            
+            # Use safe_divide from Utils for percentage calculations
             for i in range(num_classes):
                 count = (df['label'] == i).sum()
-                pct = count / len(df) * 100 if len(df) > 0 else 0
+                pct = safe_divide(count * 100, len(df), 0.0)
                 print(f"  {CLASS_NAMES[i]}: {count} ({pct:.1f}%)")
+            
+            # Final hypothesis test: Overall class balance
+            if len(df) > 0:
+                overall_counts = [sum(df['label'] == i) for i in range(num_classes)]
+                if sum(overall_counts) >= num_classes and min(overall_counts) > 0:
+                    expected_balanced = [len(df) / num_classes] * num_classes
+                    chi2_stat, p_value = chi2_contingency([overall_counts, expected_balanced])[:2]
+                    
+                    print(f"\n📊 Overall Distribution Test:")
+                    print(f"   Chi-square statistic: {chi2_stat:.4f}")
+                    print(f"   P-value: {p_value:.4f}")
+                    if p_value < 0.001:
+                        print(f"   ⚠️  Significant imbalance detected (p<0.001) - Consider adjusting retention rates")
+                    elif p_value < 0.05:
+                        print(f"   ℹ️  Moderate imbalance (p<0.05) - Expected due to problematic sample prioritization")
+                    else:
+                        print(f"   ✓ Well-balanced distribution (p≥0.05)")
 
             return df
         finally:
@@ -432,13 +524,17 @@ class DataManager:
         finally:
             cursor.close()
 
-    def cleanup_old_data(self, days_to_keep: int = 180):
+    def cleanup_old_data(self, days_to_keep: int = None):
         """
         Clean up data older than specified days.
 
         Args:
-            days_to_keep: Number of days to retain
+            days_to_keep: Number of days to retain (default: from PRODUCTION_CONFIG)
         """
+        # Use config value if not provided - NO HARDCODING!
+        if days_to_keep is None:
+            days_to_keep = PRODUCTION_CONFIG['retention']['archive_after_days']
+        
         cursor = self.conn.cursor()
         try:
             cursor.execute("""
