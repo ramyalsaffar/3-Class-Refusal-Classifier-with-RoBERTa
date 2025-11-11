@@ -53,13 +53,11 @@ class RefusalJailbreakCorrelationAnalyzer:
         # Results storage
         self.analysis_results = {}
 
-        print(f"\n{'='*60}")
-        print("REFUSAL-JAILBREAK CORRELATION ANALYZER")
-        print(f"{'='*60}")
+        print_banner("REFUSAL-JAILBREAK CORRELATION ANALYZER", width=60, char="=")
         print(f"Samples: {len(self.refusal_preds)}")
         print(f"Refusal classes: {self.refusal_class_names}")
         print(f"Jailbreak classes: {self.jailbreak_class_names}")
-        print(f"{'='*60}\n")
+        print()
 
 
     # =========================================================================
@@ -77,9 +75,8 @@ class RefusalJailbreakCorrelationAnalyzer:
         Returns:
             Dictionary with agreement metrics
         """
-        print(f"\n{'='*60}")
-        print("MODULE 1: REFUSAL-DERIVED vs ACTUAL JAILBREAK")
-        print(f"{'='*60}\n")
+        print_banner("MODULE 1: REFUSAL-DERIVED vs ACTUAL JAILBREAK", width=60, char="=")
+        print()
 
         # Derive expected jailbreak from refusal predictions
         # No Refusal (0) → Jailbreak Succeeded (1)
@@ -102,7 +99,6 @@ class RefusalJailbreakCorrelationAnalyzer:
         print()
 
         # Confusion matrix: refusal-derived vs actual jailbreak
-        from sklearn.metrics import confusion_matrix
         cm = confusion_matrix(refusal_derived_jailbreak, self.jailbreak_preds)
 
         print("Confusion Matrix (Refusal-Derived vs Actual Jailbreak):")
@@ -157,9 +153,8 @@ class RefusalJailbreakCorrelationAnalyzer:
         Returns:
             Dictionary with per-class breakdown
         """
-        print(f"\n{'='*60}")
-        print("MODULE 2: JAILBREAK DISTRIBUTION BY REFUSAL CLASS")
-        print(f"{'='*60}\n")
+        print_banner("MODULE 2: JAILBREAK DISTRIBUTION BY REFUSAL CLASS", width=60, char="=")
+        print()
 
         breakdown = {}
 
@@ -178,8 +173,8 @@ class RefusalJailbreakCorrelationAnalyzer:
             jailbreak_failed_count = (jailbreak_in_class == 0).sum()
             jailbreak_succeeded_count = (jailbreak_in_class == 1).sum()
 
-            jailbreak_failed_pct = jailbreak_failed_count / count * 100
-            jailbreak_succeeded_pct = jailbreak_succeeded_count / count * 100
+            jailbreak_failed_pct = safe_divide(jailbreak_failed_count, count, default=0.0) * 100
+            jailbreak_succeeded_pct = safe_divide(jailbreak_succeeded_count, count, default=0.0) * 100
 
             print(f"{refusal_name} (n={count}):")
             print(f"  Jailbreak Failed:    {jailbreak_failed_count:>5} ({jailbreak_failed_pct:>5.1f}%)")
@@ -290,7 +285,7 @@ class RefusalJailbreakCorrelationAnalyzer:
         print(f"{'-'*60}")
         for dtype in df['disagreement_type'].unique():
             count = (df['disagreement_type'] == dtype).sum()
-            pct = count / len(df) * 100
+            pct = safe_divide(count, len(df), default=0.0) * 100
             print(f"{dtype}: {count} ({pct:.1f}%)")
         print()
 
@@ -328,11 +323,8 @@ class RefusalJailbreakCorrelationAnalyzer:
         Returns:
             Dictionary with test results
         """
-        print(f"\n{'='*60}")
-        print("MODULE 4: STATISTICAL INDEPENDENCE TEST")
-        print(f"{'='*60}\n")
-
-        from scipy.stats import chi2_contingency
+        print_banner("MODULE 4: STATISTICAL INDEPENDENCE TEST", width=60, char="=")
+        print()
 
         # Create contingency table: refusal class × jailbreak result
         contingency_table = np.zeros((len(self.refusal_class_names), len(self.jailbreak_class_names)))
@@ -352,29 +344,72 @@ class RefusalJailbreakCorrelationAnalyzer:
             print(row)
         print()
 
-        # Perform chi-square test
-        chi2, p_value, dof, expected = chi2_contingency(contingency_table)
+        # Initialize results dictionary
+        results = {}
+        
+        # Check for empty rows or columns
+        row_sums = contingency_table.sum(axis=1)
+        col_sums = contingency_table.sum(axis=0)
+        
+        # Remove empty rows and columns for chi-square test
+        non_empty_rows = row_sums > 0
+        non_empty_cols = col_sums > 0
+        
+        if np.sum(non_empty_rows) < 2 or np.sum(non_empty_cols) < 2:
+            print(f"Chi-Square Test for Independence:")
+            print(f"{'-'*60}")
+            print("⚠️  Cannot perform chi-square test:")
+            print(f"   - Need at least 2 non-empty rows, have {np.sum(non_empty_rows)}")
+            print(f"   - Need at least 2 non-empty columns, have {np.sum(non_empty_cols)}")
+            print("   This typically happens with insufficient data or when")
+            print("   one classifier always predicts the same class.")
+            print()
+            
+            results['chi2'] = np.nan
+            results['p_value'] = np.nan
+            results['cramers_v'] = np.nan
+            results['interpretation'] = "Test cannot be performed - insufficient data variation"
+            
+        else:
+            # Filter to non-empty rows and columns
+            filtered_table = contingency_table[non_empty_rows][:, non_empty_cols]
+            
+            # Perform chi-square test on filtered table
+            chi2, p_value, dof, expected = chi2_contingency(filtered_table)
 
-        print(f"Chi-Square Test for Independence:")
-        print(f"{'-'*60}")
-        print(f"Chi-square statistic (χ²): {chi2:.4f}")
-        print(f"P-value: {p_value:.6f}")
-        print(f"Degrees of freedom: {dof}")
-        print()
+            print(f"Chi-Square Test for Independence:")
+            print(f"{'-'*60}")
+            if np.sum(non_empty_rows) < len(self.refusal_class_names) or np.sum(non_empty_cols) < len(self.jailbreak_class_names):
+                print(f"Note: Using reduced table ({np.sum(non_empty_rows)}x{np.sum(non_empty_cols)}) after removing empty rows/columns")
+            print(f"Chi-square statistic (χ²): {chi2:.4f}")
+            print(f"P-value: {p_value:.6f}")
+            print(f"Degrees of freedom: {dof}")
+            print()
 
-        # Cramér's V (effect size)
-        n = contingency_table.sum()
-        cramers_v = np.sqrt(chi2 / (n * (min(contingency_table.shape) - 1)))
-        print(f"Cramér's V (effect size): {cramers_v:.4f}")
-        print(f"  0.0-0.1: Negligible")
-        print(f"  0.1-0.3: Weak")
-        print(f"  0.3-0.5: Moderate")
-        print(f"  >0.5: Strong")
-        print()
+            # Cramér's V (effect size)
+            n = filtered_table.sum()
+            min_dim = min(filtered_table.shape) - 1
+            cramers_v = np.sqrt(safe_divide(chi2, n * min_dim, default=0.0))
+            print(f"Cramér's V (effect size): {cramers_v:.4f}")
+            print(f"  0.0-0.1: Negligible")
+            print(f"  0.1-0.3: Weak")
+            print(f"  0.3-0.5: Moderate")
+            print(f"  >0.5: Strong")
+            print()
+
+            # Store results
+            results['chi2'] = chi2
+            results['p_value'] = p_value
+            results['cramers_v'] = cramers_v
 
         # Interpretation (using config alpha)
         alpha = HYPOTHESIS_TESTING_CONFIG['alpha']
-        if p_value < alpha:
+        p_value = results.get('p_value', np.nan)
+        
+        if np.isnan(p_value):
+            print(f"⚠️  Cannot determine independence - insufficient data")
+            interpretation = "indeterminate"
+        elif p_value < alpha:
             print(f"✗ REJECT NULL HYPOTHESIS (p = {p_value:.6f} < α = {alpha})")
             print(f"  → Refusal and jailbreak are DEPENDENT (correlated)")
             interpretation = "dependent"
@@ -385,11 +420,12 @@ class RefusalJailbreakCorrelationAnalyzer:
 
         print(f"{'='*60}\n")
 
+        # Build results dictionary (handling NaN cases)
         result = {
-            'chi2_statistic': float(chi2),
-            'p_value': float(p_value),
-            'degrees_of_freedom': int(dof),
-            'cramers_v': float(cramers_v),
+            'chi2_statistic': float(results.get('chi2', np.nan)),
+            'p_value': float(results.get('p_value', np.nan)),
+            'degrees_of_freedom': int(dof) if 'dof' in locals() else 0,
+            'cramers_v': float(results.get('cramers_v', np.nan)),
             'contingency_table': contingency_table.tolist(),
             'expected_frequencies': expected.tolist(),
             'interpretation': interpretation
@@ -403,7 +439,7 @@ class RefusalJailbreakCorrelationAnalyzer:
     # MODULE 5: VISUALIZATIONS
     # =========================================================================
 
-    def visualize_correlation(self, save_visualizations: bool = True) -> Dict:
+    def visualize_correlation(self, save_visualizations: bool = True, output_dir: str = None) -> Dict:
         """
         Create correlation visualizations.
 
@@ -414,10 +450,16 @@ class RefusalJailbreakCorrelationAnalyzer:
 
         Args:
             save_visualizations: Whether to save plots
+            output_dir: Directory to save visualizations (default: correlation_viz_path)
 
         Returns:
             Dictionary with visualization paths
         """
+        # Use correlation_viz_path if not provided
+        if output_dir is None:
+            output_dir = correlation_viz_path
+        ensure_dir_exists(output_dir)
+        
         print(f"\n{'='*60}")
         print("MODULE 5: CORRELATION VISUALIZATIONS")
         print(f"{'='*60}\n")
@@ -436,7 +478,12 @@ class RefusalJailbreakCorrelationAnalyzer:
             contingency_table[self.refusal_preds[i], self.jailbreak_preds[i]] += 1
 
         # Normalize by row (percentage within each refusal class)
-        contingency_pct = contingency_table / contingency_table.sum(axis=1, keepdims=True) * 100
+        row_sums = contingency_table.sum(axis=1, keepdims=True)
+        # Handle zero rows to avoid nan/inf
+        row_sums_safe = np.where(row_sums == 0, 1, row_sums)  # Replace 0 with 1 to avoid division issues
+        contingency_pct = (contingency_table / row_sums_safe) * 100
+        # Set percentages to 0 for rows that were originally 0
+        contingency_pct = np.where(row_sums == 0, 0, contingency_pct)
 
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
@@ -459,7 +506,7 @@ class RefusalJailbreakCorrelationAnalyzer:
         axes[1].set_title('Contingency Table (Row %)', fontsize=14, fontweight='bold')
 
         plt.tight_layout()
-        heatmap_path = os.path.join(visualizations_path, "correlation_contingency_heatmap.png")
+        heatmap_path = os.path.join(output_dir, "correlation_contingency_heatmap.png")
         plt.savefig(heatmap_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
         viz_paths['heatmap'] = heatmap_path
@@ -488,7 +535,7 @@ class RefusalJailbreakCorrelationAnalyzer:
                startangle=90)
         ax.set_title('Refusal-Derived vs Actual Jailbreak Agreement', fontsize=14, fontweight='bold')
 
-        pie_path = os.path.join(visualizations_path, "correlation_agreement_pie.png")
+        pie_path = os.path.join(output_dir, "correlation_agreement_pie.png")
         plt.savefig(pie_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
         viz_paths['pie'] = pie_path
@@ -529,7 +576,7 @@ class RefusalJailbreakCorrelationAnalyzer:
         ax.grid(axis='y', alpha=0.3)
 
         plt.tight_layout()
-        bar_path = os.path.join(visualizations_path, "correlation_stacked_bar.png")
+        bar_path = os.path.join(output_dir, "correlation_stacked_bar.png")
         plt.savefig(bar_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
         plt.close()
         viz_paths['stacked_bar'] = bar_path
