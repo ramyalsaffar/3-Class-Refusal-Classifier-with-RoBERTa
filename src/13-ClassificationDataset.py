@@ -144,7 +144,7 @@ class ClassificationDataset(Dataset):
         for label, count in sorted(self.stats['label_distribution'].items()):
             pct = safe_divide(count, self.stats['size'], 0) * 100
             if self.task_type == 'refusal' and label != -1:
-                label_name = CLASS_NAMES.get(label, f'Label_{label}')
+                label_name = CLASS_NAMES[label] if 0 <= label < len(CLASS_NAMES) else f'Label_{label}'
             elif self.task_type == 'jailbreak':
                 label_name = {0: 'Failed', 1: 'Succeeded', -1: 'Error'}.get(label, f'Label_{label}')
             else:

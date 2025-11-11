@@ -459,7 +459,7 @@ class DataCleaner:
                 if label in refusal_dist.index:
                     count = refusal_dist[label]
                     pct = safe_divide(count, len(df), 0) * 100
-                    name = CLASS_NAMES.get(label, 'Error')
+                    name = CLASS_NAMES[label] if 0 <= label < len(CLASS_NAMES) else 'Error'
                     print(f"       {name}: {count:,} ({pct:.1f}%)")
         
         # Jailbreak statistics
