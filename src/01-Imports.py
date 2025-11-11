@@ -157,15 +157,14 @@ data_raw_path = glob.glob(data_path + "*Raw/")[0]
 data_responses_path = glob.glob(data_path + "*Responses/")[0]
 data_processed_path = glob.glob(data_path + "*Processed/")[0]
 data_splits_path = glob.glob(data_path + "*Splits/")[0]
-data_checkpoints_path = glob.glob(data_processed_path + "*Checkpoints/")[0]
+data_checkpoints_path = glob.glob(data_path + "*Checkpoints/")[0]
 
 # Models Directory
 models_path = glob.glob(base_results_path + "/*Models/")[0]
 
 # Results Subdirectories
-results_path = base_results_path
-analysis_results_path = os.path.join(results_path, "Analysis")
-quality_review_path = os.path.join(results_path, "Quality Review")
+analysis_results_path = glob.glob(base_results_path, "/*Analysis")[0]
+quality_review_path = glob.glob(base_results_path, "/*Quality Review")[0]
 
 # Visualization Subdirectories
 visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
