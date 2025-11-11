@@ -175,12 +175,10 @@ class AttentionVisualizer:
             num_samples = INTERPRETABILITY_CONFIG['attention_samples_per_class']
 
         if output_dir is None:
-            output_dir = os.path.join(visualizations_path, "attention_analysis")
-        os.makedirs(output_dir, exist_ok=True)
+            output_dir = attention_analysis_path
+        ensure_dir_exists(output_dir)
 
-        print("\n" + "="*60)
-        print("ATTENTION ANALYSIS")
-        print("="*60)
+        print_banner("ATTENTION ANALYSIS", width=60, char="=")
 
         results = {'by_class': {}, 'examples': []}
 
@@ -241,15 +239,23 @@ class AttentionVisualizer:
                 })
 
             # Aggregate stats
-            results['by_class'][class_name] = {
-                'avg_mean_attention': float(np.mean([s['mean_attention'] for s in class_attention_stats])),
-                'avg_max_attention': float(np.mean([s['max_attention'] for s in class_attention_stats])),
-                'avg_entropy': float(np.mean([s['entropy'] for s in class_attention_stats]))
-            }
-
-            print(f"  Mean attention: {results['by_class'][class_name]['avg_mean_attention']:.4f}")
-            print(f"  Max attention: {results['by_class'][class_name]['avg_max_attention']:.4f}")
-            print(f"  Attention entropy: {results['by_class'][class_name]['avg_entropy']:.4f}")
+            if class_attention_stats:
+                results['by_class'][class_name] = {
+                    'avg_mean_attention': float(np.mean([s['mean_attention'] for s in class_attention_stats])),
+                    'avg_max_attention': float(np.mean([s['max_attention'] for s in class_attention_stats])),
+                    'avg_entropy': float(np.mean([s['entropy'] for s in class_attention_stats]))
+                }
+                
+                print(f"  Mean attention: {results['by_class'][class_name]['avg_mean_attention']:.4f}")
+                print(f"  Max attention: {results['by_class'][class_name]['avg_max_attention']:.4f}")
+                print(f"  Attention entropy: {results['by_class'][class_name]['avg_entropy']:.4f}")
+            else:
+                print(f"  ⚠️  No valid attention data for {class_name}")
+                results['by_class'][class_name] = {
+                    'avg_mean_attention': 0.0,
+                    'avg_max_attention': 0.0,
+                    'avg_entropy': 0.0
+                }
 
         # Save results
         results_json_path = os.path.join(output_dir, "attention_analysis_results.json")
