@@ -23,7 +23,7 @@ class PowerLawAnalyzer:
     - Feature importance patterns (attention distribution)
     """
 
-    def __init__(self, model, tokenizer, device, class_names: List[str] = None):
+    def __init__(self, model, tokenizer, device, class_names: List[str] = None, model_type: str = "Model"):
         """
         Initialize power law analyzer.
 
@@ -32,12 +32,14 @@ class PowerLawAnalyzer:
             tokenizer: RoBERTa tokenizer
             device: torch device
             class_names: List of class names
+            model_type: Type of model for display (e.g., "Refusal Classifier", "Jailbreak Detector")
         """
         self.model = model
         self.tokenizer = tokenizer
         self.device = device
         self.class_names = class_names or CLASS_NAMES
         self.num_classes = len(self.class_names)
+        self.model_type = model_type
 
     def analyze_all(self, test_df: pd.DataFrame, predictions: np.ndarray,
                     confidences: np.ndarray, output_dir: str = None) -> Dict:
@@ -53,21 +55,57 @@ class PowerLawAnalyzer:
         Returns:
             Dictionary with all power law analysis results
         """
+        # Input Validation
+        if test_df is None or len(test_df) == 0:
+            print("❌ ERROR: test_df is empty. Cannot perform power law analysis.")
+            return {'error': 'Empty test dataframe'}
+        
+        # Check required columns
+        required_cols = ['label', 'response']
+        missing_cols = [col for col in required_cols if col not in test_df.columns]
+        if missing_cols:
+            print(f"❌ ERROR: Missing required columns: {missing_cols}")
+            return {'error': f'Missing columns: {missing_cols}'}
+        
+        # Validate array shapes
+        if len(predictions) != len(test_df):
+            print(f"❌ ERROR: predictions length ({len(predictions)}) != test_df length ({len(test_df)})")
+            return {'error': 'Mismatched array lengths'}
+        
+        if len(confidences) != len(test_df):
+            print(f"❌ ERROR: confidences length ({len(confidences)}) != test_df length ({len(test_df)})")
+            return {'error': 'Mismatched array lengths'}
+        
+        # Check for perfect predictions (no errors)
+        labels = test_df['label'].values
+        predictions_arr = np.asarray(predictions, dtype=np.int32)
+        errors = predictions_arr != labels
+        error_count = errors.sum()
+        
+        if error_count == 0:
+            print("⚠️  WARNING: Model has perfect predictions (0 errors)!")
+            print("   Power law analysis for errors will be skipped.")
+            print("   Confidence and attention analyses will still run.")
+        
+        # Ensure output directory exists using Utils
         if output_dir is None:
             output_dir = visualizations_path
+        ensure_dir_exists(output_dir)
 
-        print("\n" + "="*60)
-        print("POWER LAW ANALYSIS")
-        print("="*60)
+        print_banner(f"POWER LAW ANALYSIS - {self.model_type.upper()}", width=60)
 
         results = {}
 
         # 1. Error Concentration Analysis (Pareto)
         print("\n--- Error Concentration Analysis (Pareto Principle) ---")
-        results['error_concentration'] = self._analyze_error_concentration(
-            test_df, predictions, output_dir
-        )
-        self._print_pareto_results(results['error_concentration'])
+        if error_count > 0:
+            results['error_concentration'] = self._analyze_error_concentration(
+                test_df, predictions, output_dir
+            )
+            self._print_pareto_results(results['error_concentration'])
+        else:
+            print("   ⚠️  Skipped: No errors to analyze (perfect predictions)")
+            results['error_concentration'] = {'skipped': True, 'reason': 'No errors'}
 
         # 2. Confidence Distribution Analysis
         print("\n--- Confidence Distribution (Power Law Check) ---")
@@ -83,9 +121,7 @@ class PowerLawAnalyzer:
         )
         self._print_attention_analysis(results['attention_power_law'])
 
-        print("\n" + "="*60)
-        print("✅ POWER LAW ANALYSIS COMPLETE")
-        print("="*60)
+        print_banner(f"✅ POWER LAW ANALYSIS COMPLETE - {self.model_type.upper()}", width=60)
 
         return results
 
@@ -100,6 +136,8 @@ class PowerLawAnalyzer:
         Returns:
             Dictionary with Pareto analysis results
         """
+        # Ensure predictions is a numpy array
+        predictions = np.asarray(predictions, dtype=np.int32)
         labels = test_df['label'].values
         errors = predictions != labels
 
@@ -147,23 +185,24 @@ class PowerLawAnalyzer:
         df_with_errors['error'] = errors
 
         error_counts = df_with_errors.groupby(group_col)['error'].agg(['sum', 'count'])
-        error_counts['error_rate'] = error_counts['sum'] / error_counts['count']
+        error_counts['error_rate'] = error_counts.apply(
+            lambda row: safe_divide(row['sum'], row['count'], default=0.0), axis=1
+        )
         error_counts = error_counts.sort_values('sum', ascending=False)
 
         # Calculate cumulative percentages
         total_errors = error_counts['sum'].sum()
         error_counts['cumulative_errors'] = error_counts['sum'].cumsum()
-        # FIX: Protect against division by zero when model has perfect performance
-        if total_errors > 0:
-            error_counts['cumulative_pct'] = (error_counts['cumulative_errors'] / total_errors * 100)
-        else:
-            error_counts['cumulative_pct'] = 0
+        # Use safe_divide from Utils to protect against division by zero
+        error_counts['cumulative_pct'] = error_counts['cumulative_errors'].apply(
+            lambda x: safe_divide(x, total_errors, default=0.0) * 100
+        )
 
         # Find what % of groups cause 80% of errors (using config threshold)
         pareto_threshold = ANALYSIS_CONFIG['pareto_threshold']
         groups_80pct = (error_counts['cumulative_pct'] <= pareto_threshold).sum()
         total_groups = len(error_counts)
-        groups_80pct_ratio = groups_80pct / total_groups * 100 if total_groups > 0 else 0
+        groups_80pct_ratio = safe_divide(groups_80pct, total_groups, default=0.0) * 100
 
         pareto_strict = ANALYSIS_CONFIG['pareto_strict_threshold']
         return {
@@ -183,6 +222,10 @@ class PowerLawAnalyzer:
         Returns:
             Dict with per-class error analysis
         """
+        # Ensure inputs are numpy arrays
+        labels = np.asarray(labels, dtype=np.int32)
+        predictions = np.asarray(predictions, dtype=np.int32)
+        
         class_errors = {}
         total_errors = 0
 
@@ -197,7 +240,7 @@ class PowerLawAnalyzer:
             class_errors[self.class_names[class_idx]] = {
                 'error_count': int(class_error_count),
                 'total_samples': int(class_mask.sum()),
-                'error_rate': float(class_error_count / class_mask.sum())
+                'error_rate': safe_divide(float(class_error_count), float(class_mask.sum()), default=0.0)
             }
 
         # Sort by error count
@@ -211,7 +254,7 @@ class PowerLawAnalyzer:
         cumulative_errors = 0
         for class_name, stats in sorted_classes:
             cumulative_errors += stats['error_count']
-            stats['cumulative_pct'] = cumulative_errors / total_errors * 100 if total_errors > 0 else 0
+            stats['cumulative_pct'] = safe_divide(cumulative_errors, total_errors, default=0.0) * 100
 
         return {
             'class_errors': dict(sorted_classes),
@@ -233,6 +276,12 @@ class PowerLawAnalyzer:
         Returns:
             Dict with power law fit, calibration metrics
         """
+        # Ensure all inputs are numpy arrays with correct types
+        predictions = np.asarray(predictions, dtype=np.int32)
+        labels = np.asarray(labels, dtype=np.int32) 
+        confidences = np.asarray(confidences, dtype=np.float32)
+        
+        # Now safe to do boolean indexing
         errors = predictions != labels
         correct_confidences = confidences[~errors]
         error_confidences = confidences[errors]
@@ -259,10 +308,17 @@ class PowerLawAnalyzer:
             log_y = np.log(y_fit[valid_mask])
             slope, intercept = np.polyfit(log_x, log_y, 1)
             power_law_exponent = -slope
+            
+            # Statistical Test: Goodness-of-fit for power law
+            # Use Kolmogorov-Smirnov test to validate power law fit
+            power_law_test = self._test_power_law_fit(
+                confidences, power_law_exponent, 'confidence'
+            )
         else:
             power_law_exponent = None
             slope = None
             intercept = None
+            power_law_test = {'skipped': True, 'reason': 'Insufficient valid bins'}
 
         # Calibration analysis: confidence bins vs accuracy
         calibration = []
@@ -281,6 +337,10 @@ class PowerLawAnalyzer:
 
         # Expected Calibration Error (ECE)
         ece = np.mean([c['calibration_error'] for c in calibration])
+        
+        # Statistical Test: Chi-square test for calibration
+        # Test if observed accuracy matches expected confidence
+        calibration_test = self._test_calibration(calibration)
 
         # Plot confidence distribution
         self._plot_confidence_distribution(
@@ -298,7 +358,9 @@ class PowerLawAnalyzer:
             'power_law_exponent': power_law_exponent,
             'power_law_slope': slope,
             'power_law_intercept': intercept,
+            'power_law_test': power_law_test,  # NEW: Statistical test results
             'expected_calibration_error': float(ece),
+            'calibration_test': calibration_test,  # NEW: Calibration test results
             'calibration_bins': calibration,
             'stats': {
                 'mean_confidence_all': float(confidences.mean()),
@@ -390,9 +452,15 @@ class PowerLawAnalyzer:
             fit_limit = ANALYSIS_CONFIG['attention_power_law_fit_limit']
             slope, intercept = np.polyfit(log_ranks[:fit_limit], log_attentions[:fit_limit], 1)
             zipf_exponent = -slope
+            
+            # Statistical Test: Goodness-of-fit for Zipf's law
+            zipf_test = self._test_power_law_fit(
+                all_token_attentions, zipf_exponent, 'attention'
+            )
         else:
             zipf_exponent = None
             slope = None
+            zipf_test = {'skipped': True, 'reason': 'Insufficient data points'}
 
         # Plot attention distribution
         self._plot_attention_distribution(
@@ -403,6 +471,7 @@ class PowerLawAnalyzer:
         return {
             'zipf_exponent': zipf_exponent,
             'zipf_slope': slope,
+            'zipf_test': zipf_test,  # NEW: Statistical test results
             'mean_top20_concentration': float(np.mean(top_k_concentrations)),
             'attention_stats': {
                 'mean_attention': float(all_token_attentions.mean()),
@@ -411,6 +480,165 @@ class PowerLawAnalyzer:
                 'min_attention': float(all_token_attentions.min()),
                 'total_tokens_analyzed': len(all_token_attentions)
             }
+        }
+
+    def _test_power_law_fit(self, data: np.ndarray, exponent: float, 
+                           distribution_type: str) -> Dict:
+        """
+        Test if data significantly follows a power law distribution.
+        
+        Uses Kolmogorov-Smirnov test to compare empirical distribution
+        against theoretical power law with fitted exponent.
+        
+        Args:
+            data: Observed data (confidences or attention weights)
+            exponent: Fitted power law exponent
+            distribution_type: 'confidence' or 'attention' for context
+            
+        Returns:
+            Dict with test statistic, p-value, and interpretation
+        """
+        # Remove zeros and negatives (not valid for power law)
+        data_positive = data[data > 0]
+        
+        if len(data_positive) < STATISTICAL_CONFIG['min_samples_for_test']:
+            return {
+                'test': 'Kolmogorov-Smirnov',
+                'skipped': True,
+                'reason': f'Insufficient samples (n={len(data_positive)} < {STATISTICAL_CONFIG["min_samples_for_test"]})'
+            }
+        
+        # Generate theoretical power law CDF
+        # For power law: P(X ≤ x) = 1 - (x_min/x)^α
+        x_min = data_positive.min()
+        x_sorted = np.sort(data_positive)
+        
+        # Theoretical CDF for power law
+        theoretical_cdf = 1 - (x_min / x_sorted) ** exponent
+        
+        # Empirical CDF
+        empirical_cdf = np.arange(1, len(x_sorted) + 1) / len(x_sorted)
+        
+        # KS test: maximum difference between CDFs
+        ks_statistic = np.max(np.abs(empirical_cdf - theoretical_cdf))
+        
+        # Critical value for KS test (approximate)
+        # KS critical value at α=0.05: 1.36 / sqrt(n)
+        n = len(x_sorted)
+        critical_value = 1.36 / np.sqrt(n)
+        
+        # Calculate p-value using scipy's KS test
+        # We compare against uniform distribution transformed by power law
+        try:
+            from scipy.stats import kstest
+            # Transform data to test against power law
+            transformed = (data_positive / x_min) ** exponent
+            ks_result = kstest(transformed, 'uniform')
+            p_value = ks_result.pvalue
+            use_scipy = True
+        except:
+            # Fallback: approximate p-value
+            p_value = np.exp(-2 * n * ks_statistic**2) if ks_statistic < 0.5 else 0.0
+            use_scipy = False
+        
+        # Interpretation
+        alpha = STATISTICAL_CONFIG['alpha']
+        follows_power_law = p_value > alpha
+        
+        return {
+            'test': 'Kolmogorov-Smirnov',
+            'distribution_type': distribution_type,
+            'statistic': float(ks_statistic),
+            'critical_value': float(critical_value),
+            'p_value': float(p_value),
+            'alpha': alpha,
+            'follows_power_law': follows_power_law,
+            'n_samples': int(n),
+            'exponent_tested': float(exponent),
+            'method': 'scipy' if use_scipy else 'approximate',
+            'interpretation': (
+                f"Data {'DOES' if follows_power_law else 'DOES NOT'} "
+                f"follow power law distribution (p={p_value:.4f}, α={alpha})"
+            )
+        }
+    
+    def _test_calibration(self, calibration_bins: List[Dict]) -> Dict:
+        """
+        Test if model is well-calibrated using chi-square goodness-of-fit.
+        
+        Null hypothesis: Model confidence matches actual accuracy
+        (observed accuracy = expected confidence)
+        
+        Args:
+            calibration_bins: List of dicts with 'mean_confidence', 'accuracy', 'count'
+            
+        Returns:
+            Dict with chi-square statistic, p-value, and interpretation
+        """
+        if len(calibration_bins) < 2:
+            return {
+                'test': 'Chi-square',
+                'skipped': True,
+                'reason': 'Insufficient bins for test'
+            }
+        
+        # Extract data
+        observed = np.array([bin['accuracy'] * bin['count'] 
+                           for bin in calibration_bins])
+        expected = np.array([bin['mean_confidence'] * bin['count'] 
+                           for bin in calibration_bins])
+        counts = np.array([bin['count'] for bin in calibration_bins])
+        
+        # Check if we have enough samples
+        total_samples = counts.sum()
+        if total_samples < STATISTICAL_CONFIG['min_samples_for_test']:
+            return {
+                'test': 'Chi-square',
+                'skipped': True,
+                'reason': f'Insufficient samples (n={total_samples} < {STATISTICAL_CONFIG["min_samples_for_test"]})'
+            }
+        
+        # Chi-square test: sum((observed - expected)^2 / expected)
+        # Only use bins with sufficient expected counts (≥5 is standard)
+        valid_bins = expected >= 5
+        
+        if valid_bins.sum() < 2:
+            return {
+                'test': 'Chi-square',
+                'skipped': True,
+                'reason': 'Insufficient bins with expected count ≥ 5'
+            }
+        
+        observed_valid = observed[valid_bins]
+        expected_valid = expected[valid_bins]
+        
+        # Calculate chi-square statistic
+        chi2_statistic = np.sum((observed_valid - expected_valid)**2 / expected_valid)
+        
+        # Degrees of freedom = number of bins - 1
+        df = valid_bins.sum() - 1
+        
+        # Calculate p-value using scipy
+        from scipy.stats import chi2
+        p_value = 1 - chi2.cdf(chi2_statistic, df)
+        
+        # Interpretation
+        alpha = STATISTICAL_CONFIG['alpha']
+        well_calibrated = p_value > alpha
+        
+        return {
+            'test': 'Chi-square goodness-of-fit',
+            'statistic': float(chi2_statistic),
+            'degrees_of_freedom': int(df),
+            'p_value': float(p_value),
+            'alpha': alpha,
+            'well_calibrated': well_calibrated,
+            'n_bins_tested': int(valid_bins.sum()),
+            'total_samples': int(total_samples),
+            'interpretation': (
+                f"Model {'IS' if well_calibrated else 'IS NOT'} "
+                f"well-calibrated (p={p_value:.4f}, α={alpha})"
+            )
         }
 
     def _plot_pareto_chart(self, pareto_data: Dict, output_path: str, title: str):
@@ -531,6 +759,11 @@ class PowerLawAnalyzer:
 
     def _print_pareto_results(self, results: Dict):
         """Print Pareto analysis results."""
+        # Check if analysis was skipped
+        if results.get('skipped', False):
+            print(f"   ℹ️  {results.get('reason', 'Analysis skipped')}")
+            return
+        
         print("\n📊 Pareto Principle Analysis:")
 
         # By category
@@ -572,6 +805,18 @@ class PowerLawAnalyzer:
                 print(f"   ✅ Confidence follows power law distribution")
             else:
                 print(f"   ⚠️  Unusual power law exponent")
+            
+            # Print statistical test results
+            test = results.get('power_law_test', {})
+            if not test.get('skipped', False):
+                print(f"\n   Statistical Test: {test['test']}")
+                print(f"   - {test['interpretation']}")
+                print(f"   - Test statistic: {test['statistic']:.4f}")
+                print(f"   - P-value: {test['p_value']:.4f}")
+                if test['follows_power_law']:
+                    print(f"   ✅ Power law fit is statistically significant")
+                else:
+                    print(f"   ⚠️  Power law fit is NOT statistically significant")
 
         print(f"\n   Calibration:")
         print(f"   - Expected Calibration Error (ECE): {results['expected_calibration_error']:.4f}")
@@ -581,6 +826,18 @@ class PowerLawAnalyzer:
             print(f"   ⚠️  Moderate calibration (ECE < {ece_thresh['good']})")
         else:
             print(f"   🚨 Poor calibration (ECE ≥ {ece_thresh['good']})")
+        
+        # Print calibration test results
+        cal_test = results.get('calibration_test', {})
+        if not cal_test.get('skipped', False):
+            print(f"\n   Statistical Test: {cal_test['test']}")
+            print(f"   - {cal_test['interpretation']}")
+            print(f"   - Chi-square statistic: {cal_test['statistic']:.4f}")
+            print(f"   - P-value: {cal_test['p_value']:.4f}")
+            if cal_test['well_calibrated']:
+                print(f"   ✅ Calibration is statistically validated")
+            else:
+                print(f"   🚨 Significant miscalibration detected")
 
         stats = results['stats']
         print(f"\n   Confidence Statistics:")
@@ -609,6 +866,18 @@ class PowerLawAnalyzer:
                 print(f"   ✅ Attention follows Zipfian distribution (typical for language)")
             else:
                 print(f"   ⚠️  Unusual Zipf exponent")
+            
+            # Print statistical test results
+            test = results.get('zipf_test', {})
+            if not test.get('skipped', False):
+                print(f"\n   Statistical Test: {test['test']}")
+                print(f"   - {test['interpretation']}")
+                print(f"   - Test statistic: {test['statistic']:.4f}")
+                print(f"   - P-value: {test['p_value']:.4f}")
+                if test['follows_power_law']:
+                    print(f"   ✅ Zipfian distribution is statistically significant")
+                else:
+                    print(f"   ⚠️  Zipfian distribution is NOT statistically significant")
 
         print(f"\n   Attention Concentration:")
         print(f"   - Top {k_pct:.0f}% tokens receive: {results['mean_top20_concentration']*100:.1f}% of attention")
