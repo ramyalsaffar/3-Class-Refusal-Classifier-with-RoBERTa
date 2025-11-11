@@ -25,6 +25,15 @@ class ShapAnalyzer:
         self.class_names = class_names or CLASS_NAMES
         self.num_classes = len(self.class_names)
         self.model.eval()
+        
+        # Check shap availability once at initialization
+        try:
+            import shap
+            self.shap_available = True
+        except ImportError:
+            self.shap_available = False
+            print("⚠️  SHAP not installed. SHAP analysis will be unavailable.")
+            print("   Install with: pip install shap")
 
     def _predict_proba(self, texts: List[str]) -> np.ndarray:
         """
@@ -33,16 +42,23 @@ class ShapAnalyzer:
         OPTIMIZATION: Uses batched inference for efficiency.
 
         Args:
-            texts: List of text strings
+            texts: List of text strings or single string
 
         Returns:
             Probability array (num_samples, num_classes)
         """
+        # Handle single string or list of strings
+        if isinstance(texts, str):
+            texts = [texts]
+        elif hasattr(texts, '__iter__') and not isinstance(texts, (str, bytes)):
+            # Handle any iterable but ensure it's a list of strings
+            texts = [str(t) for t in texts]
+        
         self.model.eval()
         all_probs = []
 
         # Batch processing for efficiency
-        batch_size = API_CONFIG['inference_batch_size']
+        batch_size = TRAINING_CONFIG['batch_size']
 
         with torch.no_grad():
             for i in tqdm(range(0, len(texts), batch_size), desc="Computing predictions for SHAP", leave=False):
@@ -82,15 +98,14 @@ class ShapAnalyzer:
         """
         if max_background is None:
             max_background = INTERPRETABILITY_CONFIG['shap_background_samples']
-        try:
-            import shap
-        except ImportError:
+        
+        if not self.shap_available:
             print("❌ SHAP not installed. Install with: pip install shap")
             return None
+        
+        import shap  # Import here since it's checked at init
 
-        print("\n" + "="*60)
-        print("COMPUTING SHAP VALUES")
-        print("="*60)
+        print_banner("COMPUTING SHAP VALUES", width=60, char="=")
 
         # Prepare background data
         if background_texts is None:
@@ -103,13 +118,33 @@ class ShapAnalyzer:
 
         # Create SHAP explainer with proper masker for text data
         print("\nInitializing SHAP explainer...")
-        # Use PartitionExplainer with text masker for transformer models
-        masker = shap.maskers.Text(tokenizer=self.tokenizer.tokenize)
+        
+        # Create a wrapper function for tokenization that SHAP can use
+        def tokenizer_wrapper(text_list):
+            """Wrapper to make tokenizer compatible with SHAP"""
+            if isinstance(text_list, str):
+                # Single string
+                return self.tokenizer.tokenize(text_list)
+            else:
+                # List of strings
+                return [self.tokenizer.tokenize(text) for text in text_list]
+        
+        # Use the wrapper with SHAP's Text masker
+        masker = shap.maskers.Text(tokenizer=tokenizer_wrapper)
+        
+        # Use Partition explainer which works better with transformers
         explainer = shap.Explainer(self._predict_proba, masker, algorithm="partition")
-
+        
         # Compute SHAP values
         print("Computing SHAP values (this may take a while)...")
-        shap_values = explainer(texts)
+        try:
+            shap_values = explainer(texts)
+        except Exception as e:
+            print(f"⚠️  SHAP computation failed with partition algorithm: {e}")
+            print("   Trying with auto algorithm...")
+            # Fallback to auto algorithm
+            explainer = shap.Explainer(self._predict_proba, masker)
+            shap_values = explainer(texts)
 
         print("✓ SHAP computation complete")
 
@@ -130,11 +165,11 @@ class ShapAnalyzer:
             output_path: Path to save visualization
             class_idx: Which class to visualize (None for predicted class)
         """
-        try:
-            import shap
-        except ImportError:
+        if not self.shap_available:
             print("❌ SHAP not installed")
             return
+        
+        import shap  # Import here since it's checked at init
 
         # Find the text in shap_data
         text_idx = shap_data['texts'].index(text) if text in shap_data['texts'] else 0
@@ -176,12 +211,10 @@ class ShapAnalyzer:
             num_samples = INTERPRETABILITY_CONFIG['shap_samples']
 
         if output_dir is None:
-            output_dir = os.path.join(visualizations_path, "shap_analysis")
-        os.makedirs(output_dir, exist_ok=True)
+            output_dir = shap_analysis_path
+        ensure_dir_exists(output_dir)
 
-        print("\n" + "="*60)
-        print("SHAP ANALYSIS")
-        print("="*60)
+        print_banner("SHAP ANALYSIS", width=60, char="=")
 
         # Sample texts
         sample_indices = np.random.choice(
@@ -229,38 +262,41 @@ class ShapAnalyzer:
                 })
 
         # Create summary plot
-        try:
-            import shap
+        if not self.shap_available:
+            print("⚠️  SHAP not available - skipping summary plot")
+        else:
+            import shap  # Import here since it's checked at init
             print("\nCreating SHAP summary plot...")
 
-            # For each class, create a summary
-            max_display = INTERPRETABILITY_CONFIG['shap_max_display']
-            for class_idx in range(self.num_classes):
-                class_name = self.class_names[class_idx]
+            try:
+                # For each class, create a summary
+                max_display = INTERPRETABILITY_CONFIG['shap_max_display']
+                for class_idx in range(self.num_classes):
+                    class_name = self.class_names[class_idx]
 
-                plt.figure(figsize=(12, 8))
-                shap.summary_plot(
-                    shap_data['shap_values'].values[:, :, class_idx],
-                    texts,
-                    show=False,
-                    max_display=max_display
-                )
-                plt.title(
-                    f'SHAP Summary - {class_name}',
-                    fontsize=14, fontweight='bold'
-                )
-                summary_path = os.path.join(
-                    output_dir,
-                    f"shap_summary_{class_name.replace(' ', '_').lower()}.png"
-                )
-                plt.tight_layout()
-                plt.savefig(summary_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
-                plt.close()
+                    plt.figure(figsize=(12, 8))
+                    shap.summary_plot(
+                        shap_data['shap_values'].values[:, :, class_idx],
+                        texts,
+                        show=False,
+                        max_display=max_display
+                    )
+                    plt.title(
+                        f'SHAP Summary - {class_name}',
+                        fontsize=14, fontweight='bold'
+                    )
+                    summary_path = os.path.join(
+                        output_dir,
+                        f"shap_summary_{class_name.replace(' ', '_').lower()}.png"
+                    )
+                    plt.tight_layout()
+                    plt.savefig(summary_path, dpi=VISUALIZATION_CONFIG['dpi'], bbox_inches='tight')
+                    plt.close()
 
-                print(f"✓ Saved summary for {class_name}")
+                    print(f"✓ Saved summary for {class_name}")
 
-        except Exception as e:
-            print(f"⚠️  Could not create summary plot: {e}")
+            except Exception as e:
+                print(f"⚠️  Could not create summary plot: {e}")
 
         # Save results
         results_json_path = os.path.join(output_dir, "shap_analysis_results.json")
@@ -287,11 +323,12 @@ class ShapAnalyzer:
         # Use config value if not provided
         if top_k is None:
             top_k = INTERPRETABILITY_CONFIG['shap_max_display']
-        try:
-            import shap
-        except ImportError:
+        
+        if not self.shap_available:
             print("❌ SHAP not installed")
             return None
+        
+        import shap  # Import here since it's checked at init
 
         # Compute SHAP values
         shap_data = self.compute_shap_values([text])
