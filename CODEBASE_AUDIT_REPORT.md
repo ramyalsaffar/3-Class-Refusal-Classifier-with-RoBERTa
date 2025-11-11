@@ -1,9 +1,9 @@
 # COMPREHENSIVE CODEBASE AUDIT REPORT
 ## Dual-RoBERTa-Classifiers Project
 
-**Audit Date:** November 4, 2025
-**Files Scanned:** 34 Python modules in src/
-**Total Classes:** 31
+**Audit Date:** November 4, 2025 (Updated for V12: November 11, 2025)
+**Files Scanned:** 37 Python modules in src/
+**Total Classes:** 31+
 **Total Methods/Functions:** 100+
 
 ---
@@ -12,7 +12,7 @@
 
 ### BUG #1: CRITICAL - Wrong Config Reference in CrossValidator
 **Severity:** HIGH - Will cause runtime KeyError
-**Location:** src/14-CrossValidator.py, lines 404, 451
+**Location:** src/18-CrossValidator.py, lines 404, 451
 **Issue:** Using EXPERIMENT_CONFIG['random_seed'] but 'random_seed' is in DATASET_CONFIG
 
 ```python
@@ -30,10 +30,10 @@ random_state=DATASET_CONFIG['random_seed']
 
 ### BUG #2: MEDIUM - Hardcoded Jailbreak Label Names (vs. Config)
 **Severity:** MEDIUM - Violates DRY principle, prone to inconsistency
-**Locations:** 
-- src/18-JailbreakAnalysis.py, line 36
-- src/28-ExperimentRunner.py, lines 454, 557
-- src/27-RefusalPipeline.py, lines 619, 645
+**Locations:**
+- src/22-JailbreakAnalysis.py, line 36
+- src/31-ExperimentRunner.py, lines 454, 557
+- src/30-RefusalPipeline.py, lines 619, 645
 
 **Issue:** Hardcoded `["Jailbreak Failed", "Jailbreak Succeeded"]` instead of using `JAILBREAK_CLASS_NAMES`
 
@@ -57,9 +57,9 @@ jailbreak_class_names = JAILBREAK_CLASS_NAMES
 
 ## 2. UNUSED CODE: Features Defined But Never Used
 
-### UNUSED #1: Mapping Constants in Constants.py
-**Severity:** LOW - Code bloat
-**Location:** src/03-Constants.py, lines 17-44
+### UNUSED #1: Mapping Constants in Utils.py
+**Severity:** LOW - Code bloat (Note: Constants moved to Utils in V12)
+**Location:** src/03-Utils.py, lines 17-44
 **Unused Constants:**
 - CLASS_MAPPING (line 17-21)
 - CLASS_MAPPING_REVERSE (line 24-28)
@@ -83,9 +83,9 @@ CLASS_MAPPING = {
 
 ### UNUSED #2: unfreeze_all() Method
 **Severity:** MEDIUM - Dead code
-**Location:** 
-- src/11-RefusalClassifier.py, lines 129-134
-- src/12-JailbreakDetector.py, lines 131-136
+**Location:**
+- src/15-RefusalClassifier.py, lines 129-134
+- src/16-JailbreakDetector.py, lines 131-136
 
 **Usage Count:** 0 (never called)
 
@@ -104,7 +104,7 @@ def unfreeze_all(self):
 
 ### UNUSED #3: load_checkpoint() Method
 **Severity:** MEDIUM - Dead code, incomplete implementation
-**Location:** src/13-Trainer.py, lines 298-308
+**Location:** src/17-Trainer.py, lines 298-308
 **Usage Count:** 1 (defined but never called; save_checkpoint is called on line 264)
 
 **Code Pattern:**
@@ -123,9 +123,9 @@ def load_checkpoint(self, path: str):  # Never called ✗
 
 ### UNUSED #4: AWS Configuration (Partial)
 **Severity:** LOW-MEDIUM - Optional feature
-**Location:** src/02-Config.py, AWS_CONFIG section (not fully used)
+**Location:** src/04-Config.py, AWS_CONFIG section (not fully used)
 **Usage Count:** 8 references total
-- AWS_CONFIG is used in 28-ExperimentRunner.py only
+- AWS_CONFIG is used in 31-ExperimentRunner.py only
 - Many AWS_CONFIG keys may be unused
 - SecretsHandler is available but rarely used
 
@@ -138,7 +138,7 @@ def load_checkpoint(self, path: str):  # Never called ✗
 
 ### UNDERUSED #1: CrossValidator Class
 **Severity:** MEDIUM - Hidden behind wrapper function
-**Location:** src/14-CrossValidator.py
+**Location:** src/18-CrossValidator.py
 **Issue:** Class exists but is always called via wrapper function `train_with_cross_validation()`
 **Direct Usage:** Only called from train_with_cross_validation() wrapper (line 420)
 **Recommendation:** Either expose CrossValidator directly in public API or simplify
@@ -148,7 +148,7 @@ def load_checkpoint(self, path: str):  # Never called ✗
 
 ### UNDERUSED #2: ErrorAnalyzer Class
 **Severity:** MEDIUM - Hidden behind wrapper function
-**Location:** src/24-ErrorAnalysis.py
+**Location:** src/27-ErrorAnalysis.py
 **Issue:** Class exists but only used via run_error_analysis() wrapper function
 **Direct Usage:** Only called from run_error_analysis() wrapper (line 785)
 **Recommendation:** Either expose ErrorAnalyzer directly or remove wrapper indirection
@@ -158,8 +158,8 @@ def load_checkpoint(self, path: str):  # Never called ✗
 
 ### UNDERUSED #3: ReportGenerator
 **Severity:** LOW - Used but minimally
-**Location:** src/26-ReportGenerator.py
-**Usage Count:** 1 (only called in src/30-Analyze.py line 134)
+**Location:** src/29-ReportGenerator.py
+**Usage Count:** 1 (only called in src/33-Analyze.py line 134)
 **Issue:** Large feature that's only used in standalone analysis script
 **Recommendation:** Consider integrating into main pipeline or documenting as optional
 **Fix Priority:** LOW
@@ -168,7 +168,7 @@ def load_checkpoint(self, path: str):  # Never called ✗
 
 ### UNDERUSED #4: MonitoringSystem & RetrainingPipeline
 **Severity:** LOW - Production features not integrated in main pipeline
-**Location:** src/32-MonitoringSystem.py, src/33-RetrainingPipeline.py
+**Location:** src/35-MonitoringSystem.py, src/36-RetrainingPipeline.py
 **Usage Count:** 0 in main pipeline (these are standalone production modules)
 **Status:** Phase 2 features, not integrated yet
 **Recommendation:** Document as future features or integrate into ProductionAPI
@@ -180,7 +180,7 @@ def load_checkpoint(self, path: str):  # Never called ✗
 
 ### DESIGN ISSUE #1: No Validation of Input Data Before Cleaning
 **Severity:** MEDIUM
-**Location:** src/27-RefusalPipeline.py, lines 199-241 (clean_data method)
+**Location:** src/30-RefusalPipeline.py, lines 199-241 (clean_data method)
 **Issue:** DataCleaner.clean_dataset() is called AFTER labeling in pipeline
 - Line 42: `cleaned_df = self.clean_data(responses_df)` (called with unlabeled data)
 - Line 100-101: DataLabeler.label_data() expects unlabeled response_df
@@ -189,7 +189,7 @@ def load_checkpoint(self, path: str):  # Never called ✗
 **Problem:** The pipeline order is: Generate → Collect → Clean → Label → Train
 But DataLabeler expects raw responses, DataCleaner works both before and after labeling
 
-**Code Reference:** src/07-DataCleaner.py has defensive checks for this (lines 99-102, 313-317) but it's fragile
+**Code Reference:** src/09-DataCleaner.py has defensive checks for this (lines 99-102, 313-317) but it's fragile
 **Fix Priority:** MEDIUM
 
 ---
@@ -204,7 +204,7 @@ But DataLabeler expects raw responses, DataCleaner works both before and after l
 
 ### DESIGN ISSUE #3: Missing Error Handling in API Parsing
 **Severity:** MEDIUM
-**Location:** src/08-DataLabeler.py, lines 299-309
+**Location:** src/10-DataLabeler.py, lines 299-309
 **Issue:** JSON parsing from LLM judge has bounds checking but incomplete error messages
 ```python
 if cleaned.startswith("```"):
@@ -222,9 +222,9 @@ Missing handling for malformed responses
 
 ### DESIGN ISSUE #4: Duplicate Logic for Initializing Jailbreak Class Names
 **Severity:** LOW - Code duplication
-**Locations:** 
-- src/27-RefusalPipeline.py: Multiple places
-- src/28-ExperimentRunner.py: Multiple places
+**Locations:**
+- src/30-RefusalPipeline.py: Multiple places
+- src/31-ExperimentRunner.py: Multiple places
 - Should use JAILBREAK_CLASS_NAMES instead
 
 **Recommendation:** Create helper function or use constant
@@ -253,7 +253,7 @@ JAILBREAK_CONFIG = {...}  # For jailbreak detector
 
 ### DESIGN ISSUE #6: Missing Validation in prepare_datasets()
 **Severity:** MEDIUM
-**Location:** src/27-RefusalPipeline.py, lines 243-372
+**Location:** src/30-RefusalPipeline.py, lines 243-372
 **Issue:** No check that both 'refusal_label' and 'jailbreak_label' exist before splitting
 - Line 270: `stratify=labeled_df['refusal_label']` - assumes column exists
 - No early validation of required columns
@@ -265,7 +265,7 @@ JAILBREAK_CONFIG = {...}  # For jailbreak detector
 
 ### DESIGN ISSUE #7: Config Section Not Used
 **Severity:** LOW
-**Location:** src/02-Config.py, line 378
+**Location:** src/04-Config.py, line 378
 **Issue:** REPORT_CONFIG comment mentions "kept for backward compatibility" but it's never defined
 ```python
 # NOTE: REPORT_CONFIG styling consolidated into REPORT_CONFIG (kept for backward compatibility)
@@ -295,21 +295,21 @@ This comment references itself - likely a leftover note
 - HYPOTHESIS_TESTING_CONFIG (2 references)
 - ADVERSARIAL_CONFIG (2 references)
 - DATA_CLEANING_CONFIG (8 references)
-- PRODUCTION_CONFIG (6 references - mainly in 31-ProductionAPI, 32-MonitoringSystem)
+- PRODUCTION_CONFIG (6 references - mainly in 34-ProductionAPI, 35-MonitoringSystem)
 
 **⚠ RARELY USED:**
-- PROMPT_GENERATION_CONFIG (used in 05-PromptGenerator.py only)
-- CROSS_VALIDATION_CONFIG (used in 14-CrossValidator.py line 449)
-- VISUALIZATION_CONFIG (defined but mostly hardcoded in 25-Visualizer.py)
+- PROMPT_GENERATION_CONFIG (used in 07-PromptGenerator.py only)
+- CROSS_VALIDATION_CONFIG (used in 18-CrossValidator.py line 449)
+- VISUALIZATION_CONFIG (defined but mostly hardcoded in 28-Visualizer.py)
 
 ---
 
 ## 6. RECOMMENDATIONS: Prioritized Action Items
 
 ### IMMEDIATE (This Sprint):
-1. **[CRITICAL]** Fix EXPERIMENT_CONFIG → DATASET_CONFIG bug in CrossValidator (lines 404, 451)
+1. **[CRITICAL]** Fix EXPERIMENT_CONFIG → DATASET_CONFIG bug in 18-CrossValidator.py (lines 404, 451)
 2. **[HIGH]** Replace all 4 hardcoded jailbreak class names with JAILBREAK_CLASS_NAMES constant
-3. **[HIGH]** Add column validation in prepare_datasets() method
+3. **[HIGH]** Add column validation in prepare_datasets() method (30-RefusalPipeline.py)
 
 ### SOON (Next Sprint):
 1. **[MEDIUM]** Remove unused unfreeze_all() methods from model classes
@@ -343,20 +343,29 @@ This comment references itself - likely a leftover note
 
 ## APPENDIX A: File-by-File Summary
 
-**Total Files Audited:** 34 Python modules
+**Total Files Audited:** 37 Python modules (V12)
 
 **Files with Issues:**
-- 14-CrossValidator.py: 1 CRITICAL bug
-- 02-Config.py: Config organization issue
-- 27-RefusalPipeline.py: 2 MEDIUM issues
-- 28-ExperimentRunner.py: 1 HIGH issue
-- 11-RefusalClassifier.py: 1 unused method
-- 12-JailbreakDetector.py: 1 unused method
-- 13-Trainer.py: 1 unused method
-- 03-Constants.py: 4 unused constants
-- 08-DataLabeler.py: Error handling gap
-- 18-JailbreakAnalysis.py: Hardcoded strings
-- 30-Analyze.py: Minimal ReportGenerator usage
+- 18-CrossValidator.py: 1 CRITICAL bug
+- 04-Config.py: Config organization issue
+- 30-RefusalPipeline.py: 2 MEDIUM issues
+- 31-ExperimentRunner.py: 1 HIGH issue
+- 15-RefusalClassifier.py: 1 unused method
+- 16-JailbreakDetector.py: 1 unused method
+- 17-Trainer.py: 1 unused method
+- 03-Utils.py: 4 unused constants (Constants moved to Utils in V12)
+- 10-DataLabeler.py: Error handling gap
+- 22-JailbreakAnalysis.py: Hardcoded strings
+- 33-Analyze.py: Minimal ReportGenerator usage
 
-**Files with Clean Code:** 20+ modules with no identified issues
+**Files with Clean Code:** 25+ modules with no identified issues
+
+**New Files in V12:**
+- 02-Setup.py: New setup utilities
+- 05-CheckpointManager.py: Checkpoint management for API operations
+- 11-WildJailbreakLoader.py: HuggingFace dataset loader
+- 12-LabelingQualityAnalyzer.py: Quality analysis for labeling
+- 14-DatasetValidator.py: Dataset validation utilities
+- 23-CorrelationAnalysis.py: Refusal-jailbreak correlation analysis
+- 37-DataManager.py: Data management utilities
 
