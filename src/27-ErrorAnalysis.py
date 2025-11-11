@@ -42,6 +42,19 @@ class ErrorAnalyzer:
             class_names: List of class names
             task_type: 'refusal' or 'jailbreak'
         """
+        # Input Validation
+        if model is None:
+            raise ValueError("❌ ERROR: model cannot be None")
+        
+        if dataset is None or len(dataset) == 0:
+            raise ValueError("❌ ERROR: dataset cannot be None or empty")
+        
+        if tokenizer is None:
+            raise ValueError("❌ ERROR: tokenizer cannot be None")
+        
+        if class_names is None or len(class_names) == 0:
+            raise ValueError("❌ ERROR: class_names cannot be None or empty")
+        
         self.model = model.to(device)
         self.dataset = dataset
         self.tokenizer = tokenizer
@@ -60,21 +73,17 @@ class ErrorAnalyzer:
         # Analysis results
         self.analysis_results = {}
 
-        print(f"\n{'='*60}")
-        print(f"ERROR ANALYZER INITIALIZED: {task_type.upper()}")
-        print(f"{'='*60}")
+        print_banner(f"ERROR ANALYZER INITIALIZED: {task_type.upper()}", width=60)
         print(f"Model: {model.__class__.__name__}")
         print(f"Dataset size: {len(dataset)}")
         print(f"Classes: {class_names}")
         print(f"Device: {device}")
-        print(f"{'='*60}\n")
+        print_banner("", width=60, char="=")
 
 
     def run_predictions(self):
         """Run model on full dataset and store predictions."""
-        print(f"\n{'='*60}")
-        print("RUNNING MODEL PREDICTIONS")
-        print(f"{'='*60}\n")
+        print_banner("RUNNING MODEL PREDICTIONS", width=60)
 
         self.model.eval()
 
@@ -85,7 +94,8 @@ class ErrorAnalyzer:
         all_texts = []
         all_token_lengths = []
 
-        data_loader = DataLoader(self.dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
+        # CRITICAL FIX: Use TRAINING_CONFIG not API_CONFIG for batch_size!
+        data_loader = DataLoader(self.dataset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False)
 
         with torch.no_grad():
             with tqdm(total=len(data_loader), desc="Predicting") as pbar:
@@ -143,17 +153,19 @@ class ErrorAnalyzer:
         Returns:
             Dictionary with confusion matrix analysis
         """
-        print(f"\n{'='*60}")
-        print("MODULE 1: CONFUSION MATRIX DEEP DIVE")
-        print(f"{'='*60}\n")
+        print_banner("MODULE 1: CONFUSION MATRIX DEEP DIVE", width=60)
 
         from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
         # Calculate confusion matrix
         cm = confusion_matrix(self.true_labels, self.predictions)
 
-        # Normalize confusion matrix (row-wise)
-        cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        # Normalize confusion matrix (row-wise) using safe_divide
+        # Handle division by zero - rows with no samples get 0
+        row_sums = cm.sum(axis=1)[:, np.newaxis]
+        cm_normalized = np.array([[safe_divide(cm[i,j], row_sums[i,0], default=0.0) 
+                                   for j in range(cm.shape[1])] 
+                                  for i in range(cm.shape[0])])
 
         # Print raw counts
         print("Confusion Matrix (Raw Counts):")
@@ -240,9 +252,7 @@ class ErrorAnalyzer:
         Returns:
             Dictionary with per-class analysis
         """
-        print(f"\n{'='*60}")
-        print("MODULE 2: PER-CLASS PERFORMANCE BREAKDOWN")
-        print(f"{'='*60}\n")
+        print_banner("MODULE 2: PER-CLASS PERFORMANCE BREAKDOWN", width=60)
 
         from sklearn.metrics import precision_recall_fscore_support, classification_report
 
@@ -259,9 +269,12 @@ class ErrorAnalyzer:
         for i, class_name in enumerate(self.class_names):
             print(f"{class_name:<20} {precision[i]:<12.4f} {recall[i]:<12.4f} {f1[i]:<12.4f} {support[i]:<10}")
 
-        # Macro averages
+        # Macro averages using safe_divide
         print(f"{'-'*70}")
-        print(f"{'Macro Average':<20} {precision.mean():<12.4f} {recall.mean():<12.4f} {f1.mean():<12.4f} {support.sum():<10}")
+        avg_precision = safe_divide(precision.sum(), len(precision), default=0.0)
+        avg_recall = safe_divide(recall.sum(), len(recall), default=0.0)
+        avg_f1 = safe_divide(f1.sum(), len(f1), default=0.0)
+        print(f"{'Macro Average':<20} {avg_precision:<12.4f} {avg_recall:<12.4f} {avg_f1:<12.4f} {support.sum():<10}")
         print()
 
         # Identify best and worst performing classes
@@ -336,9 +349,7 @@ class ErrorAnalyzer:
         Returns:
             Dictionary with confidence analysis
         """
-        print(f"\n{'='*60}")
-        print("MODULE 3: CONFIDENCE ANALYSIS")
-        print(f"{'='*60}\n")
+        print_banner("MODULE 3: CONFIDENCE ANALYSIS", width=60)
 
         # Separate correct and incorrect predictions
         correct_mask = self.predictions == self.true_labels
@@ -350,20 +361,26 @@ class ErrorAnalyzer:
         # Statistics
         print(f"Correct Predictions:")
         print(f"  Count: {len(correct_confidences)}")
-        print(f"  Mean confidence: {correct_confidences.mean():.4f}")
-        print(f"  Std: {correct_confidences.std():.4f}")
-        print(f"  Median: {np.median(correct_confidences):.4f}")
-        print(f"  Min: {correct_confidences.min():.4f}")
-        print(f"  Max: {correct_confidences.max():.4f}")
+        if len(correct_confidences) > 0:
+            print(f"  Mean confidence: {correct_confidences.mean():.4f}")
+            print(f"  Std: {correct_confidences.std():.4f}")
+            print(f"  Median: {np.median(correct_confidences):.4f}")
+            print(f"  Min: {correct_confidences.min():.4f}")
+            print(f"  Max: {correct_confidences.max():.4f}")
+        else:
+            print(f"  No correct predictions to analyze")
         print()
 
         print(f"Incorrect Predictions:")
         print(f"  Count: {len(incorrect_confidences)}")
-        print(f"  Mean confidence: {incorrect_confidences.mean():.4f}")
-        print(f"  Std: {incorrect_confidences.std():.4f}")
-        print(f"  Median: {np.median(incorrect_confidences):.4f}")
-        print(f"  Min: {incorrect_confidences.min():.4f}")
-        print(f"  Max: {incorrect_confidences.max():.4f}")
+        if len(incorrect_confidences) > 0:
+            print(f"  Mean confidence: {incorrect_confidences.mean():.4f}")
+            print(f"  Std: {incorrect_confidences.std():.4f}")
+            print(f"  Median: {np.median(incorrect_confidences):.4f}")
+            print(f"  Min: {incorrect_confidences.min():.4f}")
+            print(f"  Max: {incorrect_confidences.max():.4f}")
+        else:
+            print(f"  No incorrect predictions to analyze")
         print()
 
         # Identify "confident mistakes" (high confidence but wrong) - using config
@@ -371,9 +388,12 @@ class ErrorAnalyzer:
         confident_mistakes = (incorrect_mask) & (self.confidence_scores > high_confidence_threshold)
         num_confident_mistakes = confident_mistakes.sum()
 
+        # Use safe_divide for percentage
+        confident_mistake_pct = safe_divide(num_confident_mistakes, len(incorrect_confidences), default=0.0) * 100
+        
         print(f"Confident Mistakes (confidence > {high_confidence_threshold}):")
         print(f"  Count: {num_confident_mistakes}")
-        print(f"  Percentage of errors: {num_confident_mistakes/len(incorrect_confidences)*100:.2f}%")
+        print(f"  Percentage of errors: {confident_mistake_pct:.2f}%")
         print()
 
         # Visualize if requested
@@ -407,18 +427,18 @@ class ErrorAnalyzer:
 
         result = {
             'correct_confidences': {
-                'mean': float(correct_confidences.mean()),
-                'std': float(correct_confidences.std()),
-                'median': float(np.median(correct_confidences))
+                'mean': float(correct_confidences.mean()) if len(correct_confidences) > 0 else 0.0,
+                'std': float(correct_confidences.std()) if len(correct_confidences) > 0 else 0.0,
+                'median': float(np.median(correct_confidences)) if len(correct_confidences) > 0 else 0.0
             },
             'incorrect_confidences': {
-                'mean': float(incorrect_confidences.mean()),
-                'std': float(incorrect_confidences.std()),
-                'median': float(np.median(incorrect_confidences))
+                'mean': float(incorrect_confidences.mean()) if len(incorrect_confidences) > 0 else 0.0,
+                'std': float(incorrect_confidences.std()) if len(incorrect_confidences) > 0 else 0.0,
+                'median': float(np.median(incorrect_confidences)) if len(incorrect_confidences) > 0 else 0.0
             },
             'confident_mistakes': {
                 'count': int(num_confident_mistakes),
-                'percentage': float(num_confident_mistakes/len(incorrect_confidences)*100) if len(incorrect_confidences) > 0 else 0.0
+                'percentage': float(safe_divide(num_confident_mistakes, len(incorrect_confidences), default=0.0) * 100)
             }
         }
 
@@ -437,9 +457,7 @@ class ErrorAnalyzer:
         Returns:
             Dictionary with length analysis
         """
-        print(f"\n{'='*60}")
-        print("MODULE 4: INPUT LENGTH ANALYSIS")
-        print(f"{'='*60}\n")
+        print_banner("MODULE 4: INPUT LENGTH ANALYSIS", width=60)
 
         # Define length bins (using config)
         config_bins = ERROR_ANALYSIS_CONFIG['length_bins']
@@ -556,9 +574,7 @@ class ErrorAnalyzer:
         if top_k is None:
             top_k = ERROR_ANALYSIS_CONFIG['top_k_errors']
 
-        print(f"\n{'='*60}")
-        print(f"MODULE 5: FAILURE CASE EXTRACTION (Top {top_k})")
-        print(f"{'='*60}\n")
+        print_banner(f"MODULE 5: FAILURE CASE EXTRACTION (Top {top_k})", width=60)
 
         # Get incorrect predictions
         incorrect_mask = self.predictions != self.true_labels
@@ -597,7 +613,7 @@ class ErrorAnalyzer:
 
         # Save to CSV if requested
         if save_to_csv:
-            csv_path = os.path.join(results_path, f"{self.task_type}_failure_cases_top{top_k}.csv")
+            csv_path = os.path.join(error_analysis_path, f"{self.task_type}_failure_cases_top{top_k}.csv")
             df_top.to_csv(csv_path, index=False)
             print(f"✓ Failure cases saved to CSV: {csv_path}\n")
 
@@ -614,7 +630,7 @@ class ErrorAnalyzer:
         """
         Module 6: Token-level attribution for failure cases using attention.
 
-        Note: Full SHAP analysis is in 21-ShapAnalyzer.py
+        Note: Full SHAP analysis is in 24-ShapAnalyzer.py
         This provides simplified attention-based attribution.
 
         Args:
@@ -623,20 +639,18 @@ class ErrorAnalyzer:
         Returns:
             Dictionary with attribution analysis
         """
-        print(f"\n{'='*60}")
-        print(f"MODULE 6: TOKEN-LEVEL ATTRIBUTION ({num_samples} samples)")
-        print(f"{'='*60}\n")
+        print_banner(f"MODULE 6: TOKEN-LEVEL ATTRIBUTION ({num_samples} samples)", width=60)
 
         print("⚠️  Note: This module provides simplified attention-based attribution.")
-        print("   For full SHAP analysis, use 21-ShapAnalyzer.py\n")
+        print("   For full SHAP analysis, use 24-ShapAnalyzer.py\n")
 
         # Get failure cases
         incorrect_mask = self.predictions != self.true_labels
         incorrect_indices = np.where(incorrect_mask)[0]
 
         if len(incorrect_indices) == 0:
-            print("✓ No failure cases found (perfect predictions!)\n")
-            return {'num_samples': 0, 'samples': []}
+            print("✓ No failures to analyze - model achieved 100% accuracy!")
+            return {'message': 'No failures to analyze', 'failure_count': 0}
 
         # Sort by confidence (most confident mistakes)
         sorted_indices = incorrect_indices[np.argsort(self.confidence_scores[incorrect_mask])[::-1]]
@@ -716,9 +730,7 @@ class ErrorAnalyzer:
             self.run_predictions()
 
         # Run all modules
-        print(f"\n{'='*60}")
-        print("RUNNING ALL ANALYSIS MODULES")
-        print(f"{'='*60}\n")
+        print_banner("RUNNING ALL ANALYSIS MODULES", width=60)
 
         self.analyze_confusion_matrix(save_visualizations)
         self.analyze_per_class_performance(save_visualizations)
@@ -730,9 +742,7 @@ class ErrorAnalyzer:
         # Save results
         self.save_analysis_results()
 
-        print(f"\n{'='*60}")
-        print("ERROR ANALYSIS COMPLETE")
-        print(f"{'='*60}\n")
+        print_banner("ERROR ANALYSIS COMPLETE", width=60)
 
         return self.analysis_results
 
@@ -753,7 +763,8 @@ class ErrorAnalyzer:
                 f"{EXPERIMENT_CONFIG['experiment_name']}_{self.task_type}_error_analysis.pkl"
             )
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        # Use ensure_dir_exists from Utils instead of os.makedirs
+        ensure_dir_exists(os.path.dirname(output_path))
 
         with open(output_path, 'wb') as f:
             pickle.dump(self.analysis_results, f)
