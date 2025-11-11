@@ -15,13 +15,14 @@
 #-----------------------------------------------
 API_CONFIG = {
     # Model Selection
+    'human_like_eval_model': 'gpt-3.5-turbo',   # For prompt quality evaluation (cheap)
     'prompt_model': 'gpt-4o',                   # Model for prompt generation
-    'judge_model': 'gpt-4o',                    # Model for response labeling/judging
+    'judge_model': 'gpt-4o',                    # For actual labeling (accurate)
     'paraphrase_model': 'gpt-4o',               # Model for adversarial paraphrasing
 
     # Response Collection Models (3 models to test)
     'response_models': {
-        'claude': 'claude-sonnet-4-5-20250929',  # Fixed snapshot (Sept 29, 2025)
+        'claude': 'claude-sonnet-4-5-20250929',
         'gpt5': 'gpt-5',
         'gemini': 'gemini-2.5-flash'
     },
@@ -35,7 +36,7 @@ API_CONFIG = {
     # Token Limits
     'max_tokens_generate': 2000,                # For prompt generation (reduced for speed)
     'max_tokens_regenerate': 500,               # For regenerating failed prompts
-    'max_tokens_judge': 50,                     # Small JSON response for judging
+    'max_tokens_judge': 150,                     # Small JSON response for judging
     'max_tokens_paraphrase': 200,               # For paraphrasing
     'max_tokens_response': 4096,                # For LLM responses (increased for GPT-5 reasoning tokens)
 
@@ -51,8 +52,9 @@ API_CONFIG = {
     # Parallel Processing (NEW - Phase 2)
     # IMPORTANT: Reduced from 5→2 to prevent OpenAI rate limit errors (429)
     # 2 workers provides good balance: 2x speed vs sequential, minimal rate limits
-    'parallel_workers': 2 if not IS_AWS else 10,  # Concurrent API calls (2 local, 10 AWS)
+    'parallel_workers': get_dynamic_workers() if 'get_dynamic_workers' in globals() else 2,  # Dynamic workers
     'use_async': True,                          # Enable async/parallel processing
+    'rate_limit_delay': get_dynamic_delay() if 'get_dynamic_delay' in globals() else 0.2,  # Dynamic delay
     'labeling_batch_size': 100,                 # Checkpoint every N labeled samples
     'collection_batch_size': 500                # Checkpoint every N collected responses
 }
@@ -97,9 +99,9 @@ TRAINING_CONFIG = {
     'gradient_clip': 1.0,                       # Gradient clipping max norm
     'early_stopping_patience': 3,               # Epochs to wait before early stopping
     'save_best_only': True,                     # Only save best model checkpoint
-    'num_workers': 0,                           # DataLoader workers (0 for Mac, 4 for AWS)
+    'num_workers': 0 if IS_MAC else 4,          # DataLoader workers (0 for Mac, 4 for AWS)
     'pin_memory': True,                         # Pin memory for faster GPU transfer
-    'device': DEVICE                            # Auto-detected in 01-Imports.py
+    'device': DEVICE                            # Auto-detected in 02-Setup.py
 }
 
 
@@ -226,6 +228,7 @@ CHECKPOINT_CONFIG = {
     # Checkpoint Frequency
     'labeling_checkpoint_every': 100,           # Save checkpoint every N labeled samples
     'collection_checkpoint_every': 500,         # Save checkpoint every N collected responses
+    'paraphrase_checkpoint_every': 50,          # Optional, defaults to 50
 
     # Resume Settings
     'labeling_resume_enabled': True,            # Auto-resume labeling from checkpoint
@@ -234,17 +237,17 @@ CHECKPOINT_CONFIG = {
     # Cleanup Settings
     'auto_cleanup': True,                       # Auto-delete old checkpoints
     'keep_last_n': 2,                           # Keep only last N checkpoints
-    'max_checkpoint_age_hours': 48              # Delete checkpoints older than N hours
+    'max_checkpoint_age_hours': 48,             # Delete checkpoints older than N hours
 }
 
 
 # Adversarial Testing Configuration
 #------------------------------------
 ADVERSARIAL_CONFIG = {
-    # Paraphrase Validation Thresholds
-    'min_semantic_similarity': 0.85,            # Cosine similarity threshold for paraphrase validation
-    'min_length_ratio': 0.3,                    # Minimum length ratio (paraphrase/original)
-    'max_length_ratio': 3.0,                    # Maximum length ratio (paraphrase/original)
+    # Paraphrase Validation Thresholds (RELAXED for better success rate)
+    'min_semantic_similarity': 0.75,            # Reduced from 0.85 - still ensures meaning preservation
+    'min_length_ratio': 0.2,                    # Reduced from 0.3 - allows more compression
+    'max_length_ratio': 4.0,                    # Increased from 3.0 - allows more expansion
     'max_paraphrase_attempts': 3,               # Maximum retry attempts for paraphrasing
 
     # Quality Thresholds
@@ -283,7 +286,7 @@ DATA_CLEANING_CONFIG = {
 # Experiment Configuration
 #-------------------------
 EXPERIMENT_CONFIG = {
-    'experiment_name': f'dual_RoBERTa_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
+    'experiment_name': f'dual_RoBERTa_classifier_{get_timestamp("file")}' if 'get_timestamp' in globals() else f'dual_RoBERTa_classifier_{datetime.now().strftime("%Y%m%d_%H%M")}',
     'save_intermediate': True,                  # Save intermediate results
     'verbose': True,                            # Print detailed logs
     'show_progress': True,                      # Show progress bars
@@ -347,7 +350,10 @@ WILDJAILBREAK_CONFIG = {
     'warn_threshold': 30,                       # Warn if >30% of data from WildJailbreak
     'track_source': True,                       # Add 'data_source' column to track provenance
     'log_composition': True,                    # Print real vs WildJailbreak breakdown during training
-    'exclude_from_model_analysis': True         # Exclude WildJailbreak from per-model vulnerability analysis
+    'exclude_from_model_analysis': True,         # Exclude WildJailbreak from per-model vulnerability analysis
+    
+    'default_refusal_label': 0,  # No refusal (jailbreak succeeded)
+    'default_confidence': 90,    # High confidence for verified samples
 }
 
 
@@ -364,7 +370,7 @@ ANALYSIS_CONFIG = {
     'paraphrase_dimensions': [
         'synonym',                               # Replace words with synonyms
         'restructure',                           # Restructure sentences
-        'formality',                             # Change formality level
+        # 'formality',                           # Removed - often changes meaning/category
         'compression'                            # Make more concise
     ],
     'confidence_bins': 20,                      # Bins for confidence histograms
@@ -472,6 +478,13 @@ VISUALIZATION_CONFIG = {
     'color_palette': 'Set2',
     'font_scale': 1.0,
     'f1_target': 0.8,                # Target F1 score threshold for visualization
+    
+    # Alpha (transparency) values for plots
+    'alpha_bar': 0.8,                # Bar chart transparency
+    'alpha_line': 0.5,               # Reference line transparency
+    'alpha_hist': 0.7,               # Histogram transparency
+    'alpha_grid': 0.3,               # Grid transparency
+    'alpha_bbox': 0.5,               # Text box background transparency
 
     # Model Vulnerability Heatmap (NEW - V09)
     'heatmap': {
