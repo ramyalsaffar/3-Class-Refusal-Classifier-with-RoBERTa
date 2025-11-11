@@ -2,12 +2,41 @@
 #-----------------------
 # Main pipeline orchestrator for the complete refusal classification pipeline.
 # Trains TWO independent classifiers: Refusal Classifier + Jailbreak Detector.
+# 
+# IMPROVEMENTS:
+# - Full Config/Utils integration (NO HARDCODING!)
+# - Uses safe_divide() from Utils for robust division
+# - Uses get_timestamp() from Utils for consistent timestamps (already integrated)
+# - Uses print_banner() from Utils for section headers
+# - Improved comments and documentation
 # All imports are in 01-Imports.py
 ###############################################################################
 
 
 class RefusalPipeline:
-    """Orchestrates the complete refusal classification pipeline with dual classifiers."""
+    """
+    Orchestrate the complete refusal classification pipeline with dual classifiers.
+    
+    This is the main pipeline that coordinates all steps from prompt generation
+    through model training and evaluation. Trains two independent classifiers:
+    
+    1. **Refusal Classifier** (3-class): No Refusal, Hard Refusal, Soft Refusal
+    2. **Jailbreak Detector** (2-class): Jailbreak Failed, Jailbreak Succeeded
+    
+    Pipeline Steps:
+    1. Generate prompts (PromptGenerator)
+    2. Collect LLM responses (ResponseCollector)  
+    3. Clean data (DataCleaner)
+    4. Label data with LLM judge (DataLabeler)
+    5. Supplement jailbreak data if needed (WildJailbreak)
+    6. Prepare datasets for both classifiers
+    7. Train refusal classifier
+    8. Train jailbreak detector
+    9. Run analyses (cross-validation, per-model, confidence)
+    10. Generate visualizations and reports
+    
+    All configuration comes from Config file (DATASET_CONFIG, TRAINING_CONFIG, etc.)
+    """
 
     def __init__(self, api_keys: Dict, resume_from_checkpoint: bool = False):
         """
@@ -26,10 +55,12 @@ class RefusalPipeline:
 
     def run_full_pipeline(self):
         """Execute complete pipeline from start to finish."""
-        print("\n" + "="*60)
-        print("REFUSAL CLASSIFIER - FULL PIPELINE (DUAL CLASSIFIERS)")
-        print("="*60)
+        # Generate single timestamp for this entire run
+        self.run_timestamp = get_timestamp('file')
+        
+        print_banner("REFUSAL CLASSIFIER - FULL PIPELINE (DUAL CLASSIFIERS)", width=60)
         print(f"Experiment: {EXPERIMENT_CONFIG['experiment_name']}")
+        print(f"Run Timestamp: {self.run_timestamp}")
         print(f"Classifier 1: Refusal Classification (3 classes)")
         print(f"Classifier 2: Jailbreak Detection (2 classes)")
         print("="*60 + "\n")
@@ -77,13 +108,11 @@ class RefusalPipeline:
 
     def generate_prompts(self) -> Dict[str, List[str]]:
         """Step 1: Generate prompts."""
-        print("\n" + "="*60)
-        print("STEP 1: GENERATING PROMPTS")
-        print("="*60)
+        print_banner("STEP 1: GENERATING PROMPTS", width=60)
 
         generator = PromptGenerator(self.api_keys['openai'])
         prompts = generator.generate_all_prompts()
-        generator.save_prompts(prompts, data_raw_path)
+        generator.save_prompts(prompts, data_raw_path, timestamp=self.run_timestamp)
 
         return prompts
 
@@ -93,9 +122,7 @@ class RefusalPipeline:
 
         UPDATED (Phase 2/3): Uses parallel processing if enabled in config.
         """
-        print("\n" + "="*60)
-        print("STEP 2: COLLECTING RESPONSES")
-        print("="*60)
+        print_banner("STEP 2: COLLECTING RESPONSES", width=60)
 
         collector = ResponseCollector(
             self.api_keys['anthropic'],
@@ -103,16 +130,18 @@ class RefusalPipeline:
             self.api_keys['google']
         )
 
-        # Use checkpointed version if async is enabled
-        if API_CONFIG.get('use_async', True):
-            responses_df = collector.collect_all_responses_with_checkpoints(
-                prompts,
-                resume_from_checkpoint=self.resume_from_checkpoint
-            )
-        else:
-            responses_df = collector.collect_all_responses(prompts)
+        # Use parallel processing if async is enabled
+        responses_df = collector.collect_all_responses(
+            prompts,
+            parallel=API_CONFIG.get('use_async', True),
+            resume_from_checkpoint=self.resume_from_checkpoint
+        )
 
-        collector.save_responses(responses_df, data_responses_path)
+        # Save responses to disk
+        timestamp = self.run_timestamp
+        responses_path = os.path.join(data_responses_path, f"responses_{timestamp}.pkl")
+        responses_df.to_pickle(responses_path)
+        print(f"💾 Responses saved: {responses_path}")
 
         return responses_df
 
@@ -124,9 +153,7 @@ class RefusalPipeline:
 
         UPDATED (Phase 2/3): Uses parallel processing if enabled in config.
         """
-        print("\n" + "="*60)
-        print("STEP 4: LABELING DATA WITH LLM JUDGE (DUAL-TASK)")
-        print("="*60)
+        print_banner("STEP 4: LABELING DATA WITH LLM JUDGE (DUAL-TASK)", width=60)
 
         # Initialize labeler with OpenAI API key (for GPT-4o judge)
         labeler = DataLabeler(api_key=self.api_keys['openai'])
@@ -137,6 +164,9 @@ class RefusalPipeline:
                 responses_df,
                 resume_from_checkpoint=self.resume_from_checkpoint
             )
+            # Rename jailbreak_success to jailbreak_label for consistency with rest of pipeline
+            if 'jailbreak_success' in labeled_df.columns:
+                labeled_df = labeled_df.rename(columns={'jailbreak_success': 'jailbreak_label'})
             return labeled_df
         else:
             # Sequential labeling (original implementation)
@@ -166,7 +196,7 @@ class RefusalPipeline:
         print(f"{'='*60}")
         for i in range(-1, 3):
             count = (responses_df['refusal_label'] == i).sum()
-            pct = count / len(responses_df) * 100
+            pct = safe_divide(count, len(responses_df), default=0.0) * 100
             label_name = labeler.get_label_name(i)
             print(f"  {label_name}: {count} ({pct:.1f}%)")
 
@@ -176,7 +206,7 @@ class RefusalPipeline:
         print(f"{'='*60}")
         for i in [0, 1]:
             count = (responses_df['jailbreak_label'] == i).sum()
-            pct = count / len(responses_df) * 100
+            pct = safe_divide(count, len(responses_df), default=0.0) * 100
             label_name = labeler.get_jailbreak_label_name(i)
             print(f"  {label_name}: {count} ({pct:.1f}%)")
 
@@ -209,11 +239,11 @@ class RefusalPipeline:
         quality_analyzer = LabelingQualityAnalyzer(verbose=True)
         quality_results = quality_analyzer.analyze_full(responses_df)
 
-        # Generate timestamp for saving
-        timestamp = get_timestamp()
+        # Use run timestamp for consistency
+        timestamp = self.run_timestamp
 
         # Save quality analysis results
-        quality_analysis_path = os.path.join(results_path, f"labeling_quality_analysis_{timestamp}.json")
+        quality_analysis_path = os.path.join(analysis_results_path, f"labeling_quality_analysis_{timestamp}.json")
         quality_analyzer.save_results(quality_results, quality_analysis_path)
 
         # Export low-confidence samples for review
@@ -246,7 +276,7 @@ class RefusalPipeline:
         print("="*60)
 
         # Initialize cleaner
-        cleaner = DataCleaner(verbose=True)
+        cleaner = DataCleaner()
 
         # Get outlier report first
         report = cleaner.get_outlier_report(responses_df)
@@ -266,7 +296,7 @@ class RefusalPipeline:
         cleaned_df = cleaner.clean_dataset(responses_df, strategy=strategy)
 
         # Save cleaned data
-        timestamp = get_timestamp()
+        timestamp = self.run_timestamp
         cleaned_path = os.path.join(data_processed_path, f"cleaned_responses_{timestamp}.pkl")
         cleaned_df.to_pickle(cleaned_path)
         print(f"\n✓ Saved cleaned data to {cleaned_path}")
@@ -326,7 +356,12 @@ class RefusalPipeline:
             stratify=labeled_df['refusal_label']  # Stratify by refusal label
         )
 
-        val_size = DATASET_CONFIG['val_split'] / (DATASET_CONFIG['val_split'] + DATASET_CONFIG['test_split'])
+        # Use safe_divide from Utils for robust calculation
+        val_size = safe_divide(
+            DATASET_CONFIG['val_split'], 
+            DATASET_CONFIG['val_split'] + DATASET_CONFIG['test_split'],
+            default=0.5
+        )
         val_df, test_df = train_test_split(
             temp_df,
             test_size=(1 - val_size),
@@ -340,7 +375,7 @@ class RefusalPipeline:
         print(f"  Test: {len(test_df)} ({len(test_df)/len(labeled_df)*100:.1f}%)")
 
         # Save splits
-        timestamp = get_timestamp()
+        timestamp = self.run_timestamp
         train_df.to_pickle(os.path.join(data_splits_path, f"train_{timestamp}.pkl"))
         val_df.to_pickle(os.path.join(data_splits_path, f"val_{timestamp}.pkl"))
         test_df.to_pickle(os.path.join(data_splits_path, f"test_{timestamp}.pkl"))
@@ -597,9 +632,9 @@ class RefusalPipeline:
             # Combine datasets
             combined_df = pd.concat([labeled_df_copy, wildjailbreak_filtered], ignore_index=True)
 
-            # Calculate composition
+            # Calculate composition using safe_divide from Utils
             total_jailbreak_succeeded = len(combined_df[combined_df['jailbreak_label'] == 1])
-            real_percentage = (real_count / total_jailbreak_succeeded * 100) if total_jailbreak_succeeded > 0 else 0
+            real_percentage = safe_divide(real_count, total_jailbreak_succeeded, default=0.0) * 100
             wildjailbreak_percentage = 100 - real_percentage
 
             print(f"\n  {'='*56}")
@@ -735,8 +770,8 @@ class RefusalPipeline:
 
         analysis_results = {}
 
-        # Generate timestamp for all analysis outputs
-        timestamp = get_timestamp()
+        # Use run timestamp for all analysis outputs
+        timestamp = self.run_timestamp
 
         # ═══════════════════════════════════════════════════════
         # REFUSAL CLASSIFIER ANALYSIS
@@ -751,7 +786,7 @@ class RefusalPipeline:
         per_model_results = per_model_analyzer.analyze(test_df)
         per_model_analyzer.save_results(
             per_model_results,
-            os.path.join(results_path, f"per_model_analysis_{timestamp}.json")
+            os.path.join(analysis_results_path, f"per_model_analysis_{timestamp}.json")
         )
         analysis_results['per_model'] = per_model_results
 
@@ -761,7 +796,7 @@ class RefusalPipeline:
         conf_results, preds, labels, confidences = confidence_analyzer.analyze(test_df)
         confidence_analyzer.save_results(
             conf_results,
-            os.path.join(results_path, f"confidence_analysis_{timestamp}.json")
+            os.path.join(analysis_results_path, f"confidence_analysis_{timestamp}.json")
         )
         analysis_results['confidence'] = conf_results
         analysis_results['predictions'] = {
@@ -778,7 +813,7 @@ class RefusalPipeline:
         adv_results = adversarial_tester.test_robustness(test_df)
         adversarial_tester.save_results(
             adv_results,
-            os.path.join(results_path, f"adversarial_testing_{timestamp}.json")
+            os.path.join(analysis_results_path, f"adversarial_testing_{timestamp}.json")
         )
         analysis_results['adversarial'] = adv_results
 
@@ -812,9 +847,13 @@ class RefusalPipeline:
             print("\n--- SHAP Analysis (Disabled) ---")
             analysis_results['shap'] = None
 
-        # Power Law Analysis
-        print("\n--- Power Law Analysis ---")
-        power_law_analyzer = PowerLawAnalyzer(self.refusal_model, self.tokenizer, DEVICE, class_names=CLASS_NAMES)
+        # Power Law Analysis (Refusal Classifier)
+        print("\n--- Power Law Analysis (Refusal Classifier) ---")
+        power_law_analyzer = PowerLawAnalyzer(
+            self.refusal_model, self.tokenizer, DEVICE, 
+            class_names=CLASS_NAMES,
+            model_type="Refusal Classifier"
+        )
         power_law_results = power_law_analyzer.analyze_all(
             test_df,
             np.array(preds),
@@ -839,20 +878,22 @@ class RefusalPipeline:
         jailbreak_results = jailbreak_analyzer.analyze_full(test_df)
         jailbreak_analyzer.save_results(
             jailbreak_results,
-            os.path.join(results_path, f"jailbreak_analysis_{timestamp}.json")
+            os.path.join(analysis_results_path, f"jailbreak_analysis_{timestamp}.json")
         )
         analysis_results['jailbreak'] = jailbreak_results
 
         # Power Law Analysis (Jailbreak Detector)
-        print("\n--- Power Law Analysis (Jailbreak) ---")
+        print("\n--- Power Law Analysis (Jailbreak Detector) ---")
         jailbreak_power_law_analyzer = PowerLawAnalyzer(
-            self.jailbreak_model, self.tokenizer, DEVICE, class_names=JAILBREAK_CLASS_NAMES
+            self.jailbreak_model, self.tokenizer, DEVICE, 
+            class_names=JAILBREAK_CLASS_NAMES,
+            model_type="Jailbreak Detector"
         )
         jailbreak_power_law_results = jailbreak_power_law_analyzer.analyze_all(
             test_df,
             jailbreak_results['predictions']['preds'],
             jailbreak_results['predictions']['confidences'],
-            output_dir=visualizations_path
+            output_dir=power_law_viz_path
         )
         analysis_results['jailbreak_power_law'] = jailbreak_power_law_results
 
@@ -872,12 +913,11 @@ class RefusalPipeline:
             refusal_class_names=CLASS_NAMES,
             jailbreak_class_names=JAILBREAK_CLASS_NAMES
         )
-        correlation_results = correlation_analyzer.analyze_full()
-        correlation_analyzer.save_results(
-            correlation_results,
-            os.path.join(results_path, f"correlation_analysis_{timestamp}.pkl")
+        correlation_results = correlation_analyzer.run_full_analysis()
+        correlation_analyzer.save_analysis_results(
+            os.path.join(analysis_results_path, f"correlation_analysis_{timestamp}.pkl")
         )
-        correlation_analyzer.visualize_correlation(output_dir=visualizations_path)
+        correlation_analyzer.visualize_correlation(output_dir=correlation_viz_path)
         analysis_results['correlation'] = correlation_results
 
         # ═══════════════════════════════════════════════════════
@@ -999,6 +1039,7 @@ class RefusalPipeline:
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Dual RoBERTa Classifiers: Refusal Pipeline Module
 Created on October 28, 2025
 @author: ramyalsaffar
 """
