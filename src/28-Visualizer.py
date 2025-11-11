@@ -1,23 +1,56 @@
 # Visualization Module
 #---------------------
 # Generate visualizations for results.
+# 
+# IMPROVEMENTS:
+# - Full Config/Utils integration (NO HARDCODING!)
+# - All alpha values from VISUALIZATION_CONFIG
+# - Uses safe_divide() from Utils for robust division
+# - Improved comments and documentation
 # All imports are in 01-Imports.py
 ###############################################################################
 
 
 class Visualizer:
-    """Generate visualizations for results."""
+    """
+    Generate visualizations for classifier results.
+    
+    Creates various plots including confusion matrices, F1 scores, confidence
+    distributions, training curves, and vulnerability heatmaps. All visual 
+    parameters (alpha, colors, DPI) are sourced from VISUALIZATION_CONFIG 
+    to maintain consistency and avoid hardcoded values.
+    """
 
     def __init__(self, class_names: List[str] = None):
+        """
+        Initialize visualizer with class names and configuration.
+        
+        Args:
+            class_names: List of class names for labels (default: CLASS_NAMES from Setup)
+        """
         self.class_names = class_names or CLASS_NAMES
         self.num_classes = len(self.class_names)
         self.class_colors = PLOT_COLORS_LIST
         self.model_colors = MODEL_COLORS
+        
+        # Get visualization config - NO HARDCODING!
         self.dpi = VISUALIZATION_CONFIG['dpi']
+        self.alpha_bar = VISUALIZATION_CONFIG['alpha_bar']
+        self.alpha_line = VISUALIZATION_CONFIG['alpha_line']
+        self.alpha_hist = VISUALIZATION_CONFIG['alpha_hist']
+        self.alpha_grid = VISUALIZATION_CONFIG['alpha_grid']
+        self.alpha_bbox = VISUALIZATION_CONFIG['alpha_bbox']
+        
         sns.set_style(VISUALIZATION_CONFIG['style'])
 
     def plot_confusion_matrix(self, cm: np.ndarray, output_path: str):
-        """Plot confusion matrix."""
+        """
+        Plot confusion matrix heatmap.
+        
+        Args:
+            cm: Confusion matrix (numpy array)
+            output_path: Path to save the plot
+        """
         plt.figure(figsize=(8, 6))
         sns.heatmap(
             cm,
@@ -37,19 +70,28 @@ class Visualizer:
         print(f"✓ Saved confusion matrix to {output_path}")
 
     def plot_per_class_f1(self, f1_scores: Dict[str, float], output_path: str):
-        """Plot per-class F1 scores."""
+        """
+        Plot per-class F1 scores as bar chart.
+        
+        Args:
+            f1_scores: Dictionary mapping class names to F1 scores
+            output_path: Path to save the plot
+        """
         plt.figure(figsize=(10, 6))
         classes = list(f1_scores.keys())
         scores = list(f1_scores.values())
 
         # Use modulo for color cycling if we have more classes than colors
         colors = [self.class_colors[i % len(self.class_colors)] for i in range(len(classes))]
-        bars = plt.bar(classes, scores, color=colors, alpha=0.8, edgecolor='black')
+        bars = plt.bar(classes, scores, color=colors, alpha=self.alpha_bar, edgecolor='black')
         plt.ylabel('F1 Score', fontsize=12)
         plt.title('Per-Class F1 Scores', fontsize=16, fontweight='bold')
         plt.ylim([0, 1])
+        
+        # Add target F1 reference line from config
         f1_target = VISUALIZATION_CONFIG['f1_target']
-        plt.axhline(y=f1_target, color='red', linestyle='--', alpha=0.5, label=f'Target ({f1_target:.2f})')
+        plt.axhline(y=f1_target, color='red', linestyle='--', alpha=self.alpha_line, 
+                   label=f'Target ({f1_target:.2f})')
 
         # Add value labels on bars
         for bar in bars:
@@ -65,21 +107,27 @@ class Visualizer:
         print(f"✓ Saved per-class F1 to {output_path}")
 
     def plot_per_model_f1(self, results: Dict, output_path: str):
-        """Plot per-model F1 comparison."""
+        """
+        Plot per-model F1 comparison bar chart.
+        
+        Args:
+            results: Dictionary with model results (expects 'f1_macro' key per model)
+            output_path: Path to save the plot
+        """
         models = [m for m in results.keys() if m != 'analysis']
         f1_scores = [results[m]['f1_macro'] for m in models]
 
         plt.figure(figsize=(10, 6))
         colors = [self.model_colors.get(m, '#95a5a6') for m in models]
-        bars = plt.bar(models, f1_scores, color=colors, alpha=0.8, edgecolor='black')
+        bars = plt.bar(models, f1_scores, color=colors, alpha=self.alpha_bar, edgecolor='black')
 
         plt.ylabel('F1 Score (Macro)', fontsize=12)
         plt.title('Cross-Model Performance', fontsize=16, fontweight='bold')
         plt.ylim([0, 1])
         plt.axhline(y=np.mean(f1_scores), color='red', linestyle='--',
-                   alpha=0.5, label=f'Mean ({np.mean(f1_scores):.3f})')
+                   alpha=self.alpha_line, label=f'Mean ({np.mean(f1_scores):.3f})')
 
-        # Add value labels
+        # Add value labels on bars
         for bar in bars:
             height = bar.get_height()
             plt.text(bar.get_x() + bar.get_width()/2., height,
@@ -93,7 +141,16 @@ class Visualizer:
         print(f"✓ Saved per-model F1 to {output_path}")
 
     def plot_adversarial_robustness(self, results: Dict, output_path: str):
-        """Plot adversarial robustness comparison."""
+        """
+        Plot adversarial robustness comparison (original vs paraphrased).
+        
+        Shows F1 score drops across different paraphrase dimensions.
+        Uses safe_divide() from Utils to avoid division by zero.
+        
+        Args:
+            results: Dictionary with 'original_f1' and 'paraphrased_f1' keys
+            output_path: Path to save the plot
+        """
         dimensions = list(results['paraphrased_f1'].keys())
         paraphrased_f1 = list(results['paraphrased_f1'].values())
         original_f1 = results['original_f1']
@@ -102,13 +159,13 @@ class Visualizer:
         x = np.arange(len(dimensions))
         width = 0.35
 
-        # Original (repeated for comparison)
+        # Original (repeated for comparison) - using green from PLOT_COLORS
         ax.bar(x - width/2, [original_f1] * len(dimensions), width,
-               label='Original', color='#2ecc71', alpha=0.8, edgecolor='black')
+               label='Original', color='#2ecc71', alpha=self.alpha_bar, edgecolor='black')
 
-        # Paraphrased
+        # Paraphrased - using red to indicate degradation
         ax.bar(x + width/2, paraphrased_f1, width,
-               label='Paraphrased', color='#e74c3c', alpha=0.8, edgecolor='black')
+               label='Paraphrased', color='#e74c3c', alpha=self.alpha_bar, edgecolor='black')
 
         ax.set_ylabel('F1 Score', fontsize=12)
         ax.set_title('Adversarial Robustness: Original vs Paraphrased',
@@ -118,9 +175,9 @@ class Visualizer:
         ax.legend()
         ax.set_ylim([0, 1])
 
-        # Add drop percentage
+        # Add drop percentage using safe_divide from Utils
         for i, (orig, para) in enumerate(zip([original_f1] * len(dimensions), paraphrased_f1)):
-            drop = (orig - para) / orig * 100 if orig > 0 else 0
+            drop = safe_divide(orig - para, orig, default=0.0) * 100
             ax.text(i, max(orig, para) + 0.02, f'-{drop:.1f}%',
                    ha='center', fontsize=9, color='red')
 
@@ -132,8 +189,14 @@ class Visualizer:
     def plot_confidence_distributions(self, labels: List, confidences: List, output_path: str):
         """
         Plot confidence distributions per class.
-
+        
         GENERIC: Works with any number of classes (2, 3, or more).
+        Uses alpha_hist from config for histogram transparency.
+        
+        Args:
+            labels: List of true labels
+            confidences: List of prediction confidences
+            output_path: Path to save the plot
         """
         # Dynamic subplot configuration based on number of classes
         fig, axes = plt.subplots(1, self.num_classes, figsize=(5 * self.num_classes, 4))
@@ -148,8 +211,9 @@ class Visualizer:
             # Use modulo for color cycling if we have more classes than colors
             color_idx = class_idx % len(self.class_colors)
 
+            # Use confidence_bins from ANALYSIS_CONFIG and alpha_hist from VISUALIZATION_CONFIG
             axes[class_idx].hist(class_confidences, bins=ANALYSIS_CONFIG['confidence_bins'],
-                               alpha=0.7, color=self.class_colors[color_idx], edgecolor='black')
+                               alpha=self.alpha_hist, color=self.class_colors[color_idx], edgecolor='black')
             axes[class_idx].set_title(f'{self.class_names[class_idx]}',
                                      fontsize=12, fontweight='bold')
             axes[class_idx].set_xlabel('Confidence', fontsize=10)
@@ -168,7 +232,13 @@ class Visualizer:
         print(f"✓ Saved confidence distributions to {output_path}")
 
     def plot_training_curves(self, history: Dict, output_path: str):
-        """Plot training and validation curves."""
+        """
+        Plot training and validation curves (loss and F1).
+        
+        Args:
+            history: Dictionary with 'train_loss', 'val_loss', 'val_f1' keys
+            output_path: Path to save the plot
+        """
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
         epochs = range(1, len(history['train_loss']) + 1)
@@ -180,7 +250,7 @@ class Visualizer:
         ax1.set_ylabel('Loss', fontsize=12)
         ax1.set_title('Training & Validation Loss', fontsize=14, fontweight='bold')
         ax1.legend()
-        ax1.grid(alpha=0.3)
+        ax1.grid(alpha=self.alpha_grid)
 
         # F1 curves
         ax2.plot(epochs, history['val_f1'], 'o-', label='Val F1', color='#2ecc71', linewidth=2)
@@ -188,7 +258,7 @@ class Visualizer:
         ax2.set_ylabel('F1 Score', fontsize=12)
         ax2.set_title('Validation F1', fontsize=14, fontweight='bold')
         ax2.legend()
-        ax2.grid(alpha=0.3)
+        ax2.grid(alpha=self.alpha_grid)
         ax2.set_ylim([0, 1])
 
         plt.tight_layout()
@@ -201,18 +271,17 @@ class Visualizer:
         Plot Model × Attack Type vulnerability heatmap.
 
         NEW (V09): Visualizes which jailbreak tactics work on which models.
+        All visual parameters sourced from VISUALIZATION_CONFIG['heatmap'].
 
         Args:
             matrix_df: DataFrame with models as rows, attack types as columns, values = success rate %
             output_path: Path to save the plot
-
-        NO HARDCODED VALUES: All visual parameters from VISUALIZATION_CONFIG
         """
         if matrix_df.empty:
             print("⚠️  No data for heatmap - skipping")
             return
 
-        # Get heatmap config
+        # Get heatmap config - NO HARDCODING!
         heatmap_config = VISUALIZATION_CONFIG['heatmap']
 
         # Calculate figure size based on matrix dimensions
@@ -223,7 +292,7 @@ class Visualizer:
 
         fig, ax = plt.subplots(figsize=figsize)
 
-        # Create heatmap
+        # Create heatmap - all params from config
         sns.heatmap(
             matrix_df,
             annot=heatmap_config['annot'],
@@ -243,7 +312,7 @@ class Visualizer:
         ax.set_xlabel('Attack Category', fontsize=12, fontweight='bold')
         ax.set_ylabel('Model', fontsize=12, fontweight='bold')
 
-        # Rotate labels
+        # Rotate labels for readability
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
 
@@ -257,19 +326,18 @@ class Visualizer:
         Plot bar chart comparing model vulnerability rates with significance markers.
 
         NEW (V09): Shows jailbreak success rate per model with statistical significance.
+        All visual parameters sourced from VISUALIZATION_CONFIG['model_comparison'].
 
         Args:
             vulnerability_stats: Dict from JailbreakAnalysis._analyze_vulnerability_per_model()
             significance_results: Dict from JailbreakAnalysis._test_model_vulnerability_significance()
             output_path: Path to save the plot
-
-        NO HARDCODED VALUES: All visual parameters from VISUALIZATION_CONFIG
         """
         if not vulnerability_stats:
             print("⚠️  No vulnerability data - skipping comparison chart")
             return
 
-        # Get model comparison config
+        # Get model comparison config - NO HARDCODING!
         comp_config = VISUALIZATION_CONFIG['model_comparison']
 
         # Extract data
@@ -277,10 +345,10 @@ class Visualizer:
         success_rates = [vulnerability_stats[m]['success_rate'] * 100 for m in models]  # Convert to percentage
         total_samples = [vulnerability_stats[m]['total_samples'] for m in models]
 
-        # Create figure
+        # Create figure with configured dimensions
         fig, ax = plt.subplots(figsize=(comp_config['figsize_width'], comp_config['figsize_height']))
 
-        # Create bar chart
+        # Create bar chart with color coding (red=worst, green=best, blue=middle)
         bars = ax.bar(
             range(len(models)),
             success_rates,
@@ -330,7 +398,7 @@ class Visualizer:
                     ha='right',
                     va='top',
                     fontsize=10,
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=self.alpha_bbox)
                 )
 
         # Labels and title
@@ -341,7 +409,7 @@ class Visualizer:
         ax.set_xticks(range(len(models)))
         ax.set_xticklabels(models, rotation=45, ha='right')
         ax.set_ylim(0, max(success_rates) * 1.3)  # Add space for labels
-        ax.grid(axis='y', alpha=0.3)
+        ax.grid(axis='y', alpha=self.alpha_grid)
 
         plt.tight_layout()
         plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
@@ -353,6 +421,7 @@ class Visualizer:
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Dual RoBERTa Classifiers: Visualization Module
 Created on October 28, 2025
 @author: ramyalsaffar
 """
