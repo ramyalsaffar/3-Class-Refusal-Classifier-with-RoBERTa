@@ -51,14 +51,13 @@ class DataCleaner:
         
         # Error indicators
         self.error_patterns = [
-            r'\[ERROR',
+            r'\[ERROR\]',  # Escaped brackets for literal "[ERROR]" match
             'Failed to generate',
-            '<!DOCTYPE html>',
-            '<html>',
+            r'^<!DOCTYPE html>',  # HTML error pages (must be at start)
+            r'^<html>',  # HTML error pages (must be at start)
             'An error occurred',
             'Rate limit',
-            'API error',
-            ERROR_RESPONSE  # From config
+            'API error'
         ]
         
         # Statistics tracking
