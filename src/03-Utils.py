@@ -457,12 +457,44 @@ def get_dynamic_workers() -> int:
 def get_dynamic_delay() -> float:
     """
     Get the current API delay from the rate limiter.
-    
+
     Returns:
         Current delay in seconds between API calls
     """
     rate_limiter = get_rate_limiter()
     return rate_limiter.delay
+
+
+def convert_to_serializable(obj):
+    """
+    Recursively convert numpy/pandas types to native Python types for JSON serialization.
+
+    Args:
+        obj: Object to convert (dict, list, numpy type, etc.)
+
+    Returns:
+        Object with all numpy/pandas types converted to native Python types
+
+    Examples:
+        >>> import numpy as np
+        >>> convert_to_serializable({'a': np.int64(5), 'b': np.bool_(True)})
+        {'a': 5, 'b': True}
+    """
+    import numpy as np
+
+    if isinstance(obj, dict):
+        return {k: convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_serializable(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
 
 
 #------------------------------------------------------------------------------
