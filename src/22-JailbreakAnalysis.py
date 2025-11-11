@@ -52,9 +52,7 @@ class JailbreakAnalysis:
         Returns:
             Dictionary with all analysis results
         """
-        print("\n" + "="*60)
-        print("JAILBREAK DETECTOR ANALYSIS")
-        print("="*60)
+        print_banner("JAILBREAK DETECTOR ANALYSIS", width=60, char="=")
 
         results = {}
 
@@ -125,9 +123,7 @@ class JailbreakAnalysis:
         if len(results['false_negatives']) > 0:
             results['attention_fn'] = self._analyze_attention_on_failures(results['false_negatives'])
 
-        print("\n" + "="*60)
-        print("✅ JAILBREAK ANALYSIS COMPLETE")
-        print("="*60)
+        print_banner("✅ JAILBREAK ANALYSIS COMPLETE", width=60, char="=")
 
         return results
 
@@ -151,7 +147,7 @@ class JailbreakAnalysis:
             test_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
+        loader = DataLoader(dataset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False)
 
         jailbreak_preds = []
         jailbreak_confidences = []
@@ -179,7 +175,7 @@ class JailbreakAnalysis:
             test_df['refusal_label'].tolist(),
             self.tokenizer
         )
-        loader = DataLoader(dataset, batch_size=API_CONFIG['inference_batch_size'], shuffle=False)
+        loader = DataLoader(dataset, batch_size=TRAINING_CONFIG['batch_size'], shuffle=False)
 
         refusal_preds = []
 
@@ -287,9 +283,9 @@ class JailbreakAnalysis:
         precision_succeeded = precision_score(all_labels, all_preds, pos_label=1, zero_division=0)
 
         # Rates
-        fnr = fn / (fn + tp) if (fn + tp) > 0 else 0  # False Negative Rate
-        tnr = tn / (tn + fp) if (tn + fp) > 0 else 0  # True Negative Rate (Specificity)
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0  # False Positive Rate
+        fnr = safe_divide(fn, fn + tp, default=0.0)  # False Negative Rate
+        tnr = safe_divide(tn, tn + fp, default=0.0)  # True Negative Rate (Specificity)
+        fpr = safe_divide(fp, fp + tn, default=0.0)  # False Positive Rate
 
         # F1 Scores
         f1_macro = f1_score(all_labels, all_preds, average='macro')
@@ -376,8 +372,12 @@ class JailbreakAnalysis:
 
         # Save for review
         if len(false_negatives) > 0:
-            fn_path = os.path.join(results_path, "jailbreak_false_negatives.csv")
-            false_negatives[['prompt', 'response', 'model', 'category', 'jailbreak_confidence']].to_csv(fn_path, index=False)
+            fn_path = os.path.join(quality_review_path, "jailbreak_false_negatives.csv")
+            # Only include columns that exist
+            columns_to_save = ['prompt', 'response', 'model', 'jailbreak_confidence']
+            if 'category' in false_negatives.columns:
+                columns_to_save.insert(3, 'category')  # Add category after model if it exists
+            false_negatives[columns_to_save].to_csv(fn_path, index=False)
 
         return false_negatives
 
@@ -393,7 +393,7 @@ class JailbreakAnalysis:
             # How many jailbreak attempts were there?
             total_samples = len(model_df)
             jailbreak_successes = (model_df['jailbreak_label'] == 1).sum()
-            success_rate = jailbreak_successes / total_samples if total_samples > 0 else 0
+            success_rate = safe_divide(jailbreak_successes, total_samples, default=0.0)
 
             vulnerability[model_name] = {
                 'total_samples': total_samples,
@@ -426,12 +426,17 @@ class JailbreakAnalysis:
         # Map categories to attack types
         jailbreak_categories = ['jailbreaks']  # Could expand if we track attack types
 
+        # Check if category column exists
+        if 'category' not in test_df.columns:
+            print("⚠️  Attack type analysis skipped - no category metadata available")
+            return attack_analysis
+            
         for category in test_df['category'].unique():
             cat_df = test_df[test_df['category'] == category]
 
             total = len(cat_df)
             successes = (cat_df['jailbreak_label'] == 1).sum()
-            success_rate = successes / total if total > 0 else 0
+            success_rate = safe_divide(successes, total, default=0.0)
 
             attack_analysis[category] = {
                 'total_samples': total,
@@ -526,7 +531,7 @@ class JailbreakAnalysis:
 
                 if len(cat_df) > 0:
                     successes = (cat_df['jailbreak_label'] == 1).sum()
-                    success_rate = (successes / len(cat_df)) * 100  # Convert to percentage
+                    success_rate = safe_divide(successes, len(cat_df), default=0.0) * 100  # Convert to percentage
                     row[category] = success_rate
                 else:
                     row[category] = 0.0
@@ -587,7 +592,6 @@ class JailbreakAnalysis:
         )
 
         # Chi-square test
-        from scipy.stats import chi2_contingency
         chi2, p_value, dof, expected = chi2_contingency(contingency)
 
         # Calculate Cramér's V (effect size)
@@ -598,7 +602,7 @@ class JailbreakAnalysis:
         vulnerability_rates = {}
         for model in models:
             model_df = test_df_filtered[test_df_filtered['model'] == model]
-            rate = (model_df['jailbreak_label'] == 1).sum() / len(model_df)
+            rate = safe_divide((model_df['jailbreak_label'] == 1).sum(), len(model_df), default=0.0)
             vulnerability_rates[model] = rate
 
         vulnerable_model = max(vulnerability_rates.items(), key=lambda x: x[1])
@@ -632,9 +636,7 @@ class JailbreakAnalysis:
         if matrix_df.empty:
             return
 
-        print("\n" + "="*60)
-        print("MODEL × ATTACK TYPE VULNERABILITY MATRIX")
-        print("="*60)
+        print_banner("MODEL × ATTACK TYPE VULNERABILITY MATRIX", width=60, char="=")
         print("(Shows jailbreak success rate % for each model-category combination)")
         print()
 
@@ -666,9 +668,7 @@ class JailbreakAnalysis:
             print(f"\n⚠️  Statistical Test Skipped: {sig_results['error']}")
             return
 
-        print("\n" + "="*60)
-        print("STATISTICAL SIGNIFICANCE TEST")
-        print("="*60)
+        print_banner("STATISTICAL SIGNIFICANCE TEST", width=60, char="=")
         print(f"Test: Chi-Square Test for Model Vulnerability Differences")
         print(f"Models Compared: {', '.join(sig_results['models_compared'])}")
         print(f"Significance Level (α): {sig_results['alpha']}")
