@@ -38,16 +38,15 @@ class RetrainingPipeline:
         Returns:
             Dictionary with retraining results
         """
-        print("\n" + "="*80)
-        print(" "*28 + "RETRAINING PIPELINE")
-        print("="*80)
+        print()
+        print_banner("RETRAINING PIPELINE", width=80)
         print(f"Reason: {reason}")
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Timestamp: {get_timestamp('display')}")
 
         # Step 1: Collect training data
-        print("\n" + "="*80)
-        print("STEP 1: COLLECTING TRAINING DATA")
-        print("="*80)
+        print()
+        print_banner("STEP 1: COLLECTING TRAINING DATA", width=80)
+        print()
 
         training_df = self.data_manager.get_retraining_data()
 
@@ -58,9 +57,9 @@ class RetrainingPipeline:
             return {'status': 'failed', 'reason': 'insufficient_data'}
 
         # Step 2: Prepare datasets
-        print("\n" + "="*80)
-        print("STEP 2: PREPARING DATASETS")
-        print("="*80)
+        print()
+        print_banner("STEP 2: PREPARING DATASETS", width=80)
+        print()
 
         train_df, val_df, test_df = self._split_data(training_df)
 
@@ -92,9 +91,9 @@ class RetrainingPipeline:
         )
 
         # Step 3: Train new model
-        print("\n" + "="*80)
-        print("STEP 3: TRAINING NEW MODEL")
-        print("="*80)
+        print()
+        print_banner("STEP 3: TRAINING NEW MODEL", width=80)
+        print()
         logger.info("Starting model training")
 
         # GENERIC: Determine number of classes from data
@@ -151,9 +150,9 @@ class RetrainingPipeline:
             }
 
         # Step 4: Validate new model
-        print("\n" + "="*80)
-        print("STEP 4: VALIDATING NEW MODEL")
-        print("="*80)
+        print()
+        print_banner("STEP 4: VALIDATING NEW MODEL", width=80)
+        print()
 
         validation_passed, validation_metrics = self._validate_new_model(
             model, test_loader, tokenizer, test_df
@@ -168,11 +167,11 @@ class RetrainingPipeline:
             }
 
         # Step 5: Save new model
-        print("\n" + "="*80)
-        print("STEP 5: SAVING NEW MODEL")
-        print("="*80)
+        print()
+        print_banner("STEP 5: SAVING NEW MODEL", width=80)
+        print()
 
-        new_version = f"v{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        new_version = f"v{get_timestamp('file')}"
         model_path = os.path.join(models_path, f"{new_version}.pt")
 
         torch.save({
@@ -181,7 +180,7 @@ class RetrainingPipeline:
             'num_classes': num_classes,  # ADDED: Save num_classes for generic loading
             'training_history': history,
             'validation_metrics': validation_metrics,
-            'training_date': datetime.now().isoformat(),
+            'training_date': get_timestamp('display'),
             'reason': reason
         }, model_path)
         logger.info(f"Model checkpoint saved to {model_path}")
@@ -202,9 +201,9 @@ class RetrainingPipeline:
         )
 
         # Step 6: Deploy with A/B testing
-        print("\n" + "="*80)
-        print("STEP 6: DEPLOYING WITH A/B TESTING")
-        print("="*80)
+        print()
+        print_banner("STEP 6: DEPLOYING WITH A/B TESTING", width=80)
+        print()
 
         ab_test_result = self._run_ab_test(new_version, validation_metrics)
 
@@ -348,9 +347,8 @@ class RetrainingPipeline:
             raise
 
         print(f"\n✓ Deployed challenger with {initial_traffic*100}% traffic")
-        print(f"\n{'='*80}")
-        print("A/B TEST ACTIVE")
-        print("="*80)
+        print()
+        print_banner("A/B TEST ACTIVE", width=80)
         print(f"\nChallenger: {new_version} ({initial_traffic*100}% traffic)")
         print(f"Active: {self.data_manager.get_active_model_version()} ({(1-initial_traffic)*100}% traffic)")
         print(f"\nNext steps:")
