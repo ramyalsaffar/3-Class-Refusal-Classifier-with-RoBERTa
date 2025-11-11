@@ -470,9 +470,28 @@ class LabelingQualityAnalyzer:
     def save_results(self, results: Dict, output_path: str):
         """Save analysis results to JSON."""
         ensure_dir_exists(os.path.dirname(output_path))
-        
+
+        # Convert numpy/pandas types to native Python types for JSON serialization
+        def convert_to_serializable(obj):
+            """Recursively convert numpy/pandas types to native Python types."""
+            if isinstance(obj, dict):
+                return {k: convert_to_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_to_serializable(item) for item in obj]
+            elif isinstance(obj, (np.integer, np.int64, np.int32)):
+                return int(obj)
+            elif isinstance(obj, (np.floating, np.float64, np.float32)):
+                return float(obj)
+            elif isinstance(obj, (np.bool_, bool)):
+                return bool(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj
+
+        serializable_results = convert_to_serializable(results)
+
         with open(output_path, 'w') as f:
-            json.dump(results, f, indent=2)
+            json.dump(serializable_results, f, indent=2)
         
         if self.verbose:
             print(f"\n✅ Saved labeling quality analysis to {output_path}")
