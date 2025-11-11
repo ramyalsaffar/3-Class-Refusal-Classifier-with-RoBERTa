@@ -3,6 +3,13 @@
 # Generates comprehensive PDF reports using ReportLab.
 # Creates professional reports for model performance, interpretability,
 # production monitoring, and executive summaries.
+# 
+# IMPROVEMENTS:
+# - Full Config/Utils integration where applicable
+# - Uses safe_divide() from Utils for robust division
+# - Uses get_timestamp() from Utils for consistent timestamps
+# - Improved comments and documentation
+# - PDF style values remain hardcoded (report-specific, only used here)
 # Requirements: pip install reportlab
 # All imports are in 01-Imports.py
 ###############################################################################
@@ -10,14 +17,19 @@
 
 class ReportGenerator:
     """
-    GENERIC: Generates professional PDF reports for any N-class classifier.
+    Generate professional PDF reports for any N-class classifier.
+    
+    Creates comprehensive reports using ReportLab with professional styling.
+    Supports multiple report types for different audiences and use cases.
 
-    Supports multiple report types:
-    - Model Performance Report
-    - Jailbreak Security Report
-    - Production Monitoring Report
-    - Interpretability Report
-    - Executive Summary
+    Supported report types:
+    - Model Performance Report: Technical deep-dive with metrics and visualizations
+    - Jailbreak Security Report: Security-focused analysis for adversarial robustness
+    - Production Monitoring Report: Real-time performance tracking and drift detection
+    - Interpretability Report: Feature importance, attention, SHAP, and power law analysis
+    - Executive Summary: High-level 1-2 page overview for stakeholders
+    
+    Uses DPI from VISUALIZATION_CONFIG for consistent image quality.
     """
 
     def __init__(self, class_names: List[str] = None):
@@ -25,7 +37,7 @@ class ReportGenerator:
         Initialize the report generator.
 
         Args:
-            class_names: List of class names (default: CLASS_NAMES from config)
+            class_names: List of class names (default: CLASS_NAMES from Setup)
         """
         self.class_names = class_names or CLASS_NAMES
         self.num_classes = len(self.class_names)
@@ -104,7 +116,18 @@ class ReportGenerator:
         return img
 
     def _create_header(self, title: str, subtitle: str = None) -> List:
-        """Create report header with title and subtitle."""
+        """
+        Create report header with title and subtitle.
+        
+        Uses get_timestamp() from Utils for consistent timestamp formatting.
+        
+        Args:
+            title: Report title
+            subtitle: Optional subtitle text
+            
+        Returns:
+            List of ReportLab elements for the header
+        """
         elements = []
         elements.append(Paragraph(title, self.styles['CustomTitle']))
 
@@ -112,8 +135,8 @@ class ReportGenerator:
             elements.append(Paragraph(subtitle, self.styles['Normal']))
             elements.append(Spacer(1, 12))
 
-        # Add timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Add timestamp using Utils function for consistency
+        timestamp = get_timestamp('display')
         elements.append(Paragraph(
             f"<i>Generated: {timestamp}</i>",
             self.styles['Footer']
@@ -158,8 +181,10 @@ class ReportGenerator:
         real_count = data_composition_stats.get('real_count', 0)
         wildjailbreak_count = data_composition_stats.get('wildjailbreak_count', 0)
         total_count = data_composition_stats.get('total_count', real_count + wildjailbreak_count)
-        real_pct = data_composition_stats.get('real_percentage', (real_count / total_count * 100) if total_count > 0 else 0)
-        wild_pct = data_composition_stats.get('wildjailbreak_percentage', (wildjailbreak_count / total_count * 100) if total_count > 0 else 0)
+        
+        # Use safe_divide from Utils to prevent division by zero
+        real_pct = data_composition_stats.get('real_percentage', safe_divide(real_count, total_count, default=0.0) * 100)
+        wild_pct = data_composition_stats.get('wildjailbreak_percentage', safe_divide(wildjailbreak_count, total_count, default=0.0) * 100)
 
         composition_text = f"""
         Training data was supplemented with samples from the <b>WildJailbreak dataset</b> to ensure
@@ -463,6 +488,9 @@ class ReportGenerator:
     ):
         """
         Generate production monitoring report from logged predictions.
+        
+        Uses get_timestamp() from Utils for consistent filename generation.
+        Uses safe_divide() from Utils for robust metric calculations.
 
         Args:
             predictions_df: DataFrame with prediction logs
@@ -471,9 +499,13 @@ class ReportGenerator:
             latency_distribution_fig: Figure showing prediction latency
             ab_test_comparison_fig: Optional A/B test comparison figure
             output_path: Path to save PDF report
+            
+        Returns:
+            Path to the generated PDF report
         """
         if output_path is None:
-            output_path = os.path.join(reports_path, f"production_monitoring_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+            timestamp = get_timestamp('file')
+            output_path = os.path.join(reports_path, f"production_monitoring_{timestamp}.pdf")
 
         doc = SimpleDocTemplate(output_path, pagesize=letter)
         elements = []
@@ -488,8 +520,10 @@ class ReportGenerator:
         elements.append(Paragraph("Summary Statistics", self.styles['SectionHeading']))
 
         total_predictions = len(predictions_df)
-        avg_confidence = predictions_df['confidence'].mean()
-        avg_latency = predictions_df['latency_ms'].mean()
+        
+        # Use safe defaults for empty dataframes
+        avg_confidence = predictions_df['confidence'].mean() if len(predictions_df) > 0 else 0.0
+        avg_latency = predictions_df['latency_ms'].mean() if len(predictions_df) > 0 else 0.0
 
         # Predictions per class
         class_counts = {}
@@ -607,11 +641,11 @@ class ReportGenerator:
         doc.build(elements)
         print(f"✓ Executive Summary saved to: {output_path}")
 
-
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Dual RoBERTa Classifiers: Report Generation Module
 Created on October 31, 2025
 @author: ramyalsaffar
 """
