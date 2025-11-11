@@ -37,10 +37,9 @@ class MonitoringSystem:
         Returns:
             Dictionary with check results
         """
-        print("\n" + "="*60)
-        print("DAILY PERFORMANCE CHECK")
-        print("="*60)
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print()
+        print_banner("DAILY PERFORMANCE CHECK", width=60)
+        print(f"Timestamp: {get_timestamp('display')}")
 
         # Sample predictions from last 24 hours
         sample_size = self.thresholds['small_sample_size']
@@ -71,7 +70,7 @@ class MonitoringSystem:
             for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
                               desc="LLM Judge evaluation"):
                 try:
-                    refusal_label, jailbreak_label = self.judge.label_response(
+                    refusal_label, is_jailbreak_attempt, jailbreak_success, _, _ = self.judge.label_response(
                         response=row['response'],
                         prompt=row['prompt']
                     )
@@ -138,10 +137,9 @@ class MonitoringSystem:
         Returns:
             Dictionary with check results
         """
-        print("\n" + "="*60)
-        print("ESCALATED PERFORMANCE CHECK")
-        print("="*60)
-        print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print()
+        print_banner("ESCALATED PERFORMANCE CHECK", width=60)
+        print(f"Timestamp: {get_timestamp('display')}")
 
         # Sample from last 7 days
         sample_size = self.thresholds['large_sample_size']
@@ -163,7 +161,7 @@ class MonitoringSystem:
             for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
                               desc="LLM Judge evaluation (escalated)"):
                 try:
-                    refusal_label, jailbreak_label = self.judge.label_response(
+                    refusal_label, is_jailbreak_attempt, jailbreak_success, _, _ = self.judge.label_response(
                         response=row['response'],
                         prompt=row['prompt']
                     )
@@ -200,7 +198,7 @@ class MonitoringSystem:
 
         # Log monitoring run
         # GENERIC: Dynamic class count
-        num_classes = len(CLASS_NAMES)
+        num_classes = MODEL_CONFIG['num_classes']
         metrics = {
             'total_samples': len(sample_df),
             'disagreements': disagreements,
@@ -265,9 +263,9 @@ class MonitoringSystem:
         Returns:
             Dictionary with final results
         """
-        print("\n" + "="*80)
-        print(" "*25 + "MONITORING CYCLE")
-        print("="*80)
+        print()
+        print_banner("MONITORING CYCLE", width=80)
+        print()
 
         # Step 1: Daily check
         daily_result = self.run_daily_check()
@@ -298,16 +296,20 @@ class MonitoringSystem:
 
             return daily_result
 
-    def get_monitoring_history(self, days: int = 30) -> pd.DataFrame:
+    def get_monitoring_history(self, days: int = None) -> pd.DataFrame:
         """
         Get monitoring history from database.
 
         Args:
-            days: Number of days to look back
+            days: Number of days to look back (default: from PRODUCTION_CONFIG)
 
         Returns:
             DataFrame with monitoring history
         """
+        # Use config value if not provided - NO HARDCODING!
+        if days is None:
+            days = PRODUCTION_CONFIG['monitoring_thresholds']['trend_window_days']
+        
         cursor = self.data_manager.conn.cursor()
 
         cursor.execute("""
@@ -323,14 +325,18 @@ class MonitoringSystem:
         cursor.close()
         return df
 
-    def plot_monitoring_trends(self, days: int = 30, output_path: str = None):
+    def plot_monitoring_trends(self, days: int = None, output_path: str = None):
         """
         Plot monitoring trends over time.
 
         Args:
-            days: Number of days to plot
+            days: Number of days to plot (default: from PRODUCTION_CONFIG)
             output_path: Path to save plot (shows if None)
         """
+        # Use config value if not provided - NO HARDCODING!
+        if days is None:
+            days = PRODUCTION_CONFIG['monitoring_thresholds']['trend_window_days']
+        
         df = self.get_monitoring_history(days=days)
 
         if len(df) == 0:
@@ -349,7 +355,7 @@ class MonitoringSystem:
         ax1.set_ylabel('Disagreement Rate (%)')
         ax1.set_title('Model-Judge Disagreement Rate Over Time')
         ax1.legend()
-        ax1.grid(True, alpha=0.3)
+        ax1.grid(True, alpha=VISUALIZATION_CONFIG['alpha_grid'])
 
         # Plot 2: Action taken over time
         action_colors = {'continue': 'green', 'monitor': 'orange',
@@ -360,7 +366,7 @@ class MonitoringSystem:
         ax2.set_xlabel('Date')
         ax2.set_ylabel('Sample Size')
         ax2.set_title('Monitoring Sample Size and Actions')
-        ax2.grid(True, alpha=0.3)
+        ax2.grid(True, alpha=VISUALIZATION_CONFIG['alpha_grid'])
 
         # Legend for colors
         from matplotlib.patches import Patch
