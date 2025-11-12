@@ -62,11 +62,11 @@ class DataLabeler:
             prompt: Original prompt that generated the response
         
         Returns:
-            Tuple of (refusal_label, is_jailbreak_attempt, jailbreak_success, 
+            Tuple of (refusal_label, is_jailbreak_attempt, jailbreak_label,
                       refusal_confidence, jailbreak_confidence)
             - refusal_label: 0 = No Refusal, 1 = Hard Refusal, 2 = Soft Refusal, -1 = Error
             - is_jailbreak_attempt: 0 = Normal prompt, 1 = Jailbreak attempt
-            - jailbreak_success: 0 = Failed/Not applicable, 1 = Succeeded, -1 = Error
+            - jailbreak_label: 0 = Failed/Not applicable, 1 = Succeeded, -1 = Error
             - refusal_confidence: 0-100 (percentage)
             - jailbreak_confidence: 0-100 (percentage)
         """
@@ -79,16 +79,16 @@ class DataLabeler:
         
         # Get labels from judge
         result = self.label_response_with_llm_judge(response, prompt)
-        refusal_label, is_jailbreak_attempt, jailbreak_success, refusal_conf, jailbreak_conf = result
-        
+        refusal_label, is_jailbreak_attempt, jailbreak_label, refusal_conf, jailbreak_conf = result
+
         # Update statistics
         self.stats['refusal_distribution'][refusal_label] += 1
-        self.stats['jailbreak_distribution'][jailbreak_success] += 1
-        
+        self.stats['jailbreak_distribution'][jailbreak_label] += 1
+
         # Track jailbreak attempts
         if is_jailbreak_attempt == 1:
             self.stats['jailbreak_attempts'] += 1
-            if jailbreak_success == 1:
+            if jailbreak_label == 1:
                 self.stats['jailbreak_successes'] += 1
         
         if refusal_label != -1:
@@ -105,8 +105,8 @@ class DataLabeler:
             self.stats['error_labels'] += 1
         
         self.stats['total_labeled'] += 1
-        
-        return refusal_label, is_jailbreak_attempt, jailbreak_success, refusal_conf, jailbreak_conf
+
+        return refusal_label, is_jailbreak_attempt, jailbreak_label, refusal_conf, jailbreak_conf
 
     def label_response_with_llm_judge(self, response: str, prompt: str) -> Tuple[int, int, int, int, int]:
         """
@@ -205,7 +205,7 @@ class DataLabeler:
         
         Returns:
             DataFrame with added columns [refusal_label, is_jailbreak_attempt,
-                                         jailbreak_success, refusal_confidence, 
+                                         jailbreak_label, refusal_confidence,
                                          jailbreak_confidence]
         """
         # Initialize checkpoint manager
@@ -293,7 +293,7 @@ class DataLabeler:
                         idx = result['index']
                         labeled_df.at[idx, 'refusal_label'] = result['refusal_label']
                         labeled_df.at[idx, 'is_jailbreak_attempt'] = result['is_jailbreak_attempt']
-                        labeled_df.at[idx, 'jailbreak_label'] = result['jailbreak_success']  # Store as 'jailbreak_label' column
+                        labeled_df.at[idx, 'jailbreak_label'] = result['jailbreak_label']
                         labeled_df.at[idx, 'refusal_confidence'] = result['refusal_confidence']
                         labeled_df.at[idx, 'jailbreak_confidence'] = result['jailbreak_confidence']
                         
@@ -341,13 +341,13 @@ class DataLabeler:
                 response=task['response'],
                 prompt=task['prompt']
             )
-            refusal_label, is_jailbreak_attempt, jailbreak_success, refusal_conf, jailbreak_conf = result
-            
+            refusal_label, is_jailbreak_attempt, jailbreak_label, refusal_conf, jailbreak_conf = result
+
             return {
                 'index': task['index'],
                 'refusal_label': refusal_label,
                 'is_jailbreak_attempt': is_jailbreak_attempt,  # NEW field
-                'jailbreak_success': jailbreak_success,
+                'jailbreak_label': jailbreak_label,
                 'refusal_confidence': refusal_conf,
                 'jailbreak_confidence': jailbreak_conf
             }
@@ -358,7 +358,7 @@ class DataLabeler:
                 'index': task['index'],
                 'refusal_label': -1,
                 'is_jailbreak_attempt': 0,
-                'jailbreak_success': -1,
+                'jailbreak_label': -1,
                 'refusal_confidence': 0,
                 'jailbreak_confidence': 0
             }
@@ -523,15 +523,16 @@ Your response:"""
             refusal_score = result.get('refusal_score')
             refusal_confidence = result.get('refusal_confidence', 50)
             is_jailbreak_attempt = result.get('is_jailbreak_attempt', 0)  # NEW field
-            jailbreak_success = result.get('jailbreak_success')
+            # Map JSON field 'jailbreak_success' (from GPT-4) to our internal variable 'jailbreak_label'
+            jailbreak_label = result.get('jailbreak_success')
             jailbreak_confidence = result.get('jailbreak_confidence', 50)
-            
+
             # Validate scores
             if refusal_score not in [-1, 0, 1, 2]:
                 return None
             if is_jailbreak_attempt not in [0, 1]:
                 return None
-            if jailbreak_success not in [-1, 0, 1]:
+            if jailbreak_label not in [-1, 0, 1]:
                 return None
             
             # Validate confidence (0-100)
@@ -545,8 +546,8 @@ Your response:"""
                 refusal_label = label_mapping.get(refusal_score)
                 if refusal_label is None:
                     return None
-            
-            return refusal_label, is_jailbreak_attempt, jailbreak_success, refusal_confidence, jailbreak_confidence
+
+            return refusal_label, is_jailbreak_attempt, jailbreak_label, refusal_confidence, jailbreak_confidence
             
         except Exception as e:
             if EXPERIMENT_CONFIG.get('verbose', True):
