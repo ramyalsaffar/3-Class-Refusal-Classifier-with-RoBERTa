@@ -524,12 +524,8 @@ Output ONLY a JSON array of {{num}} strings."""
         if category in templates:
             if refusal_type in templates[category]:
                 return templates[category][refusal_type]
-            elif refusal_type == 'none' and 'none' in templates[category]:
+            elif refusal_type == 'no_refusal' and 'none' in templates[category]:
                 return templates[category]['none']
-            elif refusal_type == 'soft' and 'soft' in templates[category]:
-                return templates[category]['soft']
-            elif refusal_type == 'hard' and 'hard' in templates[category]:
-                return templates[category]['hard']
 
         # Fallback template
         return f"""Generate {{num}} realistic human-sounding prompts for category: {category} (refusal type: {refusal_type}).
