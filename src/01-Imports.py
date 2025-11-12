@@ -84,6 +84,7 @@ from datasets import load_dataset
 import matplotlib.pyplot as plt
 from matplotlib import image as mpimg
 import seaborn as sns
+import shap
 
 # PDF Report Generation (optional - only needed for report generation)
 try:
@@ -110,20 +111,7 @@ import google.generativeai as genai
 import tiktoken  # Token counting for API usage tracking
 
 # Environment variables
-try:
-    from dotenv import load_dotenv
-    DOTENV_AVAILABLE = True
-except ImportError:
-    DOTENV_AVAILABLE = False
-    print("ℹ️  python-dotenv not available")
-
-# SHAP (optional - for interpretability)
-try:
-    import shap
-    SHAP_AVAILABLE = True
-except ImportError:
-    SHAP_AVAILABLE = False
-    print("ℹ️  shap not available - interpretability features disabled")
+from dotenv import load_dotenv
 
 # AWS (optional - only needed for cloud deployment)
 try:
@@ -184,8 +172,8 @@ data_checkpoints_path = glob.glob(data_path + "*Checkpoints/")[0]
 models_path = glob.glob(base_results_path + "/*Models/")[0]
 
 # Results Subdirectories
-analysis_results_path = glob.glob(base_results_path, "/*Analysis")[0]
-quality_review_path = glob.glob(base_results_path, "/*Quality Review")[0]
+analysis_results_path = glob.glob(base_results_path + "/*Analysis")[0]
+quality_review_path = glob.glob(base_results_path + "/*Quality Review")[0]
 
 # Visualization Subdirectories
 visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
