@@ -100,7 +100,7 @@ TRAINING_CONFIG = {
     'early_stopping_patience': 3,               # Epochs to wait before early stopping
     'save_best_only': True,                     # Only save best model checkpoint
     'num_workers': 0 if IS_MAC else 4,          # DataLoader workers (0 for Mac, 4 for AWS)
-    'pin_memory': True,                         # Pin memory for faster GPU transfer
+    'pin_memory': DEVICE.type == 'cuda',        # Pin memory only works with CUDA (not MPS/CPU)
     'device': DEVICE                            # Auto-detected in 02-Setup.py
 }
 
