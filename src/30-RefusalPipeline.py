@@ -346,6 +346,10 @@ class RefusalPipeline:
 
     def run_full_pipeline(self):
         """Execute complete pipeline from start to finish."""
+        # Start timing
+        pipeline_start_time = time.time()
+        start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         # Generate single timestamp for this entire run
         self.run_timestamp = get_timestamp('file')
 
@@ -354,6 +358,8 @@ class RefusalPipeline:
         print(f"Run Timestamp: {self.run_timestamp}")
         print(f"Classifier 1: Refusal Classification (3 classes)")
         print(f"Classifier 2: Jailbreak Detection (2 classes)")
+        print("="*60)
+        print(f"🕐 Pipeline Started: {start_timestamp}")
         print("="*60 + "\n")
 
         # Step 1: Generate prompts
@@ -403,8 +409,29 @@ class RefusalPipeline:
         # Step 10: Generate reports
         self.generate_reports(refusal_cv_results, jailbreak_cv_results, analysis_results, figures)
 
+        # End timing
+        pipeline_end_time = time.time()
+        end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        total_duration = pipeline_end_time - pipeline_start_time
+        
+        # Format duration nicely
+        hours = int(total_duration // 3600)
+        minutes = int((total_duration % 3600) // 60)
+        seconds = int(total_duration % 60)
+        
+        if hours > 0:
+            duration_str = f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            duration_str = f"{minutes}m {seconds}s"
+        else:
+            duration_str = f"{seconds}s"
+
         print("\n" + "="*60)
         print("✅ PIPELINE COMPLETE (DUAL CLASSIFIERS TRAINED)")
+        print("="*60)
+        print(f"🕐 Started:  {start_timestamp}")
+        print(f"🕐 Finished: {end_timestamp}")
+        print(f"⏱️  Duration: {duration_str} ({total_duration:.1f} seconds)")
         print("="*60)
 
     def generate_prompts(self) -> Dict[str, List[str]]:
@@ -808,7 +835,7 @@ class RefusalPipeline:
 
         # Load the trained model into self.refusal_model for later use
         self.refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
-        checkpoint = safe_load_checkpoint(cv_results['final_model_path'], DEVICE)
+        checkpoint = torch.load(cv_results['final_model_path'], map_location=DEVICE)
         self.refusal_model.load_state_dict(checkpoint['model_state_dict'])
         self.refusal_model = self.refusal_model.to(DEVICE)
         self.refusal_model.eval()
@@ -1077,7 +1104,7 @@ class RefusalPipeline:
 
         # Load the trained model into self.jailbreak_model for later use
         self.jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
-        checkpoint = safe_load_checkpoint(cv_results['final_model_path'], DEVICE)
+        checkpoint = torch.load(cv_results['final_model_path'], map_location=DEVICE)
         self.jailbreak_model.load_state_dict(checkpoint['model_state_dict'])
         self.jailbreak_model = self.jailbreak_model.to(DEVICE)
         self.jailbreak_model.eval()
