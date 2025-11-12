@@ -339,7 +339,7 @@ def create_dataloaders(train_dataset: Dataset,
 def create_jailbreak_filtered_dataset(df: pd.DataFrame,
                                      tokenizer: RobertaTokenizer,
                                      text_column: str = 'response',
-                                     label_column: str = 'jailbreak_success') -> Dataset:
+                                     label_column: str = 'jailbreak_label') -> Dataset:
     """
     Create dataset filtered for jailbreak attempts only.
     
