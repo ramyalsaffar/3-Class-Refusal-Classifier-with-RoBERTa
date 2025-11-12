@@ -31,7 +31,7 @@ class ResponseCollector:
         # Use config values - NO HARDCODING!
         self.models = list(API_CONFIG['response_models'].values())
         self.model_keys = list(API_CONFIG['response_models'].keys())  # For display names
-        self.max_tokens = API_CONFIG['max_tokens_response']
+        self.max_completion_tokens = API_CONFIG['max_tokens_response']
         self.max_retries = API_CONFIG['max_retries']
         self.rate_limit_backoff = API_CONFIG['rate_limit_backoff']
         
@@ -400,6 +400,18 @@ class ResponseCollector:
             
         except Exception as e:
             error_msg = str(e)
+            error_type = type(e).__name__
+            
+            # Print detailed error information
+            print(f"\n❌ RESPONSE COLLECTION ERROR - {get_model_display_name(model_key)}")
+            print(f"   Model: {task.get('model_name', 'unknown')}")
+            print(f"   Model Key: {model_key}")
+            print(f"   Error Type: {error_type}")
+            print(f"   Error Message: {error_msg[:300]}")
+            print(f"   Prompt preview: {task['prompt'][:100]}...")
+            if 'rate limit' in error_msg.lower() or '429' in error_msg:
+                print(f"   ⚠️  This is a RATE LIMIT error")
+            
             return {
                 'prompt': task['prompt'],
                 'response': ERROR_RESPONSE,
@@ -432,16 +444,33 @@ class ResponseCollector:
             except Exception as e:
                 # Check if rate limit error
                 error_str = str(e).lower()
+                error_type = type(e).__name__
                 is_rate_limit = any(keyword in error_str for keyword in ['rate limit', '429', 'quota'])
                 
                 if attempt < self.max_retries - 1:
+                    # Print retry information
+                    print(f"\n⚠️  API ERROR - {get_model_display_name(model_key)} (Attempt {attempt + 1}/{self.max_retries})")
+                    print(f"   Error Type: {error_type}")
+                    print(f"   Error: {str(e)[:300]}")
+                    
                     if is_rate_limit:
                         wait_time = self.rate_limit_backoff * (attempt + 1)
+                        print(f"   ⚠️  RATE LIMIT detected - waiting {wait_time}s before retry")
                     else:
                         wait_time = min(2 ** attempt, 30)  # Exponential backoff, cap at 30s
+                        print(f"   Retrying in {wait_time}s...")
                     
                     time.sleep(wait_time)
                 else:
+                    # Final failure
+                    print(f"\n❌ API CALL FAILED - {get_model_display_name(model_key)}")
+                    print(f"   Model: {model_name}")
+                    print(f"   Attempts: {self.max_retries}")
+                    print(f"   Error Type: {error_type}")
+                    print(f"   Final Error: {str(e)[:300]}")
+                    if is_rate_limit:
+                        print(f"   ⚠️  This is a persistent RATE LIMIT error")
+                        print(f"   💡 Consider: Upgrade API tier, reduce parallel workers, or increase delays")
                     raise e
 
     def collect_all_responses_sequential(self, prompts: Dict[str, List[str]]) -> pd.DataFrame:
