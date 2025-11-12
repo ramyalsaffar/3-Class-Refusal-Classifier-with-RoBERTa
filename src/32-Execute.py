@@ -141,7 +141,7 @@ if __name__ == "__main__":
             print_banner("QUICK TEST COMPLETE", width=60, char='#')
             print("✅ All results saved to:")
             print(f"   - Models: {models_path}")
-            print(f"   - Results: {results_path}")
+            print(f"   - Results: {base_results_path}")
             print(f"   - Visualizations: {visualizations_path}")
             print_banner("", width=60, char='#')
             
@@ -176,7 +176,7 @@ if __name__ == "__main__":
             print_banner("FULL EXPERIMENT COMPLETE", width=60, char='#')
             print("✅ All results saved to:")
             print(f"   - Models: {models_path}")
-            print(f"   - Results: {results_path}")
+            print(f"   - Results: {base_results_path}")
             print(f"   - Visualizations: {visualizations_path}")
             print()
             print("💡 TIP: Generate PDF reports with:")
