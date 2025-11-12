@@ -472,21 +472,24 @@ class RefusalPipeline:
         else:
             # Sequential labeling (original implementation)
             refusal_labels = []
+            is_jailbreak_attempts = []
             jailbreak_labels = []
             refusal_confidences = []
             jailbreak_confidences = []
 
             for idx, row in tqdm(responses_df.iterrows(), total=len(responses_df), desc="Dual-Task LLM Judge Labeling"):
-                refusal_label, jailbreak_label, refusal_conf, jailbreak_conf = labeler.label_response(
+                refusal_label, is_jailbreak_attempt, jailbreak_label, refusal_conf, jailbreak_conf = labeler.label_response(
                     response=row['response'],
                     prompt=row['prompt']
                 )
                 refusal_labels.append(refusal_label)
+                is_jailbreak_attempts.append(is_jailbreak_attempt)
                 jailbreak_labels.append(jailbreak_label)
                 refusal_confidences.append(refusal_conf)
                 jailbreak_confidences.append(jailbreak_conf)
 
             responses_df['refusal_label'] = refusal_labels
+            responses_df['is_jailbreak_attempt'] = is_jailbreak_attempts
             responses_df['jailbreak_label'] = jailbreak_labels
             responses_df['refusal_confidence'] = refusal_confidences
             responses_df['jailbreak_confidence'] = jailbreak_confidences
