@@ -566,6 +566,285 @@ class CrossValidator:
             return obj
 
 
+# =============================================================================
+# CONVENIENCE FUNCTION
+# =============================================================================
+
+def train_with_cross_validation(full_dataset,
+                                model_class,
+                                k_folds: int = None,
+                                test_split: float = None,
+                                class_names: List[str] = None,
+                                save_final_model: bool = True,
+                                final_model_path: str = None) -> Dict:
+    """
+    Complete cross-validation training pipeline.
+
+    This function:
+    1. Splits data into train+val (for CV) and test (held out)
+    2. Runs K-fold CV on train+val data
+    3. Trains final model on full train+val data
+    4. Evaluates final model on test data
+    5. Returns complete results
+
+    Args:
+        full_dataset: Complete dataset (before any splitting)
+        model_class: Model class to instantiate (RefusalClassifier or JailbreakDetector)
+        k_folds: Number of CV folds (uses config if None)
+        test_split: Fraction for test set (uses config if None)
+        class_names: List of class names for display
+        save_final_model: Whether to save the final trained model
+        final_model_path: Path to save final model
+
+    Returns:
+        Dictionary with keys:
+            - 'cv_results': Cross-validation results and statistics
+            - 'test_results': Final model test set performance
+            - 'final_model_path': Path to saved model
+            - 'split_info': Information about train/val/test splits
+    """
+    # Use config values if not provided
+    if k_folds is None:
+        k_folds = CROSS_VALIDATION_CONFIG['default_folds']
+    if test_split is None:
+        test_split = DATASET_CONFIG['test_split']
+    if class_names is None:
+        num_classes = len(set(full_dataset.labels))
+        class_names = [f"Class {i}" for i in range(num_classes)]
+
+    print_banner(f"CROSS-VALIDATION TRAINING PIPELINE ({k_folds}-FOLD)", width=60, char='#')
+    print(f"  Total samples: {len(full_dataset):,}")
+    print(f"  Test split: {test_split:.1%}")
+    print(f"  CV folds: {k_folds}")
+    print(f"  Classes: {len(class_names)}")
+    print(f"#" * 60)
+
+    # Step 1: Split into train+val (for CV) and test (held out)
+    print("\n" + "="*60)
+    print("STEP 1: STRATIFIED TRAIN+VAL / TEST SPLIT")
+    print("="*60)
+
+    # Get all labels for stratification
+    all_labels = np.array(full_dataset.labels)
+    all_indices = np.arange(len(full_dataset))
+
+    # Stratified split
+    train_val_idx, test_idx = train_test_split(
+        all_indices,
+        test_size=test_split,
+        random_state=DATASET_CONFIG['random_seed'],
+        stratify=all_labels
+    )
+
+    # Create train+val dataset (for CV) and test dataset
+    train_val_dataset = torch.utils.data.Subset(full_dataset, train_val_idx)
+    test_dataset = torch.utils.data.Subset(full_dataset, test_idx)
+
+    print(f"  Train+Val: {len(train_val_dataset):,} ({len(train_val_dataset)/len(full_dataset):.1%})")
+    print(f"  Test: {len(test_dataset):,} ({len(test_dataset)/len(full_dataset):.1%})")
+
+    # Print test set class distribution
+    test_labels = all_labels[test_idx]
+    print(f"\n  Test set class distribution:")
+    for i, class_name in enumerate(class_names):
+        count = (test_labels == i).sum()
+        pct = safe_divide(count, len(test_labels), 0) * 100
+        print(f"    {class_name}: {count:,} ({pct:.1f}%)")
+
+    # Step 2: Run K-fold cross-validation on train+val data
+    print("\n" + "="*60)
+    print(f"STEP 2: {k_folds}-FOLD CROSS-VALIDATION")
+    print("="*60)
+
+    cv = CrossValidator(
+        model_class=model_class,
+        dataset=train_val_dataset,
+        k_folds=k_folds,
+        device=DEVICE,
+        class_names=class_names
+    )
+
+    cv.run_cross_validation(save_fold_models=False)
+    cv_summary = cv._calculate_cv_statistics()
+    cv_summary['significance'] = cv._test_significance()
+    cv._print_cv_summary(cv_summary)
+
+    # Step 3: Train final model on full train+val data
+    print("\n" + "="*60)
+    print("STEP 3: TRAIN FINAL MODEL (FULL TRAIN+VAL)")
+    print("="*60)
+    print(f"  Training on {len(train_val_dataset):,} samples")
+
+    # Create train loader (use all train+val data)
+    train_loader = DataLoader(
+        train_val_dataset,
+        batch_size=TRAINING_CONFIG['batch_size'],
+        shuffle=True,
+        num_workers=TRAINING_CONFIG['num_workers'],
+        pin_memory=TRAINING_CONFIG.get('pin_memory', True)
+    )
+
+    # Get class distribution for weighting
+    train_val_labels = all_labels[train_val_idx]
+    class_counts = [int((train_val_labels == i).sum()) for i in range(len(class_names))]
+
+    print(f"\n  Class distribution:")
+    for i, (class_name, count) in enumerate(zip(class_names, class_counts)):
+        pct = safe_divide(count, len(train_val_dataset), 0) * 100
+        print(f"    {class_name}: {count:,} ({pct:.1f}%)")
+
+    # Initialize final model
+    model = model_class(num_classes=len(class_names))
+    model.freeze_roberta_layers()
+    model = model.to(DEVICE)
+
+    print(f"\n  Trainable parameters: {count_parameters(model):,}")
+
+    # Setup training components
+    criterion = get_weighted_criterion(class_counts, DEVICE, class_names=class_names)
+    optimizer = AdamW(
+        model.parameters(),
+        lr=TRAINING_CONFIG['learning_rate'],
+        weight_decay=TRAINING_CONFIG['weight_decay']
+    )
+
+    num_training_steps = len(train_loader) * TRAINING_CONFIG['epochs']
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=TRAINING_CONFIG['warmup_steps'],
+        num_training_steps=num_training_steps
+    )
+
+    # Create dummy val_loader for Trainer compatibility (no validation during final training)
+    val_loader = DataLoader(
+        test_dataset,  # Use test set for validation monitoring only
+        batch_size=TRAINING_CONFIG['batch_size'],
+        shuffle=False,
+        num_workers=TRAINING_CONFIG['num_workers'],
+        pin_memory=TRAINING_CONFIG.get('pin_memory', True)
+    )
+
+    # Train final model
+    trainer = Trainer(
+        model,
+        train_loader,
+        val_loader,
+        criterion,
+        optimizer,
+        scheduler,
+        DEVICE
+    )
+
+    # Save path
+    if final_model_path is None:
+        final_model_path = os.path.join(
+            models_path,
+            f"{EXPERIMENT_CONFIG['experiment_name']}_cv_final_best.pt"
+        )
+
+    history = trainer.train(model_save_path=final_model_path if save_final_model else None)
+
+    if save_final_model:
+        print(f"\n✓ Final model saved: {final_model_path}")
+
+    # Step 4: Evaluate final model on test set
+    print("\n" + "="*60)
+    print("STEP 4: EVALUATE ON TEST SET")
+    print("="*60)
+
+    # Load best model
+    model.eval()
+    if save_final_model:
+        checkpoint = torch.load(final_model_path, map_location=DEVICE)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"  Loaded best model (epoch {checkpoint['epoch']}, val F1: {checkpoint['best_val_f1']:.4f})")
+
+    # Evaluate on test set
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=TRAINING_CONFIG['batch_size'],
+        shuffle=False,
+        num_workers=TRAINING_CONFIG['num_workers'],
+        pin_memory=TRAINING_CONFIG.get('pin_memory', True)
+    )
+
+    all_preds = []
+    all_labels = []
+    all_probs = []
+
+    with torch.no_grad():
+        for batch in tqdm(test_loader, desc="Evaluating on test set"):
+            input_ids = batch['input_ids'].to(DEVICE)
+            attention_mask = batch['attention_mask'].to(DEVICE)
+            labels = batch['label']
+
+            outputs = model(input_ids, attention_mask)
+            logits = outputs['logits']
+            probs = torch.softmax(logits, dim=1)
+            preds = torch.argmax(logits, dim=1)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.numpy())
+            all_probs.extend(probs.cpu().numpy())
+
+    # Calculate test metrics
+    test_accuracy = accuracy_score(all_labels, all_preds)
+    test_f1_macro = f1_score(all_labels, all_preds, average='macro', zero_division=0)
+    test_f1_weighted = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+    test_precision = precision_score(all_labels, all_preds, average='macro', zero_division=0)
+    test_recall = recall_score(all_labels, all_preds, average='macro', zero_division=0)
+
+    # Per-class metrics
+    test_f1_per_class = f1_score(all_labels, all_preds, average=None, zero_division=0)
+    test_precision_per_class = precision_score(all_labels, all_preds, average=None, zero_division=0)
+    test_recall_per_class = recall_score(all_labels, all_preds, average=None, zero_division=0)
+
+    print(f"\n  Test Set Performance:")
+    print(f"    Accuracy: {test_accuracy:.4f}")
+    print(f"    F1 (macro): {test_f1_macro:.4f}")
+    print(f"    F1 (weighted): {test_f1_weighted:.4f}")
+    print(f"    Precision (macro): {test_precision:.4f}")
+    print(f"    Recall (macro): {test_recall:.4f}")
+
+    print(f"\n  Per-Class Performance:")
+    for i, class_name in enumerate(class_names):
+        print(f"    {class_name}:")
+        print(f"      F1: {test_f1_per_class[i]:.4f}")
+        print(f"      Precision: {test_precision_per_class[i]:.4f}")
+        print(f"      Recall: {test_recall_per_class[i]:.4f}")
+
+    # Return complete results
+    results = {
+        'cv_results': cv_summary,
+        'test_results': {
+            'accuracy': test_accuracy,
+            'f1_macro': test_f1_macro,
+            'f1_weighted': test_f1_weighted,
+            'precision_macro': test_precision,
+            'recall_macro': test_recall,
+            'f1_per_class': {class_names[i]: float(test_f1_per_class[i]) for i in range(len(class_names))},
+            'precision_per_class': {class_names[i]: float(test_precision_per_class[i]) for i in range(len(class_names))},
+            'recall_per_class': {class_names[i]: float(test_recall_per_class[i]) for i in range(len(class_names))},
+            'predictions': all_preds,
+            'labels': all_labels,
+            'probabilities': all_probs
+        },
+        'final_model_path': final_model_path if save_final_model else None,
+        'split_info': {
+            'train_val_size': len(train_val_dataset),
+            'test_size': len(test_dataset),
+            'train_val_indices': train_val_idx.tolist(),
+            'test_indices': test_idx.tolist()
+        }
+    }
+
+    print("\n" + "#"*60)
+    print("CROSS-VALIDATION TRAINING COMPLETE")
+    print("#"*60)
+
+    return results
+
+
 #------------------------------------------------------------------------------
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-

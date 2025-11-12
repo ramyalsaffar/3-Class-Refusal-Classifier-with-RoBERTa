@@ -287,29 +287,58 @@ class RefusalPipeline:
         if start_step <= 5:
             datasets = self.prepare_datasets(labeled_df_augmented)
 
-        # Training and analysis always run if we reach this point
+        # Training WITH cross-validation
+        refusal_cv_results = None
+        jailbreak_cv_results = None
+        test_df = None
+
         if start_step <= 6:
-            refusal_history = self.train_refusal_classifier(
-                datasets['refusal']['train_loader'],
-                datasets['refusal']['val_loader']
+            if datasets is None:
+                # Load datasets if we skipped step 5
+                datasets = self.prepare_datasets(labeled_df_augmented)
+            refusal_cv_results = self.train_refusal_classifier(
+                datasets['refusal']['full_dataset']
             )
 
         if start_step <= 7:
-            jailbreak_history = self.train_jailbreak_detector(
-                datasets['jailbreak']['train_loader'],
-                datasets['jailbreak']['val_loader']
+            if datasets is None:
+                # Load datasets if we skipped step 5
+                datasets = self.prepare_datasets(labeled_df_augmented)
+            jailbreak_cv_results = self.train_jailbreak_detector(
+                datasets['jailbreak']['full_dataset']
             )
 
+        # Create test_df from CV results
         if start_step <= 8:
-            analysis_results = self.run_analyses(datasets['refusal']['test_df'])
+            if refusal_cv_results and jailbreak_cv_results:
+                test_df = self._create_test_df_from_cv_results(
+                    refusal_cv_results,
+                    jailbreak_cv_results,
+                    labeled_df_augmented
+                )
+            else:
+                # Fallback: load from datasets if CV results not available
+                test_df = datasets['refusal']['test_df'] if datasets else None
+
+            if test_df is not None:
+                analysis_results = self.run_analyses(test_df)
+            else:
+                print("⚠️  No test data available for analysis")
+                analysis_results = None
 
         if start_step <= 9:
-            figures = self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
+            if refusal_cv_results and jailbreak_cv_results and analysis_results:
+                figures = self.generate_visualizations(refusal_cv_results, jailbreak_cv_results, analysis_results)
+            else:
+                figures = None
         else:
             figures = None
 
         if start_step <= 10:
-            self.generate_reports(refusal_history, jailbreak_history, analysis_results, figures)
+            if figures and refusal_cv_results and jailbreak_cv_results and analysis_results:
+                self.generate_reports(refusal_cv_results, jailbreak_cv_results, analysis_results, figures)
+            else:
+                print("⚠️  Skipping report generation - missing required data")
 
         print("\n" + "="*60)
         print(f"✅ PARTIAL PIPELINE COMPLETE (Started from Step {start_step})")
@@ -346,26 +375,33 @@ class RefusalPipeline:
         # Step 5: Prepare datasets for BOTH classifiers
         datasets = self.prepare_datasets(labeled_df_augmented)
 
-        # Step 6: Train refusal classifier
-        refusal_history = self.train_refusal_classifier(
-            datasets['refusal']['train_loader'],
-            datasets['refusal']['val_loader']
+        # Step 6: Train refusal classifier WITH cross-validation
+        refusal_cv_results = self.train_refusal_classifier(
+            datasets['refusal']['full_dataset']
         )
 
-        # Step 7: Train jailbreak detector
-        jailbreak_history = self.train_jailbreak_detector(
-            datasets['jailbreak']['train_loader'],
-            datasets['jailbreak']['val_loader']
+        # Step 7: Train jailbreak detector WITH cross-validation
+        jailbreak_cv_results = self.train_jailbreak_detector(
+            datasets['jailbreak']['full_dataset']
+        )
+
+        # Create test_df from CV results for analysis
+        # CV returns predictions and labels - reconstruct test_df
+        test_df = self._create_test_df_from_cv_results(
+            refusal_cv_results,
+            jailbreak_cv_results,
+            labeled_df_augmented
         )
 
         # Step 8: Run analyses
-        analysis_results = self.run_analyses(datasets['refusal']['test_df'])
+        analysis_results = self.run_analyses(test_df)
 
         # Step 9: Generate visualizations
-        figures = self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
+        # Note: CV results include training history from final model
+        figures = self.generate_visualizations(refusal_cv_results, jailbreak_cv_results, analysis_results)
 
         # Step 10: Generate reports
-        self.generate_reports(refusal_history, jailbreak_history, analysis_results, figures)
+        self.generate_reports(refusal_cv_results, jailbreak_cv_results, analysis_results, figures)
 
         print("\n" + "="*60)
         print("✅ PIPELINE COMPLETE (DUAL CLASSIFIERS TRAINED)")
@@ -570,13 +606,17 @@ class RefusalPipeline:
 
     def prepare_datasets(self, labeled_df: pd.DataFrame) -> Dict:
         """
-        Step 5: Prepare train/val/test datasets for BOTH classifiers.
+        Step 5: Prepare datasets for BOTH classifiers.
+
+        Creates full datasets (for CV training) and test DataFrame (for analysis).
+        Also saves train/val/test splits to disk for reference.
 
         Returns:
             Dictionary with structure:
             {
-                'refusal': {train_loader, val_loader, test_loader, test_df},
-                'jailbreak': {train_loader, val_loader, test_loader, test_df}
+                'refusal': {full_dataset, test_df},
+                'jailbreak': {full_dataset, test_df},
+                'labeled_df': labeled_df (for CV training)
             }
         """
         print("\n" + "="*60)
@@ -655,140 +695,124 @@ class RefusalPipeline:
         print("\nInitializing tokenizer...")
         self.tokenizer = RobertaTokenizer.from_pretrained(MODEL_CONFIG['model_name'])
 
-        # Prepare datasets for REFUSAL CLASSIFIER
-        print("\n--- Preparing Refusal Classifier Datasets ---")
-        refusal_train_dataset = ClassificationDataset(
-            train_df['response'].tolist(),
-            train_df['refusal_label'].tolist(),
+        # Prepare FULL datasets for cross-validation training
+        print("\n--- Preparing Full Datasets for Cross-Validation ---")
+
+        # Refusal classifier full dataset (uses all labeled data)
+        refusal_full_dataset = ClassificationDataset(
+            labeled_df['response'].tolist(),
+            labeled_df['refusal_label'].tolist(),
             self.tokenizer
         )
 
-        refusal_val_dataset = ClassificationDataset(
-            val_df['response'].tolist(),
-            val_df['refusal_label'].tolist(),
+        print(f"✓ Refusal classifier full dataset created:")
+        print(f"  Total samples: {len(refusal_full_dataset):,}")
+
+        # Jailbreak detector full dataset (uses all labeled data)
+        jailbreak_full_dataset = ClassificationDataset(
+            labeled_df['response'].tolist(),
+            labeled_df['jailbreak_label'].tolist(),
             self.tokenizer
         )
 
-        refusal_test_dataset = ClassificationDataset(
-            test_df['response'].tolist(),
-            test_df['refusal_label'].tolist(),
-            self.tokenizer
-        )
+        print(f"✓ Jailbreak detector full dataset created:")
+        print(f"  Total samples: {len(jailbreak_full_dataset):,}")
 
-        refusal_train_loader, refusal_val_loader, refusal_test_loader = create_dataloaders(
-            refusal_train_dataset, refusal_val_dataset, refusal_test_dataset
-        )
-
-        print(f"✓ Refusal classifier dataloaders created")
-        print(f"  Train batches: {len(refusal_train_loader)}")
-        print(f"  Val batches: {len(refusal_val_loader)}")
-        print(f"  Test batches: {len(refusal_test_loader)}")
-
-        # Prepare datasets for JAILBREAK DETECTOR
-        print("\n--- Preparing Jailbreak Detector Datasets ---")
-        jailbreak_train_dataset = ClassificationDataset(
-            train_df['response'].tolist(),
-            train_df['jailbreak_label'].tolist(),
-            self.tokenizer
-        )
-
-        jailbreak_val_dataset = ClassificationDataset(
-            val_df['response'].tolist(),
-            val_df['jailbreak_label'].tolist(),
-            self.tokenizer
-        )
-
-        jailbreak_test_dataset = ClassificationDataset(
-            test_df['response'].tolist(),
-            test_df['jailbreak_label'].tolist(),
-            self.tokenizer
-        )
-
-        jailbreak_train_loader, jailbreak_val_loader, jailbreak_test_loader = create_dataloaders(
-            jailbreak_train_dataset, jailbreak_val_dataset, jailbreak_test_dataset
-        )
-
-        print(f"✓ Jailbreak detector dataloaders created")
-        print(f"  Train batches: {len(jailbreak_train_loader)}")
-        print(f"  Val batches: {len(jailbreak_val_loader)}")
-        print(f"  Test batches: {len(jailbreak_test_loader)}")
+        print(f"\n{'='*60}")
+        print("NOTE: Cross-validation will handle train/val/test splitting internally")
+        print(f"{'='*60}")
 
         return {
             'refusal': {
-                'train_loader': refusal_train_loader,
-                'val_loader': refusal_val_loader,
-                'test_loader': refusal_test_loader,
-                'test_df': test_df
+                'full_dataset': refusal_full_dataset,
+                'test_df': test_df  # Will be populated by CV results
             },
             'jailbreak': {
-                'train_loader': jailbreak_train_loader,
-                'val_loader': jailbreak_val_loader,
-                'test_loader': jailbreak_test_loader,
-                'test_df': test_df
-            }
+                'full_dataset': jailbreak_full_dataset,
+                'test_df': test_df  # Will be populated by CV results
+            },
+            'labeled_df': labeled_df  # Keep for reference
         }
 
-    def train_refusal_classifier(self, train_loader, val_loader) -> Dict:
-        """Step 6: Train RoBERTa refusal classifier (3 classes)."""
+    def train_refusal_classifier(self, full_dataset) -> Dict:
+        """
+        Step 6: Train RoBERTa refusal classifier WITH cross-validation.
+
+        Uses K-fold cross-validation to:
+        1. Evaluate model performance robustly
+        2. Train final model on full train+val data
+        3. Evaluate on held-out test set
+
+        Args:
+            full_dataset: Complete dataset (CV handles splitting internally)
+
+        Returns:
+            Dictionary with CV results and test performance
+        """
         print("\n" + "="*60)
-        print("STEP 6: TRAINING REFUSAL CLASSIFIER (3 CLASSES)")
+        print("STEP 6: TRAINING REFUSAL CLASSIFIER WITH CROSS-VALIDATION")
         print("="*60)
 
-        # Initialize model
-        # WHY: Use len(CLASS_NAMES) for generic design (works with any N-class classifier)
-        self.refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
-        self.refusal_model.freeze_roberta_layers()
-        self.refusal_model = self.refusal_model.to(DEVICE)
-
-        print(f"\nModel: {MODEL_CONFIG['model_name']}")
-        print(f"Trainable parameters: {count_parameters(self.refusal_model):,}")
-
-        # Calculate class weights
-        train_labels = []
-        for batch in train_loader:
-            train_labels.extend(batch['label'].tolist())
-
-        class_counts = [train_labels.count(i) for i in range(self.refusal_model.num_classes)]
-        print(f"\nClass distribution in training set:")
-        for i, count in enumerate(class_counts):
-            print(f"  Class {i} ({CLASS_NAMES[i]}): {count}")
-
-        criterion = get_weighted_criterion(class_counts, DEVICE)
-
-        # Optimizer and scheduler
-        optimizer = AdamW(
-            self.refusal_model.parameters(),
-            lr=TRAINING_CONFIG['learning_rate'],
-            weight_decay=TRAINING_CONFIG['weight_decay']
-        )
-
-        num_training_steps = len(train_loader) * TRAINING_CONFIG['epochs']
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=TRAINING_CONFIG['warmup_steps'],
-            num_training_steps=num_training_steps
-        )
-
-        # Train
-        trainer = Trainer(
-            self.refusal_model,
-            train_loader,
-            val_loader,
-            criterion,
-            optimizer,
-            scheduler,
-            DEVICE
-        )
-
-        try:
-            history = trainer.train(
-                model_save_path=os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
+        # Use the standalone CV training function
+        cv_results = train_with_cross_validation(
+            full_dataset=full_dataset,
+            model_class=RefusalClassifier,
+            k_folds=CROSS_VALIDATION_CONFIG['default_folds'],
+            test_split=DATASET_CONFIG['test_split'],
+            class_names=CLASS_NAMES,
+            save_final_model=True,
+            final_model_path=os.path.join(
+                models_path,
+                f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt"
             )
-            print(f"\n✓ Refusal classifier training complete")
-            return history
-        except Exception as e:
-            print(f"\n❌ Refusal classifier training failed: {e}")
-            raise
+        )
+
+        # Load the trained model into self.refusal_model for later use
+        self.refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
+        checkpoint = torch.load(cv_results['final_model_path'], map_location=DEVICE)
+        self.refusal_model.load_state_dict(checkpoint['model_state_dict'])
+        self.refusal_model = self.refusal_model.to(DEVICE)
+        self.refusal_model.eval()
+
+        print(f"\n✓ Refusal classifier training complete (CV-validated)")
+        print(f"   CV Mean F1: {cv_results['cv_results']['overall']['f1_macro']['mean']:.4f} ± {cv_results['cv_results']['overall']['f1_macro']['std']:.4f}")
+        print(f"   Test F1: {cv_results['test_results']['f1_macro']:.4f}")
+
+        return cv_results
+
+    def _create_test_df_from_cv_results(self, refusal_cv_results: Dict, jailbreak_cv_results: Dict, labeled_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Create test DataFrame from CV results for analysis.
+
+        CV splits data internally, so we need to extract the test indices
+        and reconstruct the test DataFrame with proper columns.
+
+        Args:
+            refusal_cv_results: Refusal classifier CV results
+            jailbreak_cv_results: Jailbreak detector CV results
+            labeled_df: Original labeled DataFrame
+
+        Returns:
+            Test DataFrame ready for analysis
+        """
+        # Get test indices from CV (both should be the same since same random seed)
+        test_indices = refusal_cv_results['split_info']['test_indices']
+
+        # Create test_df from original labeled_df using test indices
+        test_df = labeled_df.iloc[test_indices].copy()
+
+        # Add 'label' column for backward compatibility with analysis modules
+        test_df['label'] = test_df['refusal_label']
+
+        print(f"\n✓ Created test DataFrame from CV results:")
+        print(f"  Test samples: {len(test_df):,}")
+        print(f"  Refusal class distribution:")
+        for i in range(len(CLASS_NAMES)):
+            count = (test_df['refusal_label'] == i).sum()
+            pct = safe_divide(count, len(test_df), 0) * 100
+            print(f"    {CLASS_NAMES[i]}: {count} ({pct:.1f}%)")
+
+        return test_df
 
     def prepare_jailbreak_training_data(self, labeled_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -953,32 +977,35 @@ class RefusalPipeline:
             # Return original data - training will be skipped due to zero samples
             return labeled_df_copy
 
-    def train_jailbreak_detector(self, train_loader, val_loader) -> Dict:
-        """Step 7: Train RoBERTa jailbreak detector (2 classes)."""
+    def train_jailbreak_detector(self, full_dataset) -> Dict:
+        """
+        Step 7: Train RoBERTa jailbreak detector WITH cross-validation.
+
+        Uses K-fold cross-validation to:
+        1. Evaluate model performance robustly
+        2. Train final model on full train+val data
+        3. Evaluate on held-out test set
+
+        Args:
+            full_dataset: Complete dataset (CV handles splitting internally)
+
+        Returns:
+            Dictionary with CV results and test performance
+        """
         print("\n" + "="*60)
-        print("STEP 7: TRAINING JAILBREAK DETECTOR (2 CLASSES)")
+        print("STEP 7: TRAINING JAILBREAK DETECTOR WITH CROSS-VALIDATION")
         print("="*60)
 
-        # Initialize model
-        # WHY: Use len(JAILBREAK_CLASS_NAMES) for generic design (works with any N-class classifier)
-        self.jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
-        self.jailbreak_model.freeze_roberta_layers()
-        self.jailbreak_model = self.jailbreak_model.to(DEVICE)
+        # Check for class imbalance before training
+        all_labels = full_dataset.labels
+        class_counts = [all_labels.count(i) for i in range(len(JAILBREAK_CLASS_NAMES))]
 
-        print(f"\nModel: {MODEL_CONFIG['model_name']}")
-        print(f"Trainable parameters: {count_parameters(self.jailbreak_model):,}")
+        print(f"\nOverall class distribution:")
+        for i, (class_name, count) in enumerate(zip(JAILBREAK_CLASS_NAMES, class_counts)):
+            pct = safe_divide(count, len(all_labels), 0) * 100
+            print(f"  {class_name}: {count:,} ({pct:.1f}%)")
 
-        # Calculate class weights
-        train_labels = []
-        for batch in train_loader:
-            train_labels.extend(batch['label'].tolist())
-
-        class_counts = [train_labels.count(i) for i in range(self.jailbreak_model.num_classes)]
-        print(f"\nClass distribution in training set:")
-        print(f"  Class 0 (Jailbreak Failed): {class_counts[0]}")
-        print(f"  Class 1 (Jailbreak Succeeded): {class_counts[1]}")
-
-        # CRITICAL: Cannot train with zero samples in any class
+        # Check for zero samples
         zero_classes = [i for i, count in enumerate(class_counts) if count == 0]
         if zero_classes:
             print(f"\n{'='*60}")
@@ -986,7 +1013,7 @@ class RefusalPipeline:
             print(f"{'='*60}")
             print(f"\nREASON: Zero samples in class(es): {zero_classes}")
             for i, count in enumerate(class_counts):
-                status = "❌ ZERO" if i in zero_classes else f"✓ {count}"
+                status = "❌ ZERO" if i in zero_classes else f"✓ {count:,}"
                 print(f"  Class {i} ({JAILBREAK_CLASS_NAMES[i]}): {status}")
 
             print(f"\nWildJailbreak supplementation should have fixed this!")
@@ -995,43 +1022,32 @@ class RefusalPipeline:
 
             return {'status': 'skipped', 'reason': 'zero_samples', 'class_counts': class_counts}
 
-        # Proceed with training
-        criterion = get_weighted_criterion(class_counts, DEVICE, class_names=JAILBREAK_CLASS_NAMES)
-
-        # Optimizer and scheduler
-        optimizer = AdamW(
-            self.jailbreak_model.parameters(),
-            lr=TRAINING_CONFIG['learning_rate'],
-            weight_decay=TRAINING_CONFIG['weight_decay']
-        )
-
-        num_training_steps = len(train_loader) * TRAINING_CONFIG['epochs']
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer,
-            num_warmup_steps=TRAINING_CONFIG['warmup_steps'],
-            num_training_steps=num_training_steps
-        )
-
-        # Train
-        trainer = Trainer(
-            self.jailbreak_model,
-            train_loader,
-            val_loader,
-            criterion,
-            optimizer,
-            scheduler,
-            DEVICE
-        )
-
-        try:
-            history = trainer.train(
-                model_save_path=os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
+        # Use the standalone CV training function
+        cv_results = train_with_cross_validation(
+            full_dataset=full_dataset,
+            model_class=JailbreakDetector,
+            k_folds=CROSS_VALIDATION_CONFIG['default_folds'],
+            test_split=DATASET_CONFIG['test_split'],
+            class_names=JAILBREAK_CLASS_NAMES,
+            save_final_model=True,
+            final_model_path=os.path.join(
+                models_path,
+                f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt"
             )
-            print(f"\n✓ Jailbreak detector training complete")
-            return history
-        except Exception as e:
-            print(f"\n❌ Jailbreak detector training failed: {e}")
-            raise
+        )
+
+        # Load the trained model into self.jailbreak_model for later use
+        self.jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
+        checkpoint = torch.load(cv_results['final_model_path'], map_location=DEVICE)
+        self.jailbreak_model.load_state_dict(checkpoint['model_state_dict'])
+        self.jailbreak_model = self.jailbreak_model.to(DEVICE)
+        self.jailbreak_model.eval()
+
+        print(f"\n✓ Jailbreak detector training complete (CV-validated)")
+        print(f"   CV Mean F1: {cv_results['cv_results']['overall']['f1_macro']['mean']:.4f} ± {cv_results['cv_results']['overall']['f1_macro']['std']:.4f}")
+        print(f"   Test F1: {cv_results['test_results']['f1_macro']:.4f}")
+
+        return cv_results
 
     def run_analyses(self, test_df: pd.DataFrame) -> Dict:
         """Step 8: Run all analyses for BOTH classifiers."""
