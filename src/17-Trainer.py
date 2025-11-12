@@ -225,7 +225,7 @@ class Trainer:
                 labels = batch['label'].to(self.device)
                 
                 # Mixed precision context
-                with torch.cuda.amp.autocast(enabled=self.use_mixed_precision):
+                with torch.amp.autocast('cuda', enabled=self.use_mixed_precision):
                     # Forward pass
                     logits = self.model(input_ids, attention_mask)
                     loss = self.criterion(logits, labels)
@@ -302,7 +302,7 @@ class Trainer:
                     labels = batch['label'].to(self.device)
                     
                     # Forward pass with mixed precision
-                    with torch.cuda.amp.autocast(enabled=self.use_mixed_precision):
+                    with torch.amp.autocast('cuda', enabled=self.use_mixed_precision):
                         logits = self.model(input_ids, attention_mask)
                         loss = self.criterion(logits, labels)
                     

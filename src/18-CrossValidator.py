@@ -300,7 +300,7 @@ class CrossValidator:
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['label'].to(self.device)
                 
-                with torch.cuda.amp.autocast(enabled=self.use_mixed_precision):
+                with torch.amp.autocast('cuda', enabled=self.use_mixed_precision):
                     logits = model(input_ids, attention_mask)
                     loss = criterion(logits, labels)
                 
