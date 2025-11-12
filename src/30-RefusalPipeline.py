@@ -549,7 +549,7 @@ class RefusalPipeline:
 
         # Export low-confidence samples for review
         if quality_results['low_confidence']['low_both_count'] > 0:
-            flagged_samples_path = os.path.join(results_path, f"flagged_samples_for_review_{timestamp}.csv")
+            flagged_samples_path = os.path.join(quality_review_path, f"flagged_samples_for_review_{timestamp}.csv")
             quality_analyzer.export_flagged_samples(responses_df, flagged_samples_path, threshold=LABELING_CONFIG['low_confidence_threshold'])
 
         # Save labeled data
@@ -1072,6 +1072,73 @@ class RefusalPipeline:
         print("\n" + "="*60)
         print("REFUSAL CLASSIFIER ANALYSIS")
         print("="*60)
+
+        # STEP 0: Generate predictions from refusal model on test set
+        print("\n--- Generating Refusal Predictions on Test Set ---")
+        test_dataset = ClassificationDataset(
+            test_df['response'].tolist(),
+            test_df['refusal_label'].tolist(),
+            self.tokenizer
+        )
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=TRAINING_CONFIG.get('batch_size', 16),
+            shuffle=False,
+            num_workers=0
+        )
+
+        all_preds = []
+        all_labels = []
+        all_probs = []
+
+        self.refusal_model.eval()
+        with torch.no_grad():
+            for batch in tqdm(test_loader, desc="Generating predictions"):
+                input_ids = batch['input_ids'].to(DEVICE)
+                attention_mask = batch['attention_mask'].to(DEVICE)
+                labels_batch = batch['label']
+
+                outputs = self.refusal_model(input_ids, attention_mask)
+                # Handle both dict and tensor returns
+                if isinstance(outputs, dict):
+                    logits = outputs['logits']
+                else:
+                    logits = outputs
+
+                probs = torch.softmax(logits, dim=1)
+                preds_batch = torch.argmax(logits, dim=1)
+
+                all_preds.extend(preds_batch.cpu().numpy())
+                all_labels.extend(labels_batch.numpy())
+                all_probs.extend(probs.cpu().numpy())
+
+        # Convert to numpy arrays
+        preds = np.array(all_preds)
+        labels = np.array(all_labels)
+        probs_array = np.array(all_probs)
+        confidences = np.max(probs_array, axis=1)  # Max probability as confidence
+
+        # Calculate metrics
+        accuracy = accuracy_score(labels, preds)
+        macro_f1 = f1_score(labels, preds, average='macro', zero_division=0)
+        weighted_f1 = f1_score(labels, preds, average='weighted', zero_division=0)
+        macro_precision = precision_score(labels, preds, average='macro', zero_division=0)
+        macro_recall = recall_score(labels, preds, average='macro', zero_division=0)
+
+        # Store in analysis_results
+        analysis_results['predictions'] = {
+            'preds': preds,
+            'labels': labels,
+            'confidences': confidences,
+            'probabilities': probs_array,
+            'accuracy': accuracy,
+            'macro_f1': macro_f1,
+            'weighted_f1': weighted_f1,
+            'macro_precision': macro_precision,
+            'macro_recall': macro_recall
+        }
+
+        print(f"✓ Generated predictions: Accuracy={accuracy:.4f}, F1={macro_f1:.4f}")
 
         # Per-model analysis
         print("\n--- Per-Model Analysis ---")
