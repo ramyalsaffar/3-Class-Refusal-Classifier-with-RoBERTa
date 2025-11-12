@@ -175,9 +175,9 @@ class DataCleaner:
         """Check for null values and required columns."""
         # Base columns that must ALWAYS exist
         required_cols = ['prompt', 'response', 'model']
-        
+
         # Optional columns for labeled data
-        optional_cols = ['refusal_label', 'is_jailbreak_attempt', 'jailbreak_success', 
+        optional_cols = ['refusal_label', 'is_jailbreak_attempt', 'jailbreak_label',
                         'expected_label', 'refusal_confidence', 'jailbreak_confidence']
         
         existing_optional = [col for col in optional_cols if col in df.columns]
@@ -420,16 +420,16 @@ class DataCleaner:
                 if self.verbose:
                     print(f"  ✓ Removed {invalid_attempt:,} invalid jailbreak attempt labels")
         
-        # Check jailbreak success labels (0, 1, -1)
-        if 'jailbreak_success' in df.columns:
-            valid_success = df['jailbreak_success'].isin([0, 1, -1])
-            invalid_success = (~valid_success).sum()
-            
-            if invalid_success > 0:
-                df = df[valid_success]
-                invalid_removed += invalid_success
+        # Check jailbreak labels (0, 1, -1)
+        if 'jailbreak_label' in df.columns:
+            valid_jailbreak = df['jailbreak_label'].isin([0, 1, -1])
+            invalid_jailbreak = (~valid_jailbreak).sum()
+
+            if invalid_jailbreak > 0:
+                df = df[valid_jailbreak]
+                invalid_removed += invalid_jailbreak
                 if self.verbose:
-                    print(f"  ✓ Removed {invalid_success:,} invalid jailbreak success labels")
+                    print(f"  ✓ Removed {invalid_jailbreak:,} invalid jailbreak labels")
         
         self.stats['invalid_label_removed'] = invalid_removed
         
@@ -466,11 +466,11 @@ class DataCleaner:
             attempt_count = df['is_jailbreak_attempt'].sum()
             attempt_pct = safe_divide(attempt_count, len(df), 0) * 100
             print(f"     Jailbreak Attempts: {attempt_count:,} ({attempt_pct:.1f}%)")
-            
-            if 'jailbreak_success' in df.columns and attempt_count > 0:
+
+            if 'jailbreak_label' in df.columns and attempt_count > 0:
                 # Only count successes among attempts
                 attempts_df = df[df['is_jailbreak_attempt'] == 1]
-                success_count = (attempts_df['jailbreak_success'] == 1).sum()
+                success_count = (attempts_df['jailbreak_label'] == 1).sum()
                 success_rate = safe_divide(success_count, attempt_count, 0) * 100
                 print(f"       Success Rate: {success_count:,}/{attempt_count:,} ({success_rate:.1f}%)")
 
@@ -543,7 +543,7 @@ class DataCleaner:
         # Check for nulls
         null_check_cols = ['prompt', 'response']
         if 'refusal_label' in df.columns:
-            null_check_cols.extend(['refusal_label', 'is_jailbreak_attempt', 'jailbreak_success'])
+            null_check_cols.extend(['refusal_label', 'is_jailbreak_attempt', 'jailbreak_label'])
         
         null_counts = df[null_check_cols].isnull().sum()
         if null_counts.sum() > 0:
