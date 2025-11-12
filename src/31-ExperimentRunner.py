@@ -287,14 +287,16 @@ class ExperimentRunner:
                 confirm = input().strip().lower()
                 if confirm in ['y', 'yes']:
                     print("\n✓ Starting fresh (deleting checkpoints...)")
-                    # Cleanup all checkpoints
-                    for operation in ['response_collection', 'labeling', 'wildjailbreak_loading']:
+                    # Cleanup all checkpoints - INCLUDING prompt_generation!
+                    for operation in ['prompt_generation', 'response_collection', 'labeling', 'wildjailbreak_loading']:
                         checkpoint_manager = CheckpointManager(
                             checkpoint_dir=data_checkpoints_path,
                             operation_name=operation,
                             auto_cleanup=False
                         )
                         deleted = checkpoint_manager.delete_all_checkpoints(confirm=True)
+                        if deleted > 0:
+                            print(f"   ✓ Deleted {deleted} {operation} checkpoint(s)")
                     return (False, 1)
                 else:
                     print("   Cancelled. Please select another option.")
