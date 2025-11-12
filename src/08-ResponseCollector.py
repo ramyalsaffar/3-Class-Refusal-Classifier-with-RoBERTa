@@ -573,7 +573,7 @@ class ResponseCollector:
         response = self.openai_client.chat.completions.create(
             model=API_CONFIG['response_models']['gpt5'],
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=self.max_completion_tokens,
+            max_completion_tokens=self.max_completion_tokens,  # GPT-5 uses max_completion_tokens!
             temperature=API_CONFIG['temperature_response']
         )
         
