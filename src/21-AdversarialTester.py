@@ -747,7 +747,7 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
         Returns:
             Dictionary with paired t-test results per dimension
         """
-        true_labels = sample_df['label'].values
+        true_labels = sample_df['refusal_label'].values
         results = {}
         
         # Paired t-test for each dimension
@@ -945,7 +945,7 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
         
         dataset = ClassificationDataset(
             df['response'].tolist(),
-            df['label'].tolist(),
+            df['refusal_label'].tolist(),
             self.tokenizer
         )
         loader = DataLoader(
