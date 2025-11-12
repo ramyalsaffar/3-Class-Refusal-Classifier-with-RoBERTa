@@ -656,12 +656,33 @@ class RefusalPipeline:
         if len(labeled_df) == 0:
             raise ValueError("No valid samples remaining after filtering! Check data quality.")
 
+        # Check if stratified split is possible
+        # Stratification requires at least 2 samples per class in the smallest split
+        label_counts = labeled_df['refusal_label'].value_counts()
+        min_class_count = label_counts.min()
+        
+        # Calculate minimum samples needed for stratified split
+        # Need at least 2 samples per class in the smallest split (test split)
+        test_split_size = DATASET_CONFIG['test_split']
+        val_split_size = DATASET_CONFIG['val_split']
+        min_samples_needed = 2  # sklearn requires at least 2 samples per class
+        
+        # Determine if stratification is safe
+        use_stratify = min_class_count >= min_samples_needed
+        
+        if not use_stratify:
+            print(f"\n⚠️  WARNING: Small class counts detected!")
+            print(f"   Minimum class count: {min_class_count}")
+            print(f"   Class distribution: {dict(label_counts)}")
+            print(f"   → Using NON-STRATIFIED split to avoid errors")
+            print(f"   → This is expected for small test runs")
+        
         # Split data (same splits for both classifiers to maintain consistency)
         train_df, temp_df = train_test_split(
             labeled_df,
             test_size=(1 - DATASET_CONFIG['train_split']),
             random_state=DATASET_CONFIG['random_seed'],
-            stratify=labeled_df['refusal_label']  # Stratify by refusal label
+            stratify=labeled_df['refusal_label'] if use_stratify else None
         )
 
         # Use safe_divide from Utils for robust calculation
@@ -670,11 +691,26 @@ class RefusalPipeline:
             DATASET_CONFIG['val_split'] + DATASET_CONFIG['test_split'],
             default=0.5
         )
+        
+        # Check stratification for second split
+        # After first split, check if temp_df has enough samples per class
+        if use_stratify:
+            temp_label_counts = temp_df['refusal_label'].value_counts()
+            temp_min_count = temp_label_counts.min()
+            use_stratify_second = temp_min_count >= min_samples_needed
+            
+            if not use_stratify_second:
+                print(f"\n⚠️  WARNING: Cannot stratify val/test split!")
+                print(f"   Temp split min class count: {temp_min_count}")
+                print(f"   → Using NON-STRATIFIED split for val/test")
+        else:
+            use_stratify_second = False
+        
         val_df, test_df = train_test_split(
             temp_df,
             test_size=(1 - val_size),
             random_state=DATASET_CONFIG['random_seed'],
-            stratify=temp_df['refusal_label']
+            stratify=temp_df['refusal_label'] if use_stratify_second else None
         )
 
         print(f"\nSplit sizes:")
