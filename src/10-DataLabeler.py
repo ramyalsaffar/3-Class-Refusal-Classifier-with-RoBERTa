@@ -247,7 +247,7 @@ class DataLabeler:
             labeled_df = responses_df.copy()
             labeled_df['refusal_label'] = None
             labeled_df['is_jailbreak_attempt'] = None  # NEW column
-            labeled_df['jailbreak_success'] = None     # Renamed from jailbreak_label
+            labeled_df['jailbreak_label'] = None       # Jailbreak success label (0=Failed, 1=Succeeded, -1=Error)
             labeled_df['refusal_confidence'] = None
             labeled_df['jailbreak_confidence'] = None
             completed_count = 0
@@ -293,7 +293,7 @@ class DataLabeler:
                         idx = result['index']
                         labeled_df.at[idx, 'refusal_label'] = result['refusal_label']
                         labeled_df.at[idx, 'is_jailbreak_attempt'] = result['is_jailbreak_attempt']
-                        labeled_df.at[idx, 'jailbreak_success'] = result['jailbreak_success']
+                        labeled_df.at[idx, 'jailbreak_label'] = result['jailbreak_success']  # Store as 'jailbreak_label' column
                         labeled_df.at[idx, 'refusal_confidence'] = result['refusal_confidence']
                         labeled_df.at[idx, 'jailbreak_confidence'] = result['jailbreak_confidence']
                         
