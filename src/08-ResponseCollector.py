@@ -559,7 +559,7 @@ class ResponseCollector:
         """Query Claude Sonnet 4.5."""
         response = self.anthropic_client.messages.create(
             model=API_CONFIG['response_models']['claude'],
-            max_tokens=self.max_tokens,
+            max_tokens=self.max_completion_tokens,
             temperature=API_CONFIG['temperature_response'],
             messages=[{"role": "user", "content": prompt}]
         )
@@ -573,7 +573,7 @@ class ResponseCollector:
         response = self.openai_client.chat.completions.create(
             model=API_CONFIG['response_models']['gpt5'],
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=self.max_tokens,
+            max_tokens=self.max_completion_tokens,
             temperature=API_CONFIG['temperature_response']
         )
         
@@ -584,7 +584,7 @@ class ResponseCollector:
     def _query_gemini(self, prompt: str) -> str:
         """Query Gemini 2.5."""
         generation_config = genai.types.GenerationConfig(
-            max_output_tokens=self.max_tokens,
+            max_output_tokens=self.max_completion_tokens,
             temperature=API_CONFIG['temperature_response']
         )
         
