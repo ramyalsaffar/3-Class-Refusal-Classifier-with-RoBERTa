@@ -91,7 +91,7 @@ JAILBREAK_CONFIG = {
 #-----------------------
 TRAINING_CONFIG = {
     'batch_size': 16,                           # Batch size (reduce if OOM)
-    'epochs': 5,                                # Number of training epochs
+    'epochs': 3,                                # Number of training epochs
     'learning_rate': 2e-5,                      # Learning rate (AdamW)
     'warmup_steps': 100,                        # Warmup steps for LR scheduler
     'weight_decay': 0.01,                       # Weight decay (L2 regularization)
@@ -242,7 +242,7 @@ CHECKPOINT_CONFIG = {
     # Cleanup Settings
     'auto_cleanup': True,                       # Auto-delete old checkpoints
     'keep_last_n': 2,                           # Keep only last N checkpoints
-    'max_checkpoint_age_hours': 48,             # Delete checkpoints older than N hours
+    'max_checkpoint_age_hours': 100,             # Delete checkpoints older than N hours
 }
 
 
@@ -580,7 +580,7 @@ PRODUCTION_CONFIG = {
         'trigger_on_drift': True,                   # Trigger if drift detected
         'retain_historical_samples': True,          # Prevent catastrophic forgetting
         'freeze_layers': 4,                         # Transfer learning (freeze bottom layers) - less than initial for adaptation
-        'max_epochs': 5,                            # Max training epochs
+        'max_epochs': 3,                            # Max training epochs
         'early_stopping_patience': 2,               # Early stopping patience
         'min_training_samples': 100,                # Minimum samples required for retraining
         'lr_multiplier': 0.5,                       # Learning rate multiplier vs initial training (lower for fine-tuning)
