@@ -42,9 +42,12 @@ if __name__ == "__main__":
 
             try:
                 with KeepAwake():
+                    print(f"\n🔍 DEBUG [--test mode]: start_step = {start_step}")
                     if start_step == 1:
+                        print("🔍 DEBUG [--test mode]: Calling run_full_pipeline()")
                         runner.pipeline.run_full_pipeline()
                     else:
+                        print(f"🔍 DEBUG [--test mode]: Calling run_partial_pipeline(start_step={start_step})")
                         runner.pipeline.run_partial_pipeline(start_step=start_step)
                 DATASET_CONFIG['total_prompts'] = original_total_prompts
                 runner.train_with_cross_validation()
@@ -61,9 +64,12 @@ if __name__ == "__main__":
             runner.pipeline = RefusalPipeline(api_keys, resume_from_checkpoint=resume_from_checkpoint)
 
             with KeepAwake():
+                print(f"\n🔍 DEBUG [--full mode]: start_step = {start_step}")
                 if start_step == 1:
+                    print("🔍 DEBUG [--full mode]: Calling run_full_pipeline()")
                     runner.pipeline.run_full_pipeline()
                 else:
+                    print(f"🔍 DEBUG [--full mode]: Calling run_partial_pipeline(start_step={start_step})")
                     runner.pipeline.run_partial_pipeline(start_step=start_step)
             runner.train_with_cross_validation()
 
@@ -132,11 +138,14 @@ if __name__ == "__main__":
             try:
                 with KeepAwake():
                     # Run data collection pipeline
+                    print(f"\n🔍 DEBUG [interactive quick test]: start_step = {start_step}")
                     if start_step == 1:
+                        print("🔍 DEBUG [interactive quick test]: Calling run_full_pipeline()")
                         runner.pipeline.run_full_pipeline()
                     else:
+                        print(f"🔍 DEBUG [interactive quick test]: Calling run_partial_pipeline(start_step={start_step})")
                         runner.pipeline.run_partial_pipeline(start_step=start_step)
-                    
+
                 # Restore original config before CV
                 DATASET_CONFIG['total_prompts'] = original_total_prompts
                 
@@ -179,12 +188,12 @@ if __name__ == "__main__":
 
             with KeepAwake():
                 # Run data collection pipeline
-                print(f"\n🔍 DEBUG: start_step = {start_step}")
+                print(f"\n🔍 DEBUG [interactive full experiment]: start_step = {start_step}")
                 if start_step == 1:
-                    print("🔍 DEBUG: Calling run_full_pipeline()")
+                    print("🔍 DEBUG [interactive full experiment]: Calling run_full_pipeline()")
                     runner.pipeline.run_full_pipeline()
                 else:
-                    print(f"🔍 DEBUG: Calling run_partial_pipeline(start_step={start_step})")
+                    print(f"🔍 DEBUG [interactive full experiment]: Calling run_partial_pipeline(start_step={start_step})")
                     runner.pipeline.run_partial_pipeline(start_step=start_step)
             
             # Run Phase 2 cross-validation with hypothesis testing
