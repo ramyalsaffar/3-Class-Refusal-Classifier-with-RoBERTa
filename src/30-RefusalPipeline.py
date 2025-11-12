@@ -808,7 +808,7 @@ class RefusalPipeline:
 
         # Load the trained model into self.refusal_model for later use
         self.refusal_model = RefusalClassifier(num_classes=len(CLASS_NAMES))
-        checkpoint = torch.load(cv_results['final_model_path'], map_location=DEVICE)
+        checkpoint = safe_load_checkpoint(cv_results['final_model_path'], DEVICE)
         self.refusal_model.load_state_dict(checkpoint['model_state_dict'])
         self.refusal_model = self.refusal_model.to(DEVICE)
         self.refusal_model.eval()
@@ -1077,7 +1077,7 @@ class RefusalPipeline:
 
         # Load the trained model into self.jailbreak_model for later use
         self.jailbreak_model = JailbreakDetector(num_classes=len(JAILBREAK_CLASS_NAMES))
-        checkpoint = torch.load(cv_results['final_model_path'], map_location=DEVICE)
+        checkpoint = safe_load_checkpoint(cv_results['final_model_path'], DEVICE)
         self.jailbreak_model.load_state_dict(checkpoint['model_state_dict'])
         self.jailbreak_model = self.jailbreak_model.to(DEVICE)
         self.jailbreak_model.eval()
