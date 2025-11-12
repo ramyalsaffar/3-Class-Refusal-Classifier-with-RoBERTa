@@ -186,8 +186,6 @@ class RefusalPipeline:
                 8: Run Analyses
                 9: Generate Visualizations
         """
-        print(f"\n🔍 DEBUG [RefusalPipeline.run_partial_pipeline]: METHOD CALLED with start_step={start_step}")
-
         # Generate single timestamp for this run
         self.run_timestamp = get_timestamp('file')
 
@@ -256,8 +254,6 @@ class RefusalPipeline:
 
     def run_full_pipeline(self):
         """Execute complete pipeline from start to finish."""
-        print("\n🔍 DEBUG [RefusalPipeline.run_full_pipeline]: METHOD CALLED")
-
         # Generate single timestamp for this entire run
         self.run_timestamp = get_timestamp('file')
 
