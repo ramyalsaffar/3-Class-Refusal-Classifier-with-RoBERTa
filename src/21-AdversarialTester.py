@@ -744,11 +744,6 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
         Returns:
             Dictionary with paired t-test results per dimension
         """
-        try:
-        except ImportError:
-            print("⚠️  scipy not available - skipping hypothesis tests")
-            return {'error': 'scipy not available'}
-        
         true_labels = sample_df['label'].values
         results = {}
         
