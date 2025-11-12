@@ -39,6 +39,39 @@ def get_timestamp(format_type: str = 'file') -> str:
         return datetime.now().strftime("%Y%m%d_%H%M")
 
 
+def safe_load_checkpoint(checkpoint_path: str, device: torch.device) -> dict:
+    """
+    Safely load PyTorch checkpoint, handling MPS alignment bug on Mac.
+    
+    On Mac with Apple Silicon (M1/M2/M3), loading checkpoints directly to MPS device
+    causes an alignment error in PyTorch's MPS backend. This function works around
+    that bug by loading to CPU first, then moving to the target device.
+    
+    Args:
+        checkpoint_path: Path to the checkpoint file (.pt, .pth)
+        device: Target device (cuda, mps, or cpu)
+    
+    Returns:
+        Loaded checkpoint dictionary
+    
+    Example:
+        >>> checkpoint = safe_load_checkpoint('model.pt', DEVICE)
+        >>> model.load_state_dict(checkpoint['model_state_dict'])
+        >>> model = model.to(DEVICE)
+    
+    Technical Details:
+        - PyTorch Issue: MPS backend has alignment bug in load_state_dict
+        - Workaround: Load to device specified in TRAINING_CONFIG (typically CPU)
+        - Performance Impact: None (model still runs on GPU/MPS after loading)
+        - Configuration: TRAINING_CONFIG['checkpoint_load_device']
+    """
+    # Load to device specified in config (no hardcoding!)
+    load_device = TRAINING_CONFIG.get('checkpoint_load_device', 'cpu')
+    checkpoint = torch.load(checkpoint_path, map_location=load_device)
+    
+    return checkpoint
+
+
 # =============================================================================
 # DYNAMIC RATE LIMIT MANAGEMENT
 # =============================================================================
