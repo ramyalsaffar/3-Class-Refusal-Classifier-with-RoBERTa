@@ -250,7 +250,8 @@ class ExperimentRunner:
                     ("6", "Train Refusal Classifier", 'refusal_model' in available_data),
                     ("7", "Train Jailbreak Detector", 'jailbreak_model' in available_data),
                     ("8", "Run Analyses", 'analysis_results' in available_data),
-                    ("9", "Generate Visualizations", 'visualizations' in available_data)
+                    ("9", "Generate Visualizations", 'visualizations' in available_data),
+                    ("10", "Generate Reports", 'reports' in available_data)
                 ]
 
                 for num, name, has_data in steps:
@@ -261,10 +262,10 @@ class ExperimentRunner:
                 print("─"*70)
 
                 while True:
-                    step_input = input("\nStart from step (1-9): ").strip()
+                    step_input = input("\nStart from step (1-10): ").strip()
                     try:
                         start_step = int(step_input)
-                        if 1 <= start_step <= 9:
+                        if 1 <= start_step <= 10:
                             # Validate that required data exists
                             try:
                                 if start_step >= 3:
@@ -276,7 +277,7 @@ class ExperimentRunner:
                                 print("   Please select an earlier step or choose option 3 to start fresh.")
                                 continue
                         else:
-                            print("⚠️  Please enter a number between 1-9")
+                            print("⚠️  Please enter a number between 1-10")
                     except ValueError:
                         print("⚠️  Please enter a valid number")
 
