@@ -574,18 +574,38 @@ Output ONLY a JSON array of {{num}} strings."""
             return prompts
             
         except Exception as e:
-            if "429" in str(e) or "rate" in str(e).lower():
+            # Extract error details
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            if "429" in error_msg or "rate" in error_msg.lower():
                 self.stats['rate_limit_hits'] += 1
                 self.rate_limiter.hit_rate_limit()
-                print(f"⚠️  Rate limit hit, adjusting: {self.rate_limiter.get_settings()}")
+                print(f"\n⚠️  RATE LIMIT HIT - GPT-4o Prompt Generation")
+                print(f"   Error: {error_type}: {error_msg[:200]}")
+                print(f"   Adjusting: {self.rate_limiter.get_settings()}")
                 time.sleep(self.rate_limiter.delay * 2)  # Extra wait for rate limit
                 return self._call_gpt4_generate(template, num_prompts, retry_count + 1, max_retries)
             
             if retry_count >= max_retries:
-                print(f"❌ Generation failed after {max_retries} retries: {e}")
+                print(f"\n❌ GENERATION FAILED - GPT-4o Prompt Generation")
+                print(f"   Model: {self.model}")
+                print(f"   Attempts: {max_retries + 1}")
+                print(f"   Error Type: {error_type}")
+                print(f"   Error Message: {error_msg}")
+                print(f"   Requested prompts: {num_prompts}")
+                if hasattr(e, '__traceback__'):
+                    print(f"   Traceback snippet:")
+                    tb_lines = traceback.format_exc().split('\n')
+                    for line in tb_lines[-6:]:  # Last 6 lines of traceback
+                        if line.strip():
+                            print(f"      {line}")
                 return []  # Return empty list instead of raising
             
-            print(f"⚠️  Generation attempt {retry_count + 1}/{max_retries + 1} failed: {e}")
+            print(f"\n⚠️  GENERATION ATTEMPT {retry_count + 1}/{max_retries + 1} FAILED")
+            print(f"   Model: {self.model}")
+            print(f"   Error: {error_type}: {error_msg[:200]}")
+            print(f"   Retrying in {self.rate_limiter.delay}s...")
             time.sleep(self.rate_limiter.delay)
             return self._call_gpt4_generate(template, num_prompts, retry_count + 1, max_retries)
 
@@ -737,8 +757,23 @@ Be HARSH but FAIR - we want VERY human-like prompts."""
             return results
             
         except Exception as e:
-            print(f"⚠️  Evaluation failed: {e}")
+            error_type = type(e).__name__
+            error_msg = str(e)
+            
+            print(f"\n❌ EVALUATION FAILED - GPT-3.5-turbo Quality Check")
+            print(f"   Model: {self.human_like_eval_model}")
+            print(f"   Prompts to evaluate: {len(prompts)}")
+            print(f"   Error Type: {error_type}")
+            print(f"   Error Message: {error_msg[:300]}")
+            if hasattr(e, '__traceback__'):
+                print(f"   Traceback snippet:")
+                tb_lines = traceback.format_exc().split('\n')
+                for line in tb_lines[-6:]:  # Last 6 lines of traceback
+                    if line.strip():
+                        print(f"      {line}")
+            
             # Return all as passed to not block pipeline
+            print(f"   ⚠️  Fail-open: Marking all {len(prompts)} prompts as PASSED (quality check skipped)")
             return [
                 {
                     'prompt_index': i,
