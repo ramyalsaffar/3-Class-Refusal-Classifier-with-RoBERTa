@@ -41,7 +41,6 @@ API_CONFIG = {
     'max_tokens_response': 4096,                # For LLM responses (increased for GPT-5 reasoning tokens)
 
     # Rate Limiting & Retries
-    'rate_limit_delay': 0.2,                    # Seconds between API calls (reduced for speed)
     'max_retries': 5,                           # Max retries for failed API calls
     'rate_limit_backoff': 60,                   # Seconds to wait when hitting rate limits (429 errors)
 
