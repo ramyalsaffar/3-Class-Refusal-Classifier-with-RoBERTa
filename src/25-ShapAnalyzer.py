@@ -271,8 +271,36 @@ class ShapAnalyzer:
                     class_name = self.class_names[class_idx]
 
                     plt.figure(figsize=(12, 8))
+                    
+                    # FIX: Handle different SHAP value structures
+                    shap_values_obj = shap_data['shap_values']
+                    
+                    # Check if it's a SHAP Explanation object
+                    if hasattr(shap_values_obj, 'values'):
+                        # Standard SHAP Explanation object
+                        shap_array = shap_values_obj.values
+                    elif isinstance(shap_values_obj, np.ndarray):
+                        # Already a numpy array
+                        shap_array = shap_values_obj
+                    elif isinstance(shap_values_obj, list):
+                        # Convert list to numpy array
+                        shap_array = np.array(shap_values_obj)
+                    else:
+                        # Unknown structure - try to convert
+                        shap_array = np.array(shap_values_obj)
+                    
+                    # Handle different dimensionality
+                    if len(shap_array.shape) == 3:
+                        # Shape: (samples, features, classes)
+                        class_shap_values = shap_array[:, :, class_idx]
+                    elif len(shap_array.shape) == 2:
+                        # Shape: (samples, features) - binary classification or single class
+                        class_shap_values = shap_array
+                    else:
+                        raise ValueError(f"Unexpected SHAP values shape: {shap_array.shape}")
+                    
                     shap.summary_plot(
-                        shap_data['shap_values'].values[:, :, class_idx],
+                        class_shap_values,
                         texts,
                         show=False,
                         max_display=max_display
@@ -340,7 +368,27 @@ class ShapAnalyzer:
             class_idx = np.argmax(probs)
 
         # Get SHAP values for this class
-        shap_vals = shap_data['shap_values'].values[0, :, class_idx]
+        # FIX: Handle different SHAP value structures robustly
+        shap_values_obj = shap_data['shap_values']
+        
+        if hasattr(shap_values_obj, 'values'):
+            shap_array = shap_values_obj.values
+        elif isinstance(shap_values_obj, np.ndarray):
+            shap_array = shap_values_obj
+        elif isinstance(shap_values_obj, list):
+            shap_array = np.array(shap_values_obj)
+        else:
+            shap_array = np.array(shap_values_obj)
+        
+        # Handle different dimensionality
+        if len(shap_array.shape) == 3:
+            # Shape: (samples, features, classes)
+            shap_vals = shap_array[0, :, class_idx]
+        elif len(shap_array.shape) == 2:
+            # Shape: (samples, features) - binary or single class
+            shap_vals = shap_array[0, :]
+        else:
+            raise ValueError(f"Unexpected SHAP values shape: {shap_array.shape}")
 
         # PROPER TOKENIZATION: Use actual RoBERTa tokenizer
         encoding = self.tokenizer(
