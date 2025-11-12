@@ -273,17 +273,7 @@ class ResponseCollector:
                                     }
                                 )
                                 last_checkpoint_count = current_completed
-                                
-                                # Memory management: Keep only recent results in all_results
-                                # This prevents unbounded memory growth
-                                keep_recent = CHECKPOINT_CONFIG['collection_checkpoint_every'] * 2
-                                if len(all_results) > keep_recent:
-                                    # Keep only most recent results for error recovery
-                                    all_results[:] = all_results[-keep_recent:]
-                                    if EXPERIMENT_CONFIG.get('verbose', True):
-                                        print(f"\n💾 Checkpoint saved: {len(responses_df):,} responses (trimmed memory)")
-                                else:
-                                    print(f"\n💾 Checkpoint saved: {len(responses_df):,} responses")
+                                print(f"\n💾 Checkpoint saved: {len(responses_df):,} responses")
         
         finally:
             # Cleanup: Shutdown all model-specific executors
@@ -294,11 +284,19 @@ class ResponseCollector:
                         print(f"  ✓ {get_model_display_name(model_key)} executor shutdown")
                 except Exception as e:
                     print(f"  ⚠️  Error shutting down {model_key} executor: {e}")
-        
-        # Final DataFrame
+
+        # Final DataFrame - build from any remaining results not yet in responses_df
         if all_results:
-            responses_df = pd.DataFrame(all_results)
-        
+            new_results_start = len(responses_df) if not responses_df.empty else 0
+            if new_results_start < len(all_results):
+                new_results = all_results[new_results_start:]
+                if new_results:
+                    new_df = pd.DataFrame(new_results)
+                    if responses_df.empty:
+                        responses_df = new_df
+                    else:
+                        responses_df = pd.concat([responses_df, new_df], ignore_index=True)
+
         # Final checkpoint - ALWAYS save at completion (force=True)
         rate_limiter_states = {k: v.get_settings() for k, v in self.model_rate_limiters.items()}
         self.checkpoint_manager.save_checkpoint(
