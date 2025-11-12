@@ -69,8 +69,6 @@ class DatasetValidator:
         if sum(class_counts) == 0:
             print("❌ ERROR: Total samples is zero")
             return {'error': 'No samples'}
-        
-        from scipy.stats import chisquare
 
         num_classes = len(class_counts)
         total_samples = sum(class_counts)
@@ -212,8 +210,6 @@ class DatasetValidator:
                 'reject_null': True,
                 'sample_size': len(data)
             }
-        
-        from scipy.stats import shapiro
 
         print_banner(f"SHAPIRO-WILK NORMALITY TEST: {data_name}", width=60)
         

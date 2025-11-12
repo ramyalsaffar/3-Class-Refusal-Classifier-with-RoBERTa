@@ -28,7 +28,6 @@ class ShapAnalyzer:
         
         # Check shap availability once at initialization
         try:
-            import shap
             self.shap_available = True
         except ImportError:
             self.shap_available = False
@@ -103,7 +102,6 @@ class ShapAnalyzer:
             print("❌ SHAP not installed. Install with: pip install shap")
             return None
         
-        import shap  # Import here since it's checked at init
 
         print_banner("COMPUTING SHAP VALUES", width=60, char="=")
 
@@ -169,7 +167,6 @@ class ShapAnalyzer:
             print("❌ SHAP not installed")
             return
         
-        import shap  # Import here since it's checked at init
 
         # Find the text in shap_data
         text_idx = shap_data['texts'].index(text) if text in shap_data['texts'] else 0
@@ -265,7 +262,6 @@ class ShapAnalyzer:
         if not self.shap_available:
             print("⚠️  SHAP not available - skipping summary plot")
         else:
-            import shap  # Import here since it's checked at init
             print("\nCreating SHAP summary plot...")
 
             try:
@@ -331,7 +327,6 @@ class ShapAnalyzer:
             print("❌ SHAP not installed")
             return None
         
-        import shap  # Import here since it's checked at init
 
         # Compute SHAP values
         shap_data = self.compute_shap_values([text])

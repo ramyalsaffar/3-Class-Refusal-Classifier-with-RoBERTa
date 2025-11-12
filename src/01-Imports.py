@@ -23,6 +23,8 @@ import getpass
 import atexit
 import asyncio
 import threading
+import argparse
+import traceback
 #from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional, Any, Union
@@ -52,7 +54,8 @@ from sklearn.metrics import (
 )
 
 # Statistical Testing
-from scipy.stats import chisquare, chi2_contingency, shapiro
+from scipy.stats import chisquare, chi2_contingency, shapiro, kstest, chi2
+from scipy import stats as scipy_stats
 
 # Deep Learning
 import torch
@@ -74,10 +77,12 @@ from transformers import (
 #warnings.filterwarnings('ignore', category=FutureWarning)  # Only suppress specific warnings
 
 # WildJailBreak dataset
+import datasets
 from datasets import load_dataset
 
 # Visualization
 import matplotlib.pyplot as plt
+from matplotlib import image as mpimg
 import seaborn as sns
 
 # PDF Report Generation (optional - only needed for report generation)
@@ -103,6 +108,22 @@ from openai import OpenAI
 from anthropic import Anthropic
 import google.generativeai as genai
 import tiktoken  # Token counting for API usage tracking
+
+# Environment variables
+try:
+    from dotenv import load_dotenv
+    DOTENV_AVAILABLE = True
+except ImportError:
+    DOTENV_AVAILABLE = False
+    print("ℹ️  python-dotenv not available")
+
+# SHAP (optional - for interpretability)
+try:
+    import shap
+    SHAP_AVAILABLE = True
+except ImportError:
+    SHAP_AVAILABLE = False
+    print("ℹ️  shap not available - interpretability features disabled")
 
 # AWS (optional - only needed for cloud deployment)
 try:

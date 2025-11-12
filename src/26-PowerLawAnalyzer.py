@@ -530,7 +530,6 @@ class PowerLawAnalyzer:
         # Calculate p-value using scipy's KS test
         # We compare against uniform distribution transformed by power law
         try:
-            from scipy.stats import kstest
             # Transform data to test against power law
             transformed = (data_positive / x_min) ** exponent
             ks_result = kstest(transformed, 'uniform')
@@ -619,7 +618,6 @@ class PowerLawAnalyzer:
         df = valid_bins.sum() - 1
         
         # Calculate p-value using scipy
-        from scipy.stats import chi2
         p_value = 1 - chi2.cdf(chi2_statistic, df)
         
         # Interpretation

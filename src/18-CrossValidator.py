@@ -404,7 +404,6 @@ class CrossValidator:
                 sample_std = np.std(values_array, ddof=1)  # Use sample std
                 
                 # t-distribution for small samples
-                from scipy import stats as scipy_stats
                 t_score = scipy_stats.t.ppf((1 + confidence_level) / 2, degrees_freedom)
                 margin_error = t_score * sample_std / np.sqrt(len(values))
                 
@@ -436,7 +435,6 @@ class CrossValidator:
     
     def _test_significance(self) -> Dict:
         """Test statistical significance of results."""
-        from scipy import stats as scipy_stats
         
         significance_results = {}
         

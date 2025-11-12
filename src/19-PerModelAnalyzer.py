@@ -197,7 +197,6 @@ class PerModelAnalyzer:
                                    labels: np.ndarray,
                                    confidences: np.ndarray) -> Dict:
         """Calculate metrics with confidence intervals using bootstrap."""
-        from scipy import stats as scipy_stats
         
         # Basic metrics
         accuracy = accuracy_score(labels, preds)
@@ -249,7 +248,6 @@ class PerModelAnalyzer:
     def _compare_models_statistically(self, all_model_preds: Dict,
                                      model_results: Dict) -> Dict:
         """Perform statistical tests between models."""
-        from scipy import stats as scipy_stats
         
         comparisons = {}
         model_names = list(all_model_preds.keys())

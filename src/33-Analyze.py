@@ -19,7 +19,6 @@
 
 def parse_arguments():
     """Parse command line arguments."""
-    import argparse
 
     parser = argparse.ArgumentParser(
         description='Analyze trained Refusal Classifier and Jailbreak Detector models',
@@ -133,8 +132,6 @@ def _generate_reports(analysis_results: Dict, report_type: str):
     report_generator = ReportGenerator(class_names=CLASS_NAMES)
 
     # Load visualization figures
-    import matplotlib.pyplot as plt
-    from matplotlib import image as mpimg
 
     if report_type in ['performance', 'all']:
         print("\n📊 Generating Performance Report...")

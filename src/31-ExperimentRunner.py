@@ -119,7 +119,6 @@ class ExperimentRunner:
 
         # Try loading from .env file
         try:
-            from dotenv import load_dotenv
             load_dotenv()
             print("✓ Checking .env file...")
         except (ImportError, FileNotFoundError):
@@ -731,7 +730,6 @@ class ExperimentRunner:
         print(f"✓ Saved structured results to: {analysis_results_path}")
 
         # Also save confusion matrix figure data for reports
-        import matplotlib.pyplot as plt
         cm = confusion_matrix(labels, preds)
         cm_fig = plt.figure(figsize=(10, 8))
         visualizer.plot_confusion_matrix(cm, None)  # Plot but don't save yet

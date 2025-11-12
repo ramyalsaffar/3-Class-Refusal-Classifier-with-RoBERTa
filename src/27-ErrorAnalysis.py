@@ -155,7 +155,6 @@ class ErrorAnalyzer:
         """
         print_banner("MODULE 1: CONFUSION MATRIX DEEP DIVE", width=60)
 
-        from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
         # Calculate confusion matrix
         cm = confusion_matrix(self.true_labels, self.predictions)
@@ -254,7 +253,6 @@ class ErrorAnalyzer:
         """
         print_banner("MODULE 2: PER-CLASS PERFORMANCE BREAKDOWN", width=60)
 
-        from sklearn.metrics import precision_recall_fscore_support, classification_report
 
         # Calculate per-class metrics
         precision, recall, f1, support = precision_recall_fscore_support(

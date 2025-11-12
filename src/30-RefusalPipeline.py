@@ -795,7 +795,6 @@ class RefusalPipeline:
         try:
             # Check if datasets library is installed
             try:
-                import datasets
                 print(f"  ✓ 'datasets' library found (version {datasets.__version__})")
             except ImportError:
                 raise ImportError(
@@ -880,7 +879,6 @@ class RefusalPipeline:
             print(f"  - Threshold required: {threshold}")
             print(f"  - Shortfall: {samples_needed} samples")
             print(f"\nFull traceback:")
-            import traceback
             traceback.print_exc()
             print(f"\n{'='*60}")
             print(f"SOLUTION: Fix the WildJailbreak loading error above")

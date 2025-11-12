@@ -315,7 +315,6 @@ class ConfidenceAnalyzer:
     def _perform_statistical_tests(self, preds: np.ndarray, labels: np.ndarray,
                                   confidences: np.ndarray) -> Dict:
         """Perform statistical tests on confidence scores."""
-        from scipy import stats as scipy_stats
         
         correct = preds == labels
         correct_confidences = confidences[correct]

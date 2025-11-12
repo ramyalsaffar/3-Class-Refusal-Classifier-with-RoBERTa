@@ -77,8 +77,8 @@ class WildJailbreakLoader:
             
             # Check for datasets library
             try:
-                from datasets import load_dataset
-            except ImportError:
+                load_dataset  # Already imported from 01-Imports.py
+            except NameError:
                 print("❌ ERROR: 'datasets' library not installed")
                 print("   Install with: pip install datasets")
                 return False

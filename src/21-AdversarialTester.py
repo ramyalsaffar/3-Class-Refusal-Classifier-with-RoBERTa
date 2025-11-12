@@ -745,7 +745,6 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
             Dictionary with paired t-test results per dimension
         """
         try:
-            from scipy import stats as scipy_stats
         except ImportError:
             print("⚠️  scipy not available - skipping hypothesis tests")
             return {'error': 'scipy not available'}
@@ -945,7 +944,6 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
         Returns:
             F1 score, or (F1 score, predictions) if return_predictions=True
         """
-        from sklearn.metrics import f1_score
         
         dataset = ClassificationDataset(
             df['response'].tolist(),

@@ -419,7 +419,6 @@ def ensure_dir_exists(path: str) -> None:
     Args:
         path: Directory path to check/create
     """
-    import os
     os.makedirs(path, exist_ok=True)
 
 
@@ -435,7 +434,6 @@ def count_tokens(text: str, model: str = "gpt-4o") -> int:
         Approximate token count
     """
     try:
-        import tiktoken
         encoding = tiktoken.encoding_for_model(model)
         return len(encoding.encode(text))
     except:
@@ -476,12 +474,9 @@ def convert_to_serializable(obj):
         Object with all numpy/pandas types converted to native Python types
 
     Examples:
-        >>> import numpy as np
         >>> convert_to_serializable({'a': np.int64(5), 'b': np.bool_(True)})
         {'a': 5, 'b': True}
     """
-    import numpy as np
-
     if isinstance(obj, dict):
         return {k: convert_to_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
