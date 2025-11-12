@@ -100,7 +100,13 @@ TRAINING_CONFIG = {
     'save_best_only': True,                     # Only save best model checkpoint
     'num_workers': 0 if IS_MAC else 4,          # DataLoader workers (0 for Mac, 4 for AWS)
     'pin_memory': DEVICE.type == 'cuda',        # Pin memory only works with CUDA (not MPS/CPU)
-    'device': DEVICE                            # Auto-detected in 02-Setup.py
+    'device': DEVICE,                           # Auto-detected in 02-Setup.py
+    
+    # Checkpoint Loading (MPS Bug Workaround)
+    # IMPORTANT: PyTorch MPS backend has alignment bug when loading checkpoints directly to MPS
+    # Solution: Always load to CPU first, then move to device after load_state_dict()
+    # See: https://github.com/pytorch/pytorch/issues/
+    'checkpoint_load_device': 'cpu'             # Device for torch.load (always 'cpu' to avoid MPS bug)
 }
 
 
