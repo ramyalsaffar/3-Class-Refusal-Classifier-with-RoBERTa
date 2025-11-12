@@ -108,7 +108,7 @@ class PerModelAnalyzer:
             if self.task_type == 'refusal':
                 label_col = 'refusal_label' if 'refusal_label' in model_df.columns else 'label'
             else:
-                label_col = 'jailbreak_success' if 'jailbreak_success' in model_df.columns else 'label'
+                label_col = 'jailbreak_label' if 'jailbreak_label' in model_df.columns else 'label'
             
             # Filter out error labels (-1)
             valid_mask = model_df[label_col] != -1
