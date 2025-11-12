@@ -69,14 +69,16 @@ class AdversarialTester:
             'failed_all_retries': 0,
             'retry_distribution': {}  # {attempt_number: count}
         }
-        
-        # Initialize CheckpointManager for paraphrasing
-        self.checkpoint_manager = CheckpointManager(
-            operation_name='paraphrasing',
-            checkpoint_every=CHECKPOINT_CONFIG.get('paraphrase_checkpoint_every', 50),
-            auto_cleanup=CHECKPOINT_CONFIG.get('auto_cleanup', True)
-        )
-        
+
+        # Initialize CheckpointManagers for each paraphrasing dimension
+        self.checkpoint_managers = {}
+        for dimension in self.dimensions:
+            self.checkpoint_managers[dimension] = CheckpointManager(
+                operation_name=f'paraphrase_{dimension}',
+                checkpoint_every=CHECKPOINT_CONFIG.get('paraphrase_checkpoint_every', 50),
+                auto_cleanup=CHECKPOINT_CONFIG.get('auto_cleanup', True)
+            )
+
         if EXPERIMENT_CONFIG.get('verbose', True):
             print_banner("ADVERSARIAL TESTER INITIALIZED", width=60, char="=")
             print(f"  Paraphrase Model: {self.paraphrase_model}")
@@ -304,15 +306,16 @@ class AdversarialTester:
             F1 score, or (F1 score, predictions) if return_predictions=True
         """
         texts = df['response'].tolist()
-        
+        checkpoint_manager = self.checkpoint_managers[dimension]
+
         # Try to load checkpoint
-        checkpoint_key = f"{dimension}_paraphrases"
-        checkpoint = self.checkpoint_manager.load_latest(checkpoint_key)
-        
+        checkpoint = checkpoint_manager.load_latest_checkpoint()
+
         if checkpoint:
-            print(f"📂 Resuming from checkpoint: {checkpoint['completed_items']}/{len(texts)} completed")
-            paraphrased_texts = checkpoint['data'].get('paraphrased_texts', [None] * len(texts))
-            start_idx = checkpoint['completed_items']
+            checkpoint_df = checkpoint['data']
+            start_idx = checkpoint['last_index'] + 1
+            print(f"📂 Resuming from checkpoint: {start_idx}/{len(texts)} completed")
+            paraphrased_texts = checkpoint_df['paraphrased_text'].tolist()
         else:
             paraphrased_texts = [None] * len(texts)
             start_idx = 0
@@ -340,14 +343,14 @@ class AdversarialTester:
                             paraphrased_texts[idx] = texts[idx]  # Fallback
 
                         pbar.update(1)
-                        
+
                         # Save checkpoint periodically
-                        if self.checkpoint_manager.should_checkpoint(idx):
-                            self.checkpoint_manager.save(
-                                checkpoint_key,
-                                {'paraphrased_texts': paraphrased_texts},
-                                idx
-                            )
+                        if checkpoint_manager.should_checkpoint(idx):
+                            checkpoint_df = pd.DataFrame({
+                                'original_text': texts[:idx+1],
+                                'paraphrased_text': paraphrased_texts[:idx+1]
+                            })
+                            checkpoint_manager.save_checkpoint(checkpoint_df, idx)
 
         else:
             # Sequential processing (original behavior)
@@ -356,21 +359,21 @@ class AdversarialTester:
                 text = texts[idx]
                 paraphrased = self._paraphrase_with_retry(text, dimension)
                 paraphrased_texts[idx] = paraphrased
-                
+
                 # Save checkpoint periodically
-                if self.checkpoint_manager.should_checkpoint(idx):
-                    self.checkpoint_manager.save(
-                        checkpoint_key,
-                        {'paraphrased_texts': paraphrased_texts},
-                        idx
-                    )
+                if checkpoint_manager.should_checkpoint(idx):
+                    checkpoint_df = pd.DataFrame({
+                        'original_text': texts[:idx+1],
+                        'paraphrased_text': paraphrased_texts[:idx+1]
+                    })
+                    checkpoint_manager.save_checkpoint(checkpoint_df, idx)
 
         # Final checkpoint
-        self.checkpoint_manager.save(
-            checkpoint_key,
-            {'paraphrased_texts': paraphrased_texts},
-            len(texts)
-        )
+        checkpoint_df = pd.DataFrame({
+            'original_text': texts,
+            'paraphrased_text': paraphrased_texts
+        })
+        checkpoint_manager.save_checkpoint(checkpoint_df, len(texts) - 1, force=True)
 
         # Create paraphrased dataframe and evaluate
         paraphrased_df = df.copy()
