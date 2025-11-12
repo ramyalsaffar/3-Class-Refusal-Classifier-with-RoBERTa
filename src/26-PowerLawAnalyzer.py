@@ -501,11 +501,11 @@ class PowerLawAnalyzer:
         # Remove zeros and negatives (not valid for power law)
         data_positive = data[data > 0]
         
-        if len(data_positive) < STATISTICAL_CONFIG['min_samples_for_test']:
+        if len(data_positive) < HYPOTHESIS_TESTING_CONFIG['min_samples_for_test']:
             return {
                 'test': 'Kolmogorov-Smirnov',
                 'skipped': True,
-                'reason': f'Insufficient samples (n={len(data_positive)} < {STATISTICAL_CONFIG["min_samples_for_test"]})'
+                'reason': f'Insufficient samples (n={len(data_positive)} < {HYPOTHESIS_TESTING_CONFIG["min_samples_for_test"]})'
             }
         
         # Generate theoretical power law CDF
@@ -541,7 +541,7 @@ class PowerLawAnalyzer:
             use_scipy = False
         
         # Interpretation
-        alpha = STATISTICAL_CONFIG['alpha']
+        alpha = HYPOTHESIS_TESTING_CONFIG['alpha']
         follows_power_law = p_value > alpha
         
         return {
@@ -590,11 +590,11 @@ class PowerLawAnalyzer:
         
         # Check if we have enough samples
         total_samples = counts.sum()
-        if total_samples < STATISTICAL_CONFIG['min_samples_for_test']:
+        if total_samples < HYPOTHESIS_TESTING_CONFIG['min_samples_for_test']:
             return {
                 'test': 'Chi-square',
                 'skipped': True,
-                'reason': f'Insufficient samples (n={total_samples} < {STATISTICAL_CONFIG["min_samples_for_test"]})'
+                'reason': f'Insufficient samples (n={total_samples} < {HYPOTHESIS_TESTING_CONFIG["min_samples_for_test"]})'
             }
         
         # Chi-square test: sum((observed - expected)^2 / expected)
@@ -621,7 +621,7 @@ class PowerLawAnalyzer:
         p_value = 1 - chi2.cdf(chi2_statistic, df)
         
         # Interpretation
-        alpha = STATISTICAL_CONFIG['alpha']
+        alpha = HYPOTHESIS_TESTING_CONFIG['alpha']
         well_calibrated = p_value > alpha
         
         return {
