@@ -355,7 +355,7 @@ class Trainer:
         """
         if model_save_path is None:
             model_save_path = os.path.join(
-                OUTPUT_PATHS['models'], 
+                models_path,
                 f"{EXPERIMENT_CONFIG['experiment_name']}_best.pt"
             )
         

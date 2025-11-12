@@ -119,6 +119,28 @@ class RefusalPipeline:
                 'step': 5
             }
 
+        # Step 6: Trained refusal classifier
+        refusal_model_files = glob.glob(os.path.join(models_path, "*refusal*_best.pt"))
+        if refusal_model_files:
+            latest = max(refusal_model_files, key=os.path.getmtime)
+            available['refusal_model'] = {
+                'path': latest,
+                'basename': os.path.basename(latest),
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 6
+            }
+
+        # Step 7: Trained jailbreak detector
+        jailbreak_model_files = glob.glob(os.path.join(models_path, "*jailbreak*_best.pt"))
+        if jailbreak_model_files:
+            latest = max(jailbreak_model_files, key=os.path.getmtime)
+            available['jailbreak_model'] = {
+                'path': latest,
+                'basename': os.path.basename(latest),
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 7
+            }
+
         return available
 
     def load_data_for_step(self, step: int) -> pd.DataFrame:

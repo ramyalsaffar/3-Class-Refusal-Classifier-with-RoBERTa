@@ -247,8 +247,8 @@ class ExperimentRunner:
                     ("3", "Clean Data", 'cleaned' in available_data),
                     ("4", "Label Data", 'labeled' in available_data),
                     ("5", "Prepare Datasets", 'splits' in available_data),
-                    ("6", "Train Refusal Classifier", False),
-                    ("7", "Train Jailbreak Detector", False),
+                    ("6", "Train Refusal Classifier", 'refusal_model' in available_data),
+                    ("7", "Train Jailbreak Detector", 'jailbreak_model' in available_data),
                     ("8", "Run Analyses", False),
                     ("9", "Generate Visualizations", False)
                 ]
