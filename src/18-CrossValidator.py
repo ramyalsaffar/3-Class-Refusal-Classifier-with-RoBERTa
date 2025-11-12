@@ -229,8 +229,8 @@ class CrossValidator:
 
             # CRITICAL: Clear GPU memory between folds to prevent OOM
             if self.device.type == 'mps':
-                import torch.mps
-                torch.mps.empty_cache()
+                if hasattr(torch, 'mps'):
+                    torch.mps.empty_cache()
                 if self.verbose:
                     print("  🧹 Cleared MPS cache")
             elif self.device.type == 'cuda':
