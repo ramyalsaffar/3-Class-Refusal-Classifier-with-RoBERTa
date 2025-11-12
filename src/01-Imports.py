@@ -172,8 +172,8 @@ data_checkpoints_path = glob.glob(data_path + "*Checkpoints/")[0]
 models_path = glob.glob(base_results_path + "/*Models/")[0]
 
 # Results Subdirectories
-analysis_results_path = glob.glob(base_results_path, "/*Analysis")[0]
-quality_review_path = glob.glob(base_results_path, "/*Quality Review")[0]
+analysis_results_path = glob.glob(base_results_path + "/*Analysis")[0]
+quality_review_path = glob.glob(base_results_path + "/*Quality Review")[0]
 
 # Visualization Subdirectories
 visualizations_path = glob.glob(base_results_path + "/*Visualizations/")[0]
