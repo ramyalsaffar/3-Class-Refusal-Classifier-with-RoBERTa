@@ -52,11 +52,15 @@ class AttentionVisualizer:
 
         # Get predictions and attention weights
         with torch.no_grad():
-            logits, attentions = self.model(
+            result = self.model(
                 input_ids,
                 attention_mask,
                 output_attentions=True
             )
+
+            # Extract from dictionary
+            logits = result['logits']
+            attentions = result['attentions']
 
             # Get prediction
             probs = torch.softmax(logits, dim=1)
