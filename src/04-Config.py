@@ -23,7 +23,7 @@ API_CONFIG = {
     # Response Collection Models (3 models to test)
     'response_models': {
         'claude': 'claude-sonnet-4-5-20250929',
-        'gpt5': 'gpt-5',
+        'gpt5': 'gpt-5-2025-08-07',
         'gemini': 'gemini-2.5-flash'
     },
 
