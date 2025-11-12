@@ -819,7 +819,11 @@ def train_with_cross_validation(full_dataset,
             labels = batch['label']
 
             outputs = model(input_ids, attention_mask)
-            logits = outputs['logits']
+            # Handle both dict and tensor returns
+            if isinstance(outputs, dict):
+                logits = outputs['logits']
+            else:
+                logits = outputs
             probs = torch.softmax(logits, dim=1)
             preds = torch.argmax(logits, dim=1)
 
