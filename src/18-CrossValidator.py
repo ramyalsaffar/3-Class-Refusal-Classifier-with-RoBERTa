@@ -168,18 +168,25 @@ class CrossValidator:
             train_dataset = torch.utils.data.Subset(self.dataset, train_idx)
             val_dataset = torch.utils.data.Subset(self.dataset, val_idx)
             
-            # Create data loaders
+            # Create data loaders with adaptive batch size for MPS
+            # CRITICAL: Reduce batch size on MPS (Apple Silicon) to prevent OOM
+            batch_size = TRAINING_CONFIG['batch_size']
+            if self.device.type == 'mps' and batch_size > 8:
+                batch_size = 8
+                if self.verbose and fold_idx == 1:
+                    print(f"  ⚠️  Reducing batch size to {batch_size} for MPS device")
+
             train_loader = DataLoader(
                 train_dataset,
-                batch_size=TRAINING_CONFIG['batch_size'],
+                batch_size=batch_size,
                 shuffle=True,
                 num_workers=TRAINING_CONFIG['num_workers'],
                 pin_memory=TRAINING_CONFIG.get('pin_memory', True)
             )
-            
+
             val_loader = DataLoader(
                 val_dataset,
-                batch_size=TRAINING_CONFIG['batch_size'],
+                batch_size=batch_size,
                 shuffle=False,
                 num_workers=TRAINING_CONFIG['num_workers'],
                 pin_memory=TRAINING_CONFIG.get('pin_memory', True)
@@ -219,6 +226,17 @@ class CrossValidator:
             if self.verbose:
                 print(f"\n  Fold {fold_idx} completed in {format_time(fold_time)}")
                 print("─" * 60)
+
+            # CRITICAL: Clear GPU memory between folds to prevent OOM
+            if self.device.type == 'mps':
+                import torch.mps
+                torch.mps.empty_cache()
+                if self.verbose:
+                    print("  🧹 Cleared MPS cache")
+            elif self.device.type == 'cuda':
+                torch.cuda.empty_cache()
+                if self.verbose:
+                    print("  🧹 Cleared CUDA cache")
         
         # Calculate statistics across folds
         cv_summary = self._calculate_cv_statistics()
@@ -257,11 +275,20 @@ class CrossValidator:
             weight_decay=TRAINING_CONFIG['weight_decay']
         )
         
-        # Learning rate scheduler
+        # Learning rate scheduler with ADAPTIVE warmup
         num_training_steps = len(train_loader) * TRAINING_CONFIG['epochs']
+
+        # CRITICAL FIX: Warmup should be proportional to dataset size
+        # For small datasets, use fewer warmup steps to avoid killing the learning rate
+        configured_warmup = TRAINING_CONFIG.get('warmup_steps', 500)
+        adaptive_warmup = min(configured_warmup, max(1, int(num_training_steps * 0.1)))
+
+        if self.verbose and configured_warmup != adaptive_warmup:
+            print(f"  ⚠️  Reducing warmup steps from {configured_warmup} to {adaptive_warmup} for small dataset")
+
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=TRAINING_CONFIG.get('warmup_steps', 0),
+            num_warmup_steps=adaptive_warmup,
             num_training_steps=num_training_steps
         )
         
@@ -682,10 +709,16 @@ def train_with_cross_validation(full_dataset,
     print("="*60)
     print(f"  Training on {len(train_val_dataset):,} samples")
 
-    # Create train loader (use all train+val data)
+    # Create train loader (use all train+val data) with adaptive batch size
+    # CRITICAL: Reduce batch size on MPS to prevent OOM
+    batch_size = TRAINING_CONFIG['batch_size']
+    if DEVICE.type == 'mps' and batch_size > 8:
+        batch_size = 8
+        print(f"  ⚠️  Reducing batch size to {batch_size} for MPS device")
+
     train_loader = DataLoader(
         train_val_dataset,
-        batch_size=TRAINING_CONFIG['batch_size'],
+        batch_size=batch_size,
         shuffle=True,
         num_workers=TRAINING_CONFIG['num_workers'],
         pin_memory=TRAINING_CONFIG.get('pin_memory', True)
@@ -725,7 +758,7 @@ def train_with_cross_validation(full_dataset,
     # Create dummy val_loader for Trainer compatibility (no validation during final training)
     val_loader = DataLoader(
         test_dataset,  # Use test set for validation monitoring only
-        batch_size=TRAINING_CONFIG['batch_size'],
+        batch_size=batch_size,  # Use same adaptive batch size
         shuffle=False,
         num_workers=TRAINING_CONFIG['num_workers'],
         pin_memory=TRAINING_CONFIG.get('pin_memory', True)
@@ -769,7 +802,7 @@ def train_with_cross_validation(full_dataset,
     # Evaluate on test set
     test_loader = DataLoader(
         test_dataset,
-        batch_size=TRAINING_CONFIG['batch_size'],
+        batch_size=batch_size,  # Use same adaptive batch size
         shuffle=False,
         num_workers=TRAINING_CONFIG['num_workers'],
         pin_memory=TRAINING_CONFIG.get('pin_memory', True)
