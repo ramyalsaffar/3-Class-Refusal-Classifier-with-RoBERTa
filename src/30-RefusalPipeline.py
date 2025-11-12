@@ -155,7 +155,7 @@ class RefusalPipeline:
 
         # Step 9: Visualizations
         viz_files = glob.glob(os.path.join(visualizations_path, "*.png"))
-        viz_files += glob.glob(os.path.join(visualizations_path, "**/*.png", recursive=True))
+        viz_files += glob.glob(os.path.join(visualizations_path, "**/*.png"), recursive=True)
         if viz_files:
             latest = max(viz_files, key=os.path.getmtime)
             available['visualizations'] = {
