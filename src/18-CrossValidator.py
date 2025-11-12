@@ -626,6 +626,7 @@ def train_with_cross_validation(full_dataset,
 
     # Get all labels for stratification
     all_labels = np.array(full_dataset.labels)
+    all_texts = full_dataset.texts
     all_indices = np.arange(len(full_dataset))
 
     # Stratified split
@@ -636,9 +637,15 @@ def train_with_cross_validation(full_dataset,
         stratify=all_labels
     )
 
-    # Create train+val dataset (for CV) and test dataset
-    train_val_dataset = torch.utils.data.Subset(full_dataset, train_val_idx)
-    test_dataset = torch.utils.data.Subset(full_dataset, test_idx)
+    # Create train+val dataset (for CV) - proper ClassificationDataset, not Subset
+    train_val_texts = [all_texts[i] for i in train_val_idx]
+    train_val_labels = [all_labels[i] for i in train_val_idx]
+    train_val_dataset = ClassificationDataset(train_val_texts, train_val_labels, full_dataset.tokenizer)
+
+    # Create test dataset - proper ClassificationDataset, not Subset
+    test_texts = [all_texts[i] for i in test_idx]
+    test_labels = all_labels[test_idx].tolist()
+    test_dataset = ClassificationDataset(test_texts, test_labels, full_dataset.tokenizer)
 
     print(f"  Train+Val: {len(train_val_dataset):,} ({len(train_val_dataset)/len(full_dataset):.1%})")
     print(f"  Test: {len(test_dataset):,} ({len(test_dataset)/len(full_dataset):.1%})")
