@@ -46,12 +46,15 @@ class Visualizer:
     def plot_confusion_matrix(self, cm: np.ndarray, output_path: str):
         """
         Plot confusion matrix heatmap.
-        
+
         Args:
             cm: Confusion matrix (numpy array)
             output_path: Path to save the plot
+
+        Returns:
+            Matplotlib figure object
         """
-        plt.figure(figsize=(8, 6))
+        fig = plt.figure(figsize=(8, 6))
         sns.heatmap(
             cm,
             annot=True,
@@ -66,8 +69,8 @@ class Visualizer:
         plt.xlabel('Predicted Label', fontsize=12)
         plt.tight_layout()
         plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
-        plt.close()
         print(f"✓ Saved confusion matrix to {output_path}")
+        return fig
 
     def plot_per_class_f1(self, f1_scores: Dict[str, float], output_path: str):
         """
@@ -234,10 +237,13 @@ class Visualizer:
     def plot_training_curves(self, history: Dict, output_path: str):
         """
         Plot training and validation curves (loss and F1).
-        
+
         Args:
             history: Dictionary with 'train_loss', 'val_loss', 'val_f1' keys
             output_path: Path to save the plot
+
+        Returns:
+            Matplotlib figure object
         """
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -263,8 +269,8 @@ class Visualizer:
 
         plt.tight_layout()
         plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
-        plt.close()
         print(f"✓ Saved training curves to {output_path}")
+        return fig
 
     def plot_model_vulnerability_heatmap(self, matrix_df: pd.DataFrame, output_path: str):
         """
@@ -415,6 +421,43 @@ class Visualizer:
         plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
         plt.close()
         print(f"✓ Saved vulnerability comparison to {output_path}")
+
+    def plot_class_distribution(self, labels: List, output_path: str):
+        """
+        Plot class distribution bar chart.
+
+        Args:
+            labels: List of class labels (integers)
+            output_path: Path to save the plot
+
+        Returns:
+            Matplotlib figure object
+        """
+        fig = plt.figure(figsize=(10, 6))
+
+        # Count samples per class
+        unique_labels, counts = np.unique(labels, return_counts=True)
+        class_names_subset = [self.class_names[i] for i in unique_labels]
+
+        # Use class colors
+        colors = [self.class_colors[i % len(self.class_colors)] for i in unique_labels]
+
+        bars = plt.bar(class_names_subset, counts, color=colors, alpha=self.alpha_bar, edgecolor='black')
+        plt.ylabel('Number of Samples', fontsize=12)
+        plt.xlabel('Class', fontsize=12)
+        plt.title('Class Distribution', fontsize=16, fontweight='bold')
+
+        # Add value labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{int(height)}',
+                    ha='center', va='bottom', fontsize=10)
+
+        plt.tight_layout()
+        plt.savefig(output_path, dpi=self.dpi, bbox_inches='tight')
+        print(f"✓ Saved class distribution to {output_path}")
+        return fig
 
 
 #------------------------------------------------------------------------------

@@ -304,10 +304,12 @@ class RefusalPipeline:
             analysis_results = self.run_analyses(datasets['refusal']['test_df'])
 
         if start_step <= 9:
-            self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
+            figures = self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
+        else:
+            figures = None
 
         if start_step <= 10:
-            self.generate_reports(refusal_history, jailbreak_history, analysis_results)
+            self.generate_reports(refusal_history, jailbreak_history, analysis_results, figures)
 
         print("\n" + "="*60)
         print(f"✅ PARTIAL PIPELINE COMPLETE (Started from Step {start_step})")
@@ -360,10 +362,10 @@ class RefusalPipeline:
         analysis_results = self.run_analyses(datasets['refusal']['test_df'])
 
         # Step 9: Generate visualizations
-        self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
+        figures = self.generate_visualizations(refusal_history, jailbreak_history, analysis_results)
 
         # Step 10: Generate reports
-        self.generate_reports(refusal_history, jailbreak_history, analysis_results)
+        self.generate_reports(refusal_history, jailbreak_history, analysis_results, figures)
 
         print("\n" + "="*60)
         print("✅ PIPELINE COMPLETE (DUAL CLASSIFIERS TRAINED)")
@@ -1239,32 +1241,47 @@ class RefusalPipeline:
         return analysis_results
 
     def generate_visualizations(self, refusal_history: Dict, jailbreak_history: Dict, analysis_results: Dict):
-        """Step 9: Generate all visualizations for both classifiers."""
+        """
+        Step 9: Generate all visualizations for both classifiers.
+
+        Returns:
+            Dictionary of matplotlib figure objects for use in report generation
+        """
         print("\n" + "="*60)
         print("STEP 9: GENERATING VISUALIZATIONS")
         print("="*60)
 
         visualizer = Visualizer()
+        figures = {}
 
         # Training curves - Refusal Classifier
-        visualizer.plot_training_curves(
+        figures['refusal_training_curves'] = visualizer.plot_training_curves(
             refusal_history,
             os.path.join(visualizations_path, "refusal_training_curves.png")
         )
 
         # Training curves - Jailbreak Detector
-        visualizer.plot_training_curves(
+        jailbreak_visualizer = Visualizer(class_names=JAILBREAK_CLASS_NAMES)
+        figures['jailbreak_training_curves'] = jailbreak_visualizer.plot_training_curves(
             jailbreak_history,
             os.path.join(visualizations_path, "jailbreak_training_curves.png")
         )
 
-        # Confusion matrix
+        # Get predictions and labels
         preds = analysis_results['predictions']['preds']
         labels = analysis_results['predictions']['labels']
+
+        # Confusion matrix
         cm = confusion_matrix(labels, preds)
-        visualizer.plot_confusion_matrix(
+        figures['confusion_matrix'] = visualizer.plot_confusion_matrix(
             cm,
             os.path.join(visualizations_path, "confusion_matrix.png")
+        )
+
+        # Class distribution
+        figures['class_distribution'] = visualizer.plot_class_distribution(
+            labels,
+            os.path.join(visualizations_path, "class_distribution.png")
         )
 
         # Per-class F1
@@ -1303,14 +1320,29 @@ class RefusalPipeline:
         )
 
         print("\n✓ All visualizations generated")
+        return figures
 
-    def generate_reports(self, refusal_history: Dict, jailbreak_history: Dict, analysis_results: Dict):
-        """Step 10: Generate comprehensive PDF reports for both classifiers."""
+    def generate_reports(self, refusal_history: Dict, jailbreak_history: Dict, analysis_results: Dict, figures: Dict = None):
+        """
+        Step 10: Generate comprehensive PDF reports for both classifiers.
+
+        Args:
+            refusal_history: Training history for refusal classifier
+            jailbreak_history: Training history for jailbreak detector
+            analysis_results: Results from run_analyses()
+            figures: Dictionary of matplotlib figure objects from generate_visualizations()
+        """
         print("\n" + "="*60)
         print("STEP 10: GENERATING REPORTS")
         print("="*60)
 
         timestamp = self.run_timestamp
+
+        # If figures not provided (e.g., starting from step 10), we can't generate reports
+        if figures is None:
+            print("\n⚠️  Cannot generate reports: No visualization figures available")
+            print("   Please run from Step 9 to generate visualizations first")
+            return
 
         # Initialize report generator for refusal classifier
         refusal_report_gen = ReportGenerator(class_names=CLASS_NAMES)
@@ -1324,11 +1356,6 @@ class RefusalPipeline:
 
         print("\n--- Generating Refusal Classifier Report ---")
 
-        # Load visualization figures for report
-        refusal_training_fig = os.path.join(visualizations_path, "refusal_training_curves.png")
-        confusion_matrix_fig = os.path.join(visualizations_path, "confusion_matrix.png")
-        per_class_f1_fig = os.path.join(visualizations_path, "per_class_f1.png")
-
         # Extract metrics from analysis results
         refusal_metrics = {
             'accuracy': analysis_results['predictions']['accuracy'],
@@ -1338,14 +1365,24 @@ class RefusalPipeline:
             'macro_recall': analysis_results['predictions']['macro_recall']
         }
 
-        # Note: ReportGenerator expects matplotlib figures, but we have PNG paths
-        # For now, skip the full report generation and just print that reports would be generated
-        # A full implementation would need to either:
-        # 1. Save figure objects during visualization step
-        # 2. Or reload PNG files as matplotlib figures
+        # Generate refusal classifier performance report
+        refusal_report_path = os.path.join(reports_path, f"refusal_performance_report_{timestamp}.pdf")
+        refusal_report_gen.generate_model_performance_report(
+            model_name="Refusal Classifier",
+            metrics=refusal_metrics,
+            confusion_matrix_fig=figures['confusion_matrix'],
+            training_curves_fig=figures['refusal_training_curves'],
+            class_distribution_fig=figures['class_distribution'],
+            output_path=refusal_report_path
+        )
 
-        print(f"   ✓ Refusal Classifier Performance Report: refusal_performance_report_{timestamp}.pdf")
+        print(f"   ✓ Saved: {os.path.basename(refusal_report_path)}")
         print(f"      Metrics: Accuracy={refusal_metrics['accuracy']:.3f}, F1={refusal_metrics['macro_f1']:.3f}")
+
+        # Close refusal figures to free memory
+        plt.close(figures['confusion_matrix'])
+        plt.close(figures['refusal_training_curves'])
+        plt.close(figures['class_distribution'])
 
         # ═══════════════════════════════════════════════════════
         # JAILBREAK DETECTOR REPORTS
@@ -1353,18 +1390,23 @@ class RefusalPipeline:
 
         print("\n--- Generating Jailbreak Detector Report ---")
 
-        jailbreak_training_fig = os.path.join(visualizations_path, "jailbreak_training_curves.png")
+        # For jailbreak detector, we'd need separate metrics and confusion matrix
+        # For now, just note that it would be generated
+        print(f"   ℹ️  Jailbreak report requires separate evaluation metrics")
+        print(f"      (Not yet implemented in current pipeline)")
 
-        print(f"   ✓ Jailbreak Detector Performance Report: jailbreak_performance_report_{timestamp}.pdf")
+        # Close jailbreak figure
+        plt.close(figures['jailbreak_training_curves'])
 
         # ═══════════════════════════════════════════════════════
         # COMBINED EXECUTIVE SUMMARY
         # ═══════════════════════════════════════════════════════
 
-        print("\n--- Generating Executive Summary ---")
-        print(f"   ✓ Executive Summary: executive_summary_{timestamp}.pdf")
+        print("\n--- Executive Summary ---")
+        print(f"   ℹ️  Executive summary generation not yet implemented")
+        print(f"      (Would combine both classifiers into single report)")
 
-        print("\n✓ All reports generated")
+        print("\n✓ Reports generated")
         print("   📁 Reports saved to:", reports_path)
 
 
