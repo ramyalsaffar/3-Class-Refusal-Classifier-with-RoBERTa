@@ -43,7 +43,7 @@ class LabelingQualityAnalyzer:
         Args:
             labeled_df: DataFrame with columns:
                 - refusal_label, refusal_confidence
-                - is_jailbreak_attempt, jailbreak_success, jailbreak_confidence
+                - is_jailbreak_attempt, jailbreak_label, jailbreak_confidence
                 - model (LLM that generated response)
                 - category (prompt category)
         
@@ -97,27 +97,27 @@ class LabelingQualityAnalyzer:
         
         # Filter out error labels
         valid_refusal = df[df['refusal_label'] != -1]
-        valid_jailbreak = df[df['jailbreak_success'] != -1]  # Using new field name
-        
+        valid_jailbreak = df[df['jailbreak_label'] != -1]
+
         # Calculate statistics safely
         results = {
             'refusal': self._calculate_confidence_stats(
-                valid_refusal['refusal_confidence'], 
+                valid_refusal['refusal_confidence'],
                 'Refusal'
             ),
             'jailbreak': self._calculate_confidence_stats(
-                valid_jailbreak['jailbreak_confidence'], 
+                valid_jailbreak['jailbreak_confidence'],
                 'Jailbreak'
             )
         }
-        
+
         # Track error rates
         refusal_error_rate = safe_divide(
-            (df['refusal_label'] == -1).sum(), 
+            (df['refusal_label'] == -1).sum(),
             len(df), 0
         ) * 100
         jailbreak_error_rate = safe_divide(
-            (df['jailbreak_success'] == -1).sum(), 
+            (df['jailbreak_label'] == -1).sum(),
             len(df), 0
         ) * 100
         
@@ -174,7 +174,7 @@ class LabelingQualityAnalyzer:
         # Among attempts, how many succeeded?
         attempts_df = df[df['is_jailbreak_attempt'] == 1]
         if len(attempts_df) > 0:
-            successes = (attempts_df['jailbreak_success'] == 1).sum()
+            successes = (attempts_df['jailbreak_label'] == 1).sum()
             success_rate = safe_divide(successes, len(attempts_df), 0) * 100
         else:
             successes = 0
@@ -327,7 +327,7 @@ class LabelingQualityAnalyzer:
                 'category': row.get('category', 'unknown'),
                 'refusal_label': int(row['refusal_label']),
                 'refusal_confidence': float(row['refusal_confidence']),
-                'jailbreak_success': int(row.get('jailbreak_success', -1)),
+                'jailbreak_label': int(row.get('jailbreak_label', -1)),
                 'jailbreak_confidence': float(row['jailbreak_confidence']),
                 'is_jailbreak_attempt': int(row.get('is_jailbreak_attempt', 0))
             })
@@ -341,13 +341,13 @@ class LabelingQualityAnalyzer:
         """Analyze agreement between refusal and jailbreak labeling."""
         if self.verbose:
             print_banner("Task Agreement Analysis", char="─")
-        
-        valid_df = df[(df['refusal_label'] != -1) & (df['jailbreak_success'] != -1)]
-        
+
+        valid_df = df[(df['refusal_label'] != -1) & (df['jailbreak_label'] != -1)]
+
         # Confidence correlation
         correlation = valid_df['refusal_confidence'].corr(valid_df['jailbreak_confidence'])
-        
-        
+
+
         alpha = HYPOTHESIS_TESTING_CONFIG.get('alpha', 0.05)
         n = len(valid_df)
         if n > 3:  # Need at least 4 samples
@@ -358,21 +358,21 @@ class LabelingQualityAnalyzer:
         else:
             p_value = 1.0
             correlation_significant = False
-            
-        
-        
-        
+
+
+
+
         # Logical consistency checks
         # No refusal (0) but jailbreak succeeded (1) - expected for successful jailbreaks
         no_refusal_jb_success = len(valid_df[
-            (valid_df['refusal_label'] == 0) & 
-            (valid_df['jailbreak_success'] == 1)
+            (valid_df['refusal_label'] == 0) &
+            (valid_df['jailbreak_label'] == 1)
         ])
-        
+
         # Refusal (1 or 2) but jailbreak succeeded (1) - inconsistent!
         refusal_but_jb_success = len(valid_df[
-            (valid_df['refusal_label'].isin([1, 2])) & 
-            (valid_df['jailbreak_success'] == 1)
+            (valid_df['refusal_label'].isin([1, 2])) &
+            (valid_df['jailbreak_label'] == 1)
         ])
         
         results = {
@@ -401,13 +401,13 @@ class LabelingQualityAnalyzer:
         if 'refusal_label' in df.columns:
             refusal_dist = df['refusal_label'].value_counts().to_dict()
             results['refusal'] = {
-                self.class_names.get(k, f'Label_{k}'): v 
+                (self.class_names[k] if 0 <= k < len(self.class_names) else f'Label_{k}'): v
                 for k, v in refusal_dist.items()
             }
         
         # Jailbreak distribution
-        if 'jailbreak_success' in df.columns:
-            jb_dist = df['jailbreak_success'].value_counts().to_dict()
+        if 'jailbreak_label' in df.columns:
+            jb_dist = df['jailbreak_label'].value_counts().to_dict()
             results['jailbreak'] = {
                 'Failed': jb_dist.get(0, 0),
                 'Succeeded': jb_dist.get(1, 0),
@@ -458,7 +458,7 @@ class LabelingQualityAnalyzer:
         export_cols = [
             'prompt', 'response', 'model', 'category',
             'refusal_label', 'refusal_confidence',
-            'is_jailbreak_attempt', 'jailbreak_success', 'jailbreak_confidence'
+            'is_jailbreak_attempt', 'jailbreak_label', 'jailbreak_confidence'
         ]
         export_cols = [col for col in export_cols if col in low_both.columns]
         
