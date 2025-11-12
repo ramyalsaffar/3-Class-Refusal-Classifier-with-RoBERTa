@@ -179,9 +179,12 @@ if __name__ == "__main__":
 
             with KeepAwake():
                 # Run data collection pipeline
+                print(f"\n🔍 DEBUG: start_step = {start_step}")
                 if start_step == 1:
+                    print("🔍 DEBUG: Calling run_full_pipeline()")
                     runner.pipeline.run_full_pipeline()
                 else:
+                    print(f"🔍 DEBUG: Calling run_partial_pipeline(start_step={start_step})")
                     runner.pipeline.run_partial_pipeline(start_step=start_step)
             
             # Run Phase 2 cross-validation with hypothesis testing
