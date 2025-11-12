@@ -1004,17 +1004,12 @@ class RefusalPipeline:
         # Confidence analysis
         print("\n--- Confidence Analysis ---")
         confidence_analyzer = ConfidenceAnalyzer(self.refusal_model, self.tokenizer, DEVICE)
-        conf_results, preds, labels, confidences = confidence_analyzer.analyze(test_df)
+        conf_results = confidence_analyzer.analyze(test_df)
         confidence_analyzer.save_results(
             conf_results,
             os.path.join(analysis_results_path, f"confidence_analysis_{timestamp}.json")
         )
         analysis_results['confidence'] = conf_results
-        analysis_results['predictions'] = {
-            'preds': preds,
-            'labels': labels,
-            'confidences': confidences
-        }
 
         # Adversarial testing
         print("\n--- Adversarial Testing ---")
