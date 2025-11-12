@@ -141,6 +141,30 @@ class RefusalPipeline:
                 'step': 7
             }
 
+        # Step 8: Analysis results
+        analysis_files = glob.glob(os.path.join(analysis_results_path, "*_analysis_*.json"))
+        analysis_files += glob.glob(os.path.join(analysis_results_path, "*_testing_*.json"))
+        if analysis_files:
+            latest = max(analysis_files, key=os.path.getmtime)
+            available['analysis_results'] = {
+                'path': latest,
+                'basename': f"{len(analysis_files)} analysis files",
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 8
+            }
+
+        # Step 9: Visualizations
+        viz_files = glob.glob(os.path.join(visualizations_path, "*.png"))
+        viz_files += glob.glob(os.path.join(visualizations_path, "**/*.png", recursive=True))
+        if viz_files:
+            latest = max(viz_files, key=os.path.getmtime)
+            available['visualizations'] = {
+                'path': latest,
+                'basename': f"{len(viz_files)} visualization files",
+                'age_hours': (time.time() - os.path.getmtime(latest)) / 3600,
+                'step': 9
+            }
+
         return available
 
     def load_data_for_step(self, step: int) -> pd.DataFrame:

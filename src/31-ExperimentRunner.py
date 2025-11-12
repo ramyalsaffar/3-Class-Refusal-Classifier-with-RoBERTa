@@ -249,8 +249,8 @@ class ExperimentRunner:
                     ("5", "Prepare Datasets", 'splits' in available_data),
                     ("6", "Train Refusal Classifier", 'refusal_model' in available_data),
                     ("7", "Train Jailbreak Detector", 'jailbreak_model' in available_data),
-                    ("8", "Run Analyses", False),
-                    ("9", "Generate Visualizations", False)
+                    ("8", "Run Analyses", 'analysis_results' in available_data),
+                    ("9", "Generate Visualizations", 'visualizations' in available_data)
                 ]
 
                 for num, name, has_data in steps:
