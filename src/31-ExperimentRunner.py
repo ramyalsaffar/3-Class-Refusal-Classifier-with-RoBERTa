@@ -474,7 +474,7 @@ class ExperimentRunner:
 
         # Validate test data has required columns
         # WHY: Ensure test data contains both refusal and jailbreak labels for dual-task analysis
-        required_columns = ['response', 'refusal_label', 'is_jailbreak_attempt', 'jailbreak_success']
+        required_columns = ['response', 'refusal_label', 'is_jailbreak_attempt', 'jailbreak_label']
         missing_columns = [col for col in required_columns if col not in test_df.columns]
         if missing_columns:
             print(f"❌ Error: Test data missing required columns: {missing_columns}")
@@ -526,7 +526,7 @@ class ExperimentRunner:
         per_model_results = per_model_analyzer.analyze(test_df)
         per_model_analyzer.save_results(
             per_model_results,
-            os.path.join(results_path, "per_model_analysis.json")
+            os.path.join(analysis_results_path, "per_model_analysis.json")
         )
         analysis_results['per_model'] = per_model_results
 
@@ -536,7 +536,7 @@ class ExperimentRunner:
         conf_results, preds, labels, confidences = confidence_analyzer.analyze(test_df)
         confidence_analyzer.save_results(
             conf_results,
-            os.path.join(results_path, "confidence_analysis.json")
+            os.path.join(analysis_results_path, "confidence_analysis.json")
         )
         analysis_results['confidence'] = conf_results
         analysis_results['predictions'] = {
@@ -562,7 +562,7 @@ class ExperimentRunner:
         adv_results = adversarial_tester.test_robustness(test_df)
         adversarial_tester.save_results(
             adv_results,
-            os.path.join(results_path, "adversarial_testing.json")
+            os.path.join(analysis_results_path, "adversarial_testing.json")
         )
         analysis_results['adversarial'] = adv_results
 
@@ -612,7 +612,7 @@ class ExperimentRunner:
         jailbreak_results = jailbreak_analyzer.analyze_full(test_df)
         jailbreak_analyzer.save_results(
             jailbreak_results,
-            os.path.join(results_path, "jailbreak_analysis.json")
+            os.path.join(analysis_results_path, "jailbreak_analysis.json")
         )
         analysis_results['jailbreak'] = jailbreak_results
 
@@ -638,12 +638,12 @@ class ExperimentRunner:
             jailbreak_labels=jailbreak_results['predictions']['labels'],
             texts=test_df['response'].tolist(),
             refusal_class_names=CLASS_NAMES,
-            jailbreak_class_names=jailbreak_class_names
+            jailbreak_class_names=JAILBREAK_CLASS_NAMES
         )
-        correlation_results = correlation_analyzer.analyze_full()
+        correlation_results = correlation_analyzer.run_full_analysis()
         correlation_analyzer.save_results(
             correlation_results,
-            os.path.join(results_path, "correlation_analysis.pkl")
+            os.path.join(analysis_results_path, "correlation_analysis.pkl")
         )
         correlation_analyzer.visualize_correlation(output_dir=visualizations_path)
         analysis_results['correlation'] = correlation_results
@@ -725,10 +725,10 @@ class ExperimentRunner:
         }
 
         # Save as JSON
-        analysis_results_path = os.path.join(results_path, "analysis_results_structured.json")
-        with open(analysis_results_path, 'w') as f:
+        structured_results_path = os.path.join(analysis_results_path, "analysis_results_structured.json")
+        with open(structured_results_path, 'w') as f:
             json.dump(serializable_results, f, indent=2)
-        print(f"✓ Saved structured results to: {analysis_results_path}")
+        print(f"✓ Saved structured results to: {structured_results_path}")
 
         # Also save confusion matrix figure data for reports
         cm = confusion_matrix(labels, preds)
@@ -835,7 +835,7 @@ class ExperimentRunner:
 
         # Prepare jailbreak dataset
         jailbreak_texts = labeled_df['response'].tolist()
-        jailbreak_labels = labeled_df['jailbreak_success'].tolist()  # NEW: Uses jailbreak_success (0=Failed, 1=Succeeded)
+        jailbreak_labels = labeled_df['jailbreak_label'].tolist()  # NEW: Uses jailbreak_label (0=Failed, 1=Succeeded)
         jailbreak_dataset = ClassificationDataset(jailbreak_texts, jailbreak_labels, tokenizer)
 
         # Step 1: Hypothesis testing on jailbreak dataset
@@ -958,7 +958,7 @@ class ExperimentRunner:
         print(f"   Jailbreak failure cases: {len(jailbreak_error_results.get('failure_cases', []))}")
 
         print(f"\n✅ All results saved to:")
-        print(f"   - {results_path}")
+        print(f"   - {analysis_results_path}")
         print(f"   - {visualizations_path}")
         print(f"   - {models_path}")
 
