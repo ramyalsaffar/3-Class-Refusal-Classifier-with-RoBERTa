@@ -62,38 +62,37 @@ JAILBREAK_CLASS_NAMES = ['Jailbreak Failed', 'Jailbreak Succeeded']
 #
 # 1. 'is_jailbreak_attempt' (binary flag)
 #    - Purpose: Identifies if a prompt is attempting a jailbreak
-#    - Values: 0 = not a jailbreak attempt, 1 = is a jailbreak attempt  
+#    - Values: 0 = not a jailbreak attempt, 1 = is a jailbreak attempt
 #    - Used by: DataLabeler to flag prompts for jailbreak classification
 #    - Column type: Boolean indicator
 #    - When used: During labeling phase to identify which prompts need jailbreak analysis
 #
-# 2. 'jailbreak_success' (predicted outcome - NEW naming)
-#    - Purpose: Classifier's prediction of jailbreak outcome
-#    - Values: 0 = jailbreak failed, 1 = jailbreak succeeded
-#    - Used by: JailbreakDetector model outputs, training pipeline
-#    - Column type: Predicted label
-#    - When used: Model predictions and training
-#    - Note: Replaces older 'jailbreak_label' column name in DataLabeler outputs
-#
-# 3. 'jailbreak_label' (ground truth - analysis files)
-#    - Purpose: True label for evaluation and analysis
-#    - Values: 0 = jailbreak failed, 1 = jailbreak succeeded
-#    - Used by: Analysis files (JailbreakAnalysis, CorrelationAnalysis, etc.)
+# 2. 'jailbreak_label' (ground truth from judge or dataset)
+#    - Purpose: Ground truth label indicating whether jailbreak succeeded
+#    - Values: 0 = jailbreak failed, 1 = jailbreak succeeded, -1 = error
+#    - Used by: DataLabeler outputs, training datasets, analysis files
+#    - Source: GPT-4 judge labeling OR dataset ground truth
 #    - Column type: Ground truth label
-#    - When used: Model evaluation, performance analysis, statistical testing
+#    - When used: Throughout pipeline for training, evaluation, and analysis
+#    - Note: This is the PRIMARY column name used throughout the codebase
 #
-# Why three columns?
-# - 'is_jailbreak_attempt' = "Is this a jailbreak?" (filtering)
-# - 'jailbreak_success' = "What did the model predict?" (prediction)
-# - 'jailbreak_label' = "What actually happened?" (ground truth)
+# 3. 'jailbreak_success' (ONLY in GPT-4 JSON response)
+#    - Purpose: External API format from GPT-4 judge
+#    - Values: 0 = jailbreak failed, 1 = jailbreak succeeded, -1 = error
+#    - Used by: GPT-4 API JSON response format only
+#    - When used: Internally in DataLabeler when parsing GPT-4 responses
+#    - Note: Immediately mapped to 'jailbreak_label' in Python code (line 527 in DataLabeler)
+#    - This name exists ONLY in the JSON - all Python code uses 'jailbreak_label'
 #
-# Example usage in analysis:
-#   confusion_matrix(y_true=df['jailbreak_label'], y_pred=df['jailbreak_success'])
+# Why this naming?
+# - 'is_jailbreak_attempt' = "Is this a jailbreak attempt?" (filtering)
+# - 'jailbreak_label' = "Did the jailbreak succeed?" (ground truth)
+# - 'jailbreak_success' = External JSON field name only (not used in Python variables)
 #
-# IMPORTANT: Files may use 'jailbreak_label' and 'jailbreak_success' together:
-# - 'jailbreak_label' = ground truth (what actually happened)
-# - 'jailbreak_success' = prediction (what model predicted)
-# This is CORRECT and intentional for model evaluation!
+# IMPORTANT: After DataLabeler processes responses, everything uses 'jailbreak_label'.
+# The 'jailbreak_success' name only appears in:
+#   1. GPT-4's JSON response format
+#   2. Old checkpoint files (handled by backward compatibility in RefusalPipeline line 469-470)
 #
 
 
