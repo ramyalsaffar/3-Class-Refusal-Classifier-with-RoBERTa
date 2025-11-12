@@ -328,13 +328,13 @@ class WildJailbreakLoader:
     def _standardize_format(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Convert WildJailbreak format to pipeline's standardized format.
-        
+
         Expected format:
         - prompt: The jailbreak prompt text
         - response: The model response
         - refusal_label: Classification (from config, not hardcoded!)
         - is_jailbreak_attempt: 1 (these are all jailbreak attempts)
-        - jailbreak_success: 1 (these all succeeded)
+        - jailbreak_label: 1 (these all succeeded)
         - confidence scores: From config
         """
         try:
