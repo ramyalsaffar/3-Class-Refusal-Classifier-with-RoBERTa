@@ -280,9 +280,10 @@ class RefusalPipeline:
         if start_step <= 4:
             labeled_df = self.label_data(cleaned_df)
             labeled_df_augmented = self.prepare_jailbreak_training_data(labeled_df)
-        elif start_step >= 5:
+        else:
+            # Starting from step 5+: Just load the data, NO step 4.5!
             labeled_df = self.load_data_for_step(5)
-            labeled_df_augmented = self.prepare_jailbreak_training_data(labeled_df)
+            labeled_df_augmented = labeled_df  # Use as-is (already processed in previous run)
 
         if start_step <= 5:
             datasets = self.prepare_datasets(labeled_df_augmented)
@@ -346,10 +347,6 @@ class RefusalPipeline:
 
     def run_full_pipeline(self):
         """Execute complete pipeline from start to finish."""
-        # Start timing
-        pipeline_start_time = time.time()
-        start_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
         # Generate single timestamp for this entire run
         self.run_timestamp = get_timestamp('file')
 
@@ -358,8 +355,6 @@ class RefusalPipeline:
         print(f"Run Timestamp: {self.run_timestamp}")
         print(f"Classifier 1: Refusal Classification (3 classes)")
         print(f"Classifier 2: Jailbreak Detection (2 classes)")
-        print("="*60)
-        print(f"🕐 Pipeline Started: {start_timestamp}")
         print("="*60 + "\n")
 
         # Step 1: Generate prompts
@@ -409,29 +404,8 @@ class RefusalPipeline:
         # Step 10: Generate reports
         self.generate_reports(refusal_cv_results, jailbreak_cv_results, analysis_results, figures)
 
-        # End timing
-        pipeline_end_time = time.time()
-        end_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        total_duration = pipeline_end_time - pipeline_start_time
-        
-        # Format duration nicely
-        hours = int(total_duration // 3600)
-        minutes = int((total_duration % 3600) // 60)
-        seconds = int(total_duration % 60)
-        
-        if hours > 0:
-            duration_str = f"{hours}h {minutes}m {seconds}s"
-        elif minutes > 0:
-            duration_str = f"{minutes}m {seconds}s"
-        else:
-            duration_str = f"{seconds}s"
-
         print("\n" + "="*60)
         print("✅ PIPELINE COMPLETE (DUAL CLASSIFIERS TRAINED)")
-        print("="*60)
-        print(f"🕐 Started:  {start_timestamp}")
-        print(f"🕐 Finished: {end_timestamp}")
-        print(f"⏱️  Duration: {duration_str} ({total_duration:.1f} seconds)")
         print("="*60)
 
     def generate_prompts(self) -> Dict[str, List[str]]:
