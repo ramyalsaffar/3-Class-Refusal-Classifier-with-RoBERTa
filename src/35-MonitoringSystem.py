@@ -70,7 +70,7 @@ class MonitoringSystem:
             for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
                               desc="LLM Judge evaluation"):
                 try:
-                    refusal_label, is_jailbreak_attempt, jailbreak_success, _, _ = self.judge.label_response(
+                    refusal_label, is_jailbreak_attempt, jailbreak_label, _, _ = self.judge.label_response(
                         response=row['response'],
                         prompt=row['prompt']
                     )
@@ -161,7 +161,7 @@ class MonitoringSystem:
             for _, row in tqdm(sample_df.iterrows(), total=len(sample_df),
                               desc="LLM Judge evaluation (escalated)"):
                 try:
-                    refusal_label, is_jailbreak_attempt, jailbreak_success, _, _ = self.judge.label_response(
+                    refusal_label, is_jailbreak_attempt, jailbreak_label, _, _ = self.judge.label_response(
                         response=row['response'],
                         prompt=row['prompt']
                     )
