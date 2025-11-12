@@ -51,8 +51,8 @@ class CrossValidator:
         self.dataset = dataset
         
         # Use config values - NO HARDCODING!
-        self.k_folds = k_folds or CROSS_VAL_CONFIG.get('k_folds', 5)
-        self.random_state = random_state or EXPERIMENT_CONFIG.get('random_seed', 42)
+        self.k_folds = k_folds or CROSS_VALIDATION_CONFIG.get('default_folds', 5)
+        self.random_state = random_state or DATASET_CONFIG.get('random_seed', 42)
         self.use_mixed_precision = use_mixed_precision or TRAINING_CONFIG.get('mixed_precision', False)
         self.verbose = EXPERIMENT_CONFIG.get('verbose', True)
         
@@ -215,10 +215,12 @@ class CrossValidator:
             self._store_fold_metrics(fold_idx, fold_metrics)
             
             # Save checkpoint after each fold
+            # Convert fold results to DataFrame for CheckpointManager
+            checkpoint_df = pd.DataFrame(self.fold_results) if self.fold_results else pd.DataFrame()
             self.checkpoint_manager.save_checkpoint(
-                data={'fold_results': self.fold_results, 'cv_metrics': self.cv_metrics},
+                data=checkpoint_df,
                 last_index=fold_idx,
-                metadata={'k_folds': self.k_folds}
+                metadata={'k_folds': self.k_folds, 'cv_metrics': self.cv_metrics}
             )
             
             # Print fold time
@@ -326,8 +328,11 @@ class CrossValidator:
                 input_ids = batch['input_ids'].to(self.device)
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['label'].to(self.device)
-                
-                with torch.amp.autocast('cuda', enabled=self.use_mixed_precision):
+
+                # Device-aware autocast (MPS doesn't support AMP)
+                device_type = 'cuda' if self.device.type == 'cuda' else 'cpu'
+                use_amp = self.use_mixed_precision and self.device.type == 'cuda'
+                with torch.amp.autocast(device_type, enabled=use_amp):
                     logits = model(input_ids, attention_mask)
                     loss = criterion(logits, labels)
                 
@@ -489,10 +494,17 @@ class CrossValidator:
         
         # Test variance across folds (low variance = stable model)
         if self.cv_metrics['f1_macro']:
-            cv_coefficient = np.std(self.cv_metrics['f1_macro']) / np.mean(self.cv_metrics['f1_macro'])
+            mean_f1 = np.mean(self.cv_metrics['f1_macro'])
+            if mean_f1 > 0:
+                cv_coefficient = np.std(self.cv_metrics['f1_macro']) / mean_f1
+                interpretation = 'Stable' if cv_coefficient < 0.1 else 'Variable'
+            else:
+                cv_coefficient = float('inf')
+                interpretation = 'Unstable (zero mean F1)'
+
             significance_results['stability'] = {
                 'cv_coefficient': cv_coefficient,
-                'interpretation': 'Stable' if cv_coefficient < 0.1 else 'Variable'
+                'interpretation': interpretation
             }
         
         return significance_results
@@ -548,7 +560,7 @@ class CrossValidator:
         """Save cross-validation results."""
         if output_path is None:
             output_path = os.path.join(
-                results_path,
+                analysis_results_path,
                 f"{EXPERIMENT_CONFIG['experiment_name']}_cv_results.pkl"
             )
         
@@ -738,7 +750,12 @@ def train_with_cross_validation(full_dataset,
     model.freeze_roberta_layers()
     model = model.to(DEVICE)
 
-    print(f"\n  Trainable parameters: {count_parameters(model):,}")
+    # Count trainable parameters (with fallback if count_parameters not available)
+    if 'count_parameters' in globals():
+        trainable_params = count_parameters(model)
+    else:
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"\n  Trainable parameters: {trainable_params:,}")
 
     # Setup training components
     criterion = get_weighted_criterion(class_counts, DEVICE, class_names=class_names)
