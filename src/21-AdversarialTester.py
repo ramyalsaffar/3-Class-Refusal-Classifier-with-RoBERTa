@@ -961,7 +961,8 @@ IMPORTANT: Return ONLY two numbers separated by comma (e.g., "0,0" or "1,2"). No
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['label'].to(self.device)
 
-                preds, _, _ = self.model.predict_with_confidence(input_ids, attention_mask)
+                result = self.model.predict_with_confidence(input_ids, attention_mask)
+                preds = result['predictions']
 
                 all_preds.extend(preds.cpu().numpy())
                 all_labels.extend(labels.cpu().numpy())
