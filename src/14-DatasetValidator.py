@@ -26,11 +26,11 @@ class DatasetValidator:
 
         Args:
             class_names: List of class names for display
-            alpha: Significance level (default: from STATISTICAL_CONFIG)
+            alpha: Significance level (default: from HYPOTHESIS_TESTING_CONFIG)
         """
         self.class_names = class_names
         # Use config value if not provided - NO HARDCODING!
-        self.alpha = alpha if alpha is not None else STATISTICAL_CONFIG['alpha']
+        self.alpha = alpha if alpha is not None else HYPOTHESIS_TESTING_CONFIG['alpha']
         self.test_results = {}
 
         print_banner("HYPOTHESIS TESTING SETUP", width=60)
@@ -529,14 +529,14 @@ def analyze_class_balance(dataset, task_type: str = 'refusal', alpha: float = No
     Args:
         dataset: Dataset with labels
         task_type: 'refusal' or 'jailbreak'
-        alpha: Significance level (default: from STATISTICAL_CONFIG)
+        alpha: Significance level (default: from HYPOTHESIS_TESTING_CONFIG)
 
     Returns:
         Statistical analysis results
     """
     # Use config value if not provided - NO HARDCODING!
     if alpha is None:
-        alpha = STATISTICAL_CONFIG['alpha']
+        alpha = HYPOTHESIS_TESTING_CONFIG['alpha']
     
     tester = DatasetValidator(alpha=alpha)
     results = tester.analyze_dataset_statistics(dataset, task_type=task_type)
