@@ -223,9 +223,11 @@ class Trainer:
                 input_ids = batch['input_ids'].to(self.device)
                 attention_mask = batch['attention_mask'].to(self.device)
                 labels = batch['label'].to(self.device)
-                
-                # Mixed precision context
-                with torch.amp.autocast('cuda', enabled=self.use_mixed_precision):
+
+                # Device-aware autocast (MPS doesn't support AMP)
+                device_type = 'cuda' if self.device.type == 'cuda' else 'cpu'
+                use_amp = self.use_mixed_precision and self.device.type == 'cuda'
+                with torch.amp.autocast(device_type, enabled=use_amp):
                     # Forward pass
                     logits = self.model(input_ids, attention_mask)
                     loss = self.criterion(logits, labels)
@@ -300,9 +302,11 @@ class Trainer:
                     input_ids = batch['input_ids'].to(self.device)
                     attention_mask = batch['attention_mask'].to(self.device)
                     labels = batch['label'].to(self.device)
-                    
-                    # Forward pass with mixed precision
-                    with torch.amp.autocast('cuda', enabled=self.use_mixed_precision):
+
+                    # Device-aware autocast (MPS doesn't support AMP)
+                    device_type = 'cuda' if self.device.type == 'cuda' else 'cpu'
+                    use_amp = self.use_mixed_precision and self.device.type == 'cuda'
+                    with torch.amp.autocast(device_type, enabled=use_amp):
                         logits = self.model(input_ids, attention_mask)
                         loss = self.criterion(logits, labels)
                     
