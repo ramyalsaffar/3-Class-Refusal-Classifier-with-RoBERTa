@@ -395,8 +395,10 @@ class ExperimentRunner:
         labeled_df = pd.read_pickle(labeled_data_path)
         print(f"✓ Loaded {len(labeled_df)} labeled samples")
 
-        # Get API keys (only need OpenAI for adversarial testing)
-        api_keys = {'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for analysis): ")}
+        # Get API keys (use already-loaded keys from self.api_keys)
+        api_keys = self.api_keys if hasattr(self, 'api_keys') and self.api_keys else {
+            'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for analysis): ")
+        }
 
         # Initialize pipeline
         self.pipeline = RefusalPipeline(api_keys)
@@ -503,8 +505,10 @@ class ExperimentRunner:
         jailbreak_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
         print(f"✓ Jailbreak detector loaded (Best Val F1: {jailbreak_checkpoint['best_val_f1']:.4f})")
 
-        # Get API keys for adversarial testing
-        api_keys = {'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for adversarial): ")}
+        # Get API keys for adversarial testing (use already-loaded keys from self.api_keys)
+        api_keys = self.api_keys if hasattr(self, 'api_keys') and self.api_keys else {
+            'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for adversarial): ")
+        }
 
         # Run analyses
         print("\n" + "="*60)
@@ -556,15 +560,19 @@ class ExperimentRunner:
         )
         analysis_results['power_law'] = power_law_results
 
-        # Adversarial testing
-        print("\n--- Adversarial Testing ---")
-        adversarial_tester = AdversarialTester(refusal_model, tokenizer, DEVICE, api_keys['openai'])
-        adv_results = adversarial_tester.test_robustness(test_df)
-        adversarial_tester.save_results(
-            adv_results,
-            os.path.join(analysis_results_path, "adversarial_testing.json")
-        )
-        analysis_results['adversarial'] = adv_results
+        # Adversarial testing (only if enabled in config)
+        if ADVERSARIAL_CONFIG.get('enabled', False):
+            print("\n--- Adversarial Testing ---")
+            adversarial_tester = AdversarialTester(refusal_model, tokenizer, DEVICE, api_keys['openai'])
+            adv_results = adversarial_tester.test_robustness(test_df)
+            adversarial_tester.save_results(
+                adv_results,
+                os.path.join(analysis_results_path, "adversarial_testing.json")
+            )
+            analysis_results['adversarial'] = adv_results
+        else:
+            print("\n--- Adversarial Testing (Disabled) ---")
+            analysis_results['adversarial'] = None
 
         # Attention visualization
         print("\n--- Attention Visualization ---")
@@ -683,11 +691,12 @@ class ExperimentRunner:
             os.path.join(visualizations_path, "per_model_f1.png")
         )
 
-        # Adversarial robustness
-        visualizer.plot_adversarial_robustness(
-            analysis_results['adversarial'],
-            os.path.join(visualizations_path, "adversarial_robustness.png")
-        )
+        # Adversarial robustness (only if adversarial testing was run)
+        if analysis_results.get('adversarial') is not None:
+            visualizer.plot_adversarial_robustness(
+                analysis_results['adversarial'],
+                os.path.join(visualizations_path, "adversarial_robustness.png")
+            )
 
         # Confidence distributions
         visualizer.plot_confidence_distributions(
