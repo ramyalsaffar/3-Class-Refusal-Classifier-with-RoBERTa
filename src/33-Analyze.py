@@ -336,14 +336,23 @@ def interactive_mode():
 
 if __name__ == "__main__":
 
-    # Parse arguments
+    # Parse arguments (empty when called via exec())
     args = parse_arguments()
 
     # If --auto flag or any arguments provided, use command-line mode
-    if args.auto or args.refusal_model or args.jailbreak_model or args.test_data:
+    # OR if no arguments at all (exec() case), default to auto mode
+    if args.auto or args.refusal_model or args.jailbreak_model or args.test_data or len(sys.argv) == 1:
         print()
         print_banner("📊 REFUSAL CLASSIFIER - ANALYSIS MODE", width=60)
         print()
+
+        # Use predefined paths if not specified
+        if not args.refusal_model:
+            args.refusal_model = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
+        if not args.jailbreak_model:
+            args.jailbreak_model = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
+        if not args.test_data:
+            args.test_data = os.path.join(data_splits_path, 'test.pkl')
 
         # Validate file paths
         if not validate_file_exists(args.refusal_model, "Refusal model"):
@@ -355,13 +364,13 @@ if __name__ == "__main__":
 
         # Show configuration
         print("\nConfiguration:")
-        print(f"  Refusal model: {args.refusal_model or 'default'}")
-        print(f"  Jailbreak model: {args.jailbreak_model or 'default'}")
-        print(f"  Test data: {args.test_data or 'default'}")
+        print(f"  Refusal model: {args.refusal_model}")
+        print(f"  Jailbreak model: {args.jailbreak_model}")
+        print(f"  Test data: {args.test_data}")
         print(f"  Generate report: {'Yes (' + args.report_type + ')' if args.generate_report else 'No'}")
 
         # Notify if custom test data provided
-        if args.test_data:
+        if args.test_data != os.path.join(data_splits_path, 'test.pkl'):
             print(f"\n✓ Using custom test data: {args.test_data}")
 
         # Run analysis
@@ -388,7 +397,7 @@ if __name__ == "__main__":
                 print("   Analysis results are still available in results/ directory")
 
     else:
-        # Interactive mode
+        # Interactive mode (only if explicitly running with -i or --interactive flag)
         interactive_mode()
 
 
