@@ -539,12 +539,43 @@ class ExperimentRunner:
         # Confidence analysis
         print("\n--- Confidence Analysis ---")
         confidence_analyzer = ConfidenceAnalyzer(refusal_model, tokenizer, DEVICE)
-        conf_results, preds, labels, confidences = confidence_analyzer.analyze(test_df)
+        conf_results = confidence_analyzer.analyze(test_df)
         confidence_analyzer.save_results(
             conf_results,
             os.path.join(analysis_results_path, "confidence_analysis.json")
         )
         analysis_results['confidence'] = conf_results
+        
+        # Extract predictions for power law analysis
+        # Need to re-run evaluation to get preds, labels, confidences
+        from torch.utils.data import DataLoader
+        dataset = ClassificationDataset(
+            texts=test_df['response'].tolist(),
+            labels=test_df['refusal_label' if 'refusal_label' in test_df.columns else 'label'].tolist(),
+            tokenizer=tokenizer,
+            task_type='refusal',
+            validate_labels=False
+        )
+        loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=0)
+        
+        # Get predictions
+        refusal_model.eval()
+        preds, labels, confidences = [], [], []
+        with torch.no_grad():
+            for batch in loader:
+                input_ids = batch['input_ids'].to(DEVICE)
+                attention_mask = batch['attention_mask'].to(DEVICE)
+                batch_labels = batch['labels']
+                
+                logits = refusal_model(input_ids, attention_mask)
+                probs = torch.softmax(logits, dim=1)
+                batch_preds = torch.argmax(probs, dim=1).cpu().numpy()
+                batch_confidences = probs.max(dim=1)[0].cpu().numpy()
+                
+                preds.extend(batch_preds)
+                labels.extend(batch_labels.numpy())
+                confidences.extend(batch_confidences)
+        
         analysis_results['predictions'] = {
             'preds': preds,
             'labels': labels,
