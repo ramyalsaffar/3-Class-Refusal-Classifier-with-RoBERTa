@@ -287,16 +287,14 @@ class ExperimentRunner:
                 confirm = input().strip().lower()
                 if confirm in ['y', 'yes']:
                     print("\n✓ Starting fresh (deleting checkpoints...)")
-                    # Cleanup all checkpoints - INCLUDING prompt_generation!
-                    for operation in ['prompt_generation', 'response_collection', 'labeling', 'wildjailbreak_loading']:
+                    # Cleanup all checkpoints
+                    for operation in ['response_collection', 'labeling', 'wildjailbreak_loading']:
                         checkpoint_manager = CheckpointManager(
                             checkpoint_dir=data_checkpoints_path,
                             operation_name=operation,
                             auto_cleanup=False
                         )
                         deleted = checkpoint_manager.delete_all_checkpoints(confirm=True)
-                        if deleted > 0:
-                            print(f"   ✓ Deleted {deleted} {operation} checkpoint(s)")
                     return (False, 1)
                 else:
                     print("   Cancelled. Please select another option.")
@@ -487,19 +485,19 @@ class ExperimentRunner:
         # Initialize tokenizer
         tokenizer = RobertaTokenizer.from_pretrained(MODEL_CONFIG['model_name'])
 
-        # Load refusal classifier
+        # Load refusal classifier (using safe_load_checkpoint for MPS bug workaround)
         print(f"\nLoading refusal classifier from {refusal_model_path}...")
         refusal_model = RefusalClassifier(num_classes=MODEL_CONFIG['num_classes'])
-        refusal_checkpoint = torch.load(refusal_model_path, map_location=DEVICE)
+        refusal_checkpoint = safe_load_checkpoint(refusal_model_path, DEVICE)
         refusal_model.load_state_dict(refusal_checkpoint['model_state_dict'])
         refusal_model = refusal_model.to(DEVICE)
         refusal_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
         print(f"✓ Refusal classifier loaded (Best Val F1: {refusal_checkpoint['best_val_f1']:.4f})")
 
-        # Load jailbreak detector
+        # Load jailbreak detector (using safe_load_checkpoint for MPS bug workaround)
         print(f"\nLoading jailbreak detector from {jailbreak_model_path}...")
         jailbreak_model = JailbreakDetector(num_classes=JAILBREAK_CONFIG['num_classes'])
-        jailbreak_checkpoint = torch.load(jailbreak_model_path, map_location=DEVICE)
+        jailbreak_checkpoint = safe_load_checkpoint(jailbreak_model_path, DEVICE)
         jailbreak_model.load_state_dict(jailbreak_checkpoint['model_state_dict'])
         jailbreak_model = jailbreak_model.to(DEVICE)
         jailbreak_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
