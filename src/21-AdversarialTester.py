@@ -308,17 +308,9 @@ class AdversarialTester:
         texts = df['response'].tolist()
         checkpoint_manager = self.checkpoint_managers[dimension]
 
-        # Try to load checkpoint
-        checkpoint = checkpoint_manager.load_latest_checkpoint()
-
-        if checkpoint:
-            checkpoint_df = checkpoint['data']
-            start_idx = checkpoint['last_index'] + 1
-            print(f"📂 Resuming from checkpoint: {start_idx}/{len(texts)} completed")
-            paraphrased_texts = checkpoint_df['paraphrased_text'].tolist()
-        else:
-            paraphrased_texts = [None] * len(texts)
-            start_idx = 0
+        # Always start fresh - checkpoints are only used for crash recovery within same run
+        paraphrased_texts = [None] * len(texts)
+        start_idx = 0
 
         # Use parallel processing if enabled
         if API_CONFIG.get('use_async', True):
