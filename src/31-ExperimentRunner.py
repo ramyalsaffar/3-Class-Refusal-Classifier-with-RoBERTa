@@ -565,7 +565,7 @@ class ExperimentRunner:
             for batch in loader:
                 input_ids = batch['input_ids'].to(DEVICE)
                 attention_mask = batch['attention_mask'].to(DEVICE)
-                batch_labels = batch['labels']
+                batch_labels = batch['label']  # ← FIXED: 'label' not 'labels'
                 
                 logits = refusal_model(input_ids, attention_mask)
                 probs = torch.softmax(logits, dim=1)
@@ -753,6 +753,7 @@ class ExperimentRunner:
             'shap': analysis_results['shap'],
             'jailbreak': analysis_results['jailbreak'],
             'jailbreak_power_law': analysis_results['jailbreak_power_law'],
+            'correlation': analysis_results['correlation'],  # ← ADDED
             'predictions': {
                 'preds': [int(p) for p in preds],
                 'labels': [int(l) for l in labels],
