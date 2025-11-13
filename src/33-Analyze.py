@@ -347,12 +347,33 @@ if __name__ == "__main__":
         print()
 
         # Use predefined paths if not specified
+        # IMPORTANT: Find LATEST trained model, not current timestamp!
         if not args.refusal_model:
-            args.refusal_model = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
+            # Find latest refusal model
+            refusal_pattern = os.path.join(models_path, "*_refusal_best.pt")
+            refusal_models = sorted(glob.glob(refusal_pattern), key=os.path.getmtime, reverse=True)
+            if refusal_models:
+                args.refusal_model = refusal_models[0]  # Most recent
+            else:
+                args.refusal_model = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_refusal_best.pt")
+        
         if not args.jailbreak_model:
-            args.jailbreak_model = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
+            # Find latest jailbreak model
+            jailbreak_pattern = os.path.join(models_path, "*_jailbreak_best.pt")
+            jailbreak_models = sorted(glob.glob(jailbreak_pattern), key=os.path.getmtime, reverse=True)
+            if jailbreak_models:
+                args.jailbreak_model = jailbreak_models[0]  # Most recent
+            else:
+                args.jailbreak_model = os.path.join(models_path, f"{EXPERIMENT_CONFIG['experiment_name']}_jailbreak_best.pt")
+        
         if not args.test_data:
-            args.test_data = os.path.join(data_splits_path, 'test.pkl')
+            # Find latest test split
+            test_pattern = os.path.join(data_splits_path, 'test*.pkl')
+            test_files = sorted(glob.glob(test_pattern), key=os.path.getmtime, reverse=True)
+            if test_files:
+                args.test_data = test_files[0]  # Most recent
+            else:
+                args.test_data = os.path.join(data_splits_path, 'test.pkl')
 
         # Validate file paths
         if not validate_file_exists(args.refusal_model, "Refusal model"):
