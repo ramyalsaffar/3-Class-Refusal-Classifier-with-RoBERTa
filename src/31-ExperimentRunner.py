@@ -438,6 +438,10 @@ class ExperimentRunner:
         WHY: Allows rerunning analysis with different test sets or on different model checkpoints
         without retraining. Useful for validating model on new data or comparing model versions.
         """
+        # Load API keys if not already loaded
+        if not self.api_keys:
+            self.api_keys = self._get_api_keys()
+        
         self._print_experiment_header(
             "Analysis Only Mode",
             "Loading trained models and running analysis (BOTH classifiers)"
@@ -505,10 +509,8 @@ class ExperimentRunner:
         jailbreak_model.eval()  # WHY: Set to evaluation mode (disables dropout, sets BatchNorm to eval)
         print(f"✓ Jailbreak detector loaded (Best Val F1: {jailbreak_checkpoint['best_val_f1']:.4f})")
 
-        # Get API keys for adversarial testing (use already-loaded keys from self.api_keys)
-        api_keys = self.api_keys if hasattr(self, 'api_keys') and self.api_keys else {
-            'openai': os.getenv('OPENAI_API_KEY') or getpass.getpass("OpenAI API Key (for adversarial): ")
-        }
+        # Get API keys for adversarial testing (use already-loaded keys)
+        api_keys = self.api_keys
 
         # Run analyses
         print("\n" + "="*60)
